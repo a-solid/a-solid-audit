@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Claude Code local settings (contains user-specific paths/perms)
+.claude/settings.local.json
+
+# Logs
+*.log
+
+# Superpowers (local tooling, not part of the project)
+.superpowers/
+docs/superpowers/

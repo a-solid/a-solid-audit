@@ -1,0 +1,1587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>A-Solid Audit Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
+<style>
+  body { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+  [x-cloak] { display: none !important; }
+  *, *::before, *::after { box-sizing: border-box; }
+  @media print {
+    .no-print { display: none !important; }
+    .print-only { display: block !important; }
+    body { background: white; font-size: 10pt; margin: 0; }
+    .print-only { padding: 0; }
+    .print-only section { padding: 16pt 0; page-break-inside: avoid; }
+    .print-only section:not(:last-child) { page-break-after: always; }
+    h1, h2, h3 { page-break-after: avoid; }
+    tr { page-break-inside: avoid; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+    /* Table styling */
+    .print-only table { width: 100%; border-collapse: collapse; }
+    .print-only th, .print-only td { padding: 4pt 6pt; border-bottom: 1px solid #e5e7eb; text-align: left; font-size: 9pt; }
+    .print-only th { font-weight: 600; color: #6b7280; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.05em; }
+    .print-only thead tr { border-bottom: 2px solid #d1d5db; }
+
+    /* Findings table column widths */
+    .print-only .findings-table th:nth-child(1),
+    .print-only .findings-table td:nth-child(1) { width: 15%; }
+    .print-only .findings-table th:nth-child(2),
+    .print-only .findings-table td:nth-child(2) { width: 45%; }
+    .print-only .findings-table th:nth-child(3),
+    .print-only .findings-table td:nth-child(3) { width: 25%; }
+    .print-only .findings-table th:nth-child(4),
+    .print-only .findings-table td:nth-child(4) { width: 15%; }
+
+    /* Word wrapping */
+    .print-only .finding-desc,
+    .print-only td,
+    .print-only th {
+      word-break: break-word;
+      overflow-wrap: break-word;
+      max-width: 100%;
+    }
+
+    /* Page margins */
+    @page { margin: 1cm 1cm; }
+  }
+</style>
+</head>
+<body class="bg-[#FAFAFA] text-[#111827] antialiased" x-data="auditReport" x-init="init()">
+
+  <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:top-1 focus:left-1 focus:z-50 focus:bg-white focus:text-gray-900 focus:px-4 focus:py-2 focus:shadow focus:rounded">Skip to content</a>
+
+  <!-- Fixed Header bar -->
+  <header class="fixed top-0 left-0 right-0 h-[52px] bg-white border-b border-[#F0F0F0] z-30 flex items-center px-4 gap-4 no-print">
+    <!-- Logo -->
+    <span class="font-semibold text-gray-900 text-sm whitespace-nowrap">A-Solid Audit</span>
+
+    <!-- Grade Badge -->
+    <span class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+          :style="'background-color: ' + grade.color"
+          x-text="grade.letter">–</span>
+
+    <!-- Score -->
+    <span class="text-lg font-bold tracking-tight text-gray-900" x-text="avgScore">–</span>
+
+    <!-- Progress bar + count -->
+    <div class="flex items-center gap-2 flex-1 min-w-0">
+      <div class="flex-1 max-w-[120px] h-1.5 bg-gray-100 rounded-full overflow-hidden">
+        <div class="h-full bg-indigo-500 rounded-full transition-all duration-500"
+             :style="'width: ' + ((session?.progress?.reviewed || 0) / (session?.progress?.total || 1) * 100) + '%'"></div>
+      </div>
+      <span class="text-xs text-gray-500 whitespace-nowrap"
+            x-text="(session?.progress?.reviewed || 0) + '/' + (session?.progress?.total || 0) + ' AI reviewed'"></span>
+    </div>
+
+    <!-- Export PDF button -->
+    <button @click="window.print()"
+            class="flex items-center gap-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-150">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/>
+      </svg>
+      Export PDF
+    </button>
+
+    <!-- Saved indicator -->
+    <span x-cloak x-show="lastSaved"
+          x-transition class="text-xs text-green-600 font-medium">Saved ✓</span>
+  </header>
+
+  <!-- Left Panel -->
+  <aside class="fixed top-[52px] left-0 bottom-0 w-[260px] bg-white border-r border-[#F0F0F0] z-20 flex flex-col no-print">
+    <!-- Severity Distribution Bar -->
+    <div class="px-3 pt-3 pb-2">
+      <div class="flex h-1.5 rounded-full overflow-hidden gap-px">
+        <template x-for="s in [
+          {key:'critical', color:'#DC2626'},
+          {key:'major', color:'#EA580C'},
+          {key:'minor', color:'#CA8A04'},
+          {key:'info', color:'#2563EB'},
+          {key:'not-met', color:'#DC2626'},
+          {key:'partially-met', color:'#CA8A04'}
+        ]" :key="s.key">
+          <div :style="'background-color: ' + s.color + '; width: ' + (totalFindings ? (severityCounts[s.key] || 0) / totalFindings * 100 : 0) + '%'"
+               class="min-w-[2px] first:rounded-l-full last:rounded-r-full"
+               :class="(severityCounts[s.key] || 0) === 0 ? 'hidden' : ''"></div>
+        </template>
+      </div>
+    </div>
+
+    <!-- Task List -->
+    <div x-ref="taskList" class="flex-1 overflow-y-auto px-2 py-1 space-y-0.5">
+      <template x-for="task in sortedTasks" :key="task.file">
+        <div @click="openTask(task)"
+             class="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer transition-all duration-150 rounded-r-lg"
+             :class="currentTask?.file === task.file
+               ? 'border-l-[3px] border-l-indigo-500 bg-indigo-50/30 text-indigo-700 font-medium'
+               : 'border-l-[3px] border-l-transparent text-gray-700 hover:bg-gray-50'">
+          <!-- Severity dot -->
+          <span class="w-2 h-2 rounded-full shrink-0"
+                :style="'background-color: ' + severityColor(task)"></span>
+          <!-- Task name (truncated) -->
+          <span class="flex-1 truncate" x-text="task.name || task.file"></span>
+          <!-- Score -->
+          <span class="text-xs font-mono shrink-0"
+                :class="task.status === 'reviewed' ? 'text-gray-700' : 'text-gray-400'"
+                x-text="taskScore(task)"></span>
+          <!-- Review status dot -->
+          <span class="w-1.5 h-1.5 rounded-full shrink-0"
+                :class="humanStatus(task) ? 'bg-green-500' : 'bg-gray-300'"></span>
+        </div>
+      </template>
+
+      <!-- Empty state -->
+      <div x-show="tasks.length === 0" class="px-3 py-8 text-center text-sm text-gray-400">
+        No tasks found
+      </div>
+    </div>
+
+    <!-- Bottom Navigation -->
+    <div class="border-t border-[#F0F0F0] p-2 flex flex-col gap-0.5">
+      <button @click="currentView = 'overview'; currentTask = null"
+              class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-all duration-150 w-full text-left"
+              :class="currentView === 'overview' ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-600 hover:bg-gray-50'">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Overview
+      </button>
+      <button @click="currentView = 'summary'; currentTask = null"
+              class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-all duration-150 w-full text-left"
+              :class="currentView === 'summary' ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-gray-600 hover:bg-gray-50'">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
+        Summary
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content Area -->
+  <main id="main" class="ml-[260px] mt-[52px] min-h-[calc(100vh-52px)] p-6 no-print">
+
+    <!-- Toast -->
+    <div x-show="error" x-transition
+         role="alert"
+         class="fixed top-16 right-4 bg-red-50 text-red-700 border border-red-200 rounded-lg px-4 py-2 text-sm shadow-sm z-40 max-w-sm"
+         x-text="error"></div>
+
+    <!-- Loading State -->
+    <div x-show="loading" class="flex items-center justify-center flex-1 py-20" x-cloak>
+      <div class="flex flex-col items-center gap-3">
+        <div class="animate-spin w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full"></div>
+        <p class="text-sm text-gray-400">Loading audit data...</p>
+      </div>
+    </div>
+
+    <!-- Error state -->
+    <div x-show="error" class="flex items-center justify-center py-20" x-cloak>
+      <div class="text-sm text-red-600 bg-red-50 rounded-lg px-4 py-3" x-text="error"></div>
+    </div>
+
+    <!-- ======================== OVERVIEW VIEW ======================== -->
+    <div x-show="currentView === 'overview' && !loading" x-cloak>
+
+      <!-- Page Title -->
+      <h1 class="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-4">Overview</h1>
+
+      <!-- 1. Top Stats Row — 4 equal cards -->
+      <div class="grid grid-cols-4 gap-3 mb-6">
+        <!-- Grade Card -->
+        <div class="bg-white rounded-xl border border-[#F0F0F0] p-4">
+          <p class="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-1">Grade</p>
+          <p class="text-2xl font-bold tracking-tight" :style="'color: ' + grade.color" x-text="grade.letter">–</p>
+        </div>
+
+        <!-- Score Card -->
+        <div class="bg-white rounded-xl border border-[#F0F0F0] p-4">
+          <p class="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-1">Score</p>
+          <p class="text-2xl font-bold tracking-tight text-gray-900" x-text="avgScore">–</p>
+          <p class="text-xs text-gray-500">avg</p>
+        </div>
+
+        <!-- Reviewed Card -->
+        <div class="bg-white rounded-xl border border-[#F0F0F0] p-4">
+          <p class="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-1">AI Reviewed</p>
+          <p class="text-2xl font-bold tracking-tight text-gray-900"
+             x-text="(session?.progress?.reviewed || 0) + '/' + (session?.progress?.total || 0)">0/0</p>
+          <div class="mt-1 h-1 bg-gray-100 rounded-full overflow-hidden">
+            <div class="h-full bg-indigo-500 rounded-full transition-all duration-500"
+                 :style="'width: ' + (session?.progress?.percentage || 0) + '%'"></div>
+          </div>
+        </div>
+
+        <!-- Findings Card -->
+        <div class="bg-white rounded-xl border border-[#F0F0F0] p-4">
+          <p class="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-1">Findings</p>
+          <p class="text-2xl font-bold tracking-tight text-gray-900" x-text="totalFindings">0</p>
+          <p class="text-xs text-gray-500">total</p>
+        </div>
+      </div>
+
+      <!-- 2. Findings Breakdown Card -->
+      <div class="bg-white rounded-xl border border-[#F0F0F0] p-4 mb-6">
+        <h2 class="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-3">Findings Breakdown</h2>
+
+        <!-- Stacked horizontal bars -->
+        <div class="space-y-1.5 mb-4">
+          <template x-for="s in [
+            {key:'critical', label:'Critical', color:'#DC2626'},
+            {key:'major', label:'Major', color:'#EA580C'},
+            {key:'minor', label:'Minor', color:'#CA8A04'},
+            {key:'info', label:'Info', color:'#2563EB'},
+            {key:'not-met', label:'Not Met', color:'#DC2626'},
+            {key:'partially-met', label:'Partially Met', color:'#CA8A04'}
+          ]" :key="s.key">
+            <div class="flex items-center gap-3" x-show="(severityCounts[s.key] || 0) > 0">
+              <span class="text-xs text-gray-500 w-20 shrink-0 text-right" x-text="s.label"></span>
+              <div class="flex-1 h-4 bg-gray-50 rounded-sm overflow-hidden">
+                <div class="h-full rounded-sm transition-all duration-500"
+                     :style="'background-color: ' + s.color + '; width: ' + (totalFindings ? (severityCounts[s.key] || 0) / totalFindings * 100 : 0) + '%'"></div>
+              </div>
+              <span class="text-xs font-mono text-gray-600 w-6 shrink-0" x-text="severityCounts[s.key] || 0"></span>
+            </div>
+          </template>
+          <div x-show="totalFindings === 0" class="text-sm text-gray-400 py-2">No findings</div>
+        </div>
+
+        <!-- Separator -->
+        <div class="border-t border-[#F0F0F0] my-3"></div>
+
+        <!-- Human Review Stats -->
+        <div class="flex items-center gap-6 text-sm text-gray-600">
+          <div class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-green-500"></span>
+            <span class="">Confirmed</span>
+            <span class="font-mono text-xs" x-text="humanReviewStats.confirmed">0</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-red-500"></span>
+            <span class="">Dismissed</span>
+            <span class="font-mono text-xs" x-text="humanReviewStats.dismissed">0</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full bg-gray-300"></span>
+            <span class="">Pending</span>
+            <span class="font-mono text-xs" x-text="humanReviewStats.pending">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Needs Attention -->
+      <div class="mb-6">
+        <h2 class="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-3">Needs Attention</h2>
+
+        <!-- Empty state: all clear -->
+        <div x-show="needsAttention.length === 0" class="bg-white rounded-xl border border-[#F0F0F0] p-8 text-center">
+          <svg class="w-12 h-12 mx-auto mb-3 text-green-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4L12 14.01l-3-3"/></svg>
+          <p class="text-sm font-medium text-gray-700">All tasks look good</p>
+          <p class="text-xs text-gray-400 mt-1">No critical findings.</p>
+        </div>
+
+        <!-- Attention cards -->
+        <div class="space-y-2" x-show="needsAttention.length > 0">
+          <template x-for="task in needsAttention" :key="task.file">
+            <div @click="openTask(task)"
+                 class="bg-white border border-gray-200 rounded-lg p-3 hover:border-gray-300 cursor-pointer transition-all duration-150 flex items-center gap-3">
+              <!-- Left: severity dot + name + worst finding -->
+              <div class="flex items-center gap-2 flex-1 min-w-0">
+                <span class="w-2 h-2 rounded-full shrink-0"
+                      :style="'background-color: ' + severityColor(task)"></span>
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-gray-900 truncate" x-text="task.name || task.file"></p>
+                  <p class="text-xs text-gray-500 mt-0.5 truncate">
+                    <template x-for="s in [
+                      {key:'critical', label:'Critical'},
+                      {key:'major', label:'Major'},
+                      {key:'minor', label:'Minor'},
+                      {key:'info', label:'Info'},
+                      {key:'not-met', label:'Not Met'},
+                      {key:'partially-met', label:'Partially Met'}
+                    ]" :key="s.key">
+                      <span x-show="(severityCountsForTask(task)[s.key] || 0) > 0">
+                        <span x-text="severityCountsForTask(task)[s.key] + ' ' + s.label"></span>
+                        <span class="mx-1">·</span>
+                      </span>
+                    </template>
+                    <span x-text="worstFinding(task)"></span>
+                  </p>
+                </div>
+              </div>
+
+              <!-- Right: Score badge + arrow -->
+              <div class="flex items-center gap-2 shrink-0">
+                <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
+                      :style="'background-color: ' + scoreColor(task) + '15; color: ' + scoreColor(task)"
+                      x-text="taskScore(task)"></span>
+                <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================== SUMMARY VIEW ======================== -->
+    <div x-show="currentView === 'summary' && !loading" x-cloak>
+
+      <!-- Page Title -->
+      <h1 class="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-4">Summary</h1>
+
+      <!-- 1. Task Status Table -->
+      <div class="bg-white rounded-xl border border-[#F0F0F0] overflow-hidden mb-6">
+        <table class="w-full">
+          <caption class="sr-only">Task review status overview</caption>
+          <thead>
+            <tr class="border-b border-[#F0F0F0]">
+              <th class="text-left px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-gray-500">Task</th>
+              <th class="text-center px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-gray-500 w-16">Score</th>
+              <th class="text-center px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-gray-500 w-24">AI Review</th>
+              <th class="text-center px-4 py-2.5 text-xs font-semibold uppercase tracking-widest text-gray-500 w-32">Human Confirm</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="task in sortedTasks" :key="task.file">
+              <tr @click="openTask(task)"
+                  class="border-b border-[#F0F0F0] last:border-b-0 hover:bg-gray-50 cursor-pointer transition-all duration-150">
+                <!-- Task name -->
+                <td class="px-4 py-2.5">
+                  <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full shrink-0"
+                          :style="'background-color: ' + severityColor(task)"></span>
+                    <span class="text-sm font-medium text-gray-900 truncate" x-text="task.name || task.file"></span>
+                  </div>
+                </td>
+
+                <!-- Score -->
+                <td class="px-4 py-2.5 text-center">
+                  <span class="text-sm font-semibold" :style="'color: ' + scoreColor(task)" x-text="taskScore(task)">–</span>
+                </td>
+
+                <!-- AI Review Status -->
+                <td class="px-4 py-2.5 text-center">
+                  <span class="text-xs font-semibold px-2 py-0.5 rounded-full"
+                        :class="{
+                          'bg-green-100 text-green-700': task.status === 'reviewed',
+                          'bg-yellow-100 text-yellow-700': task.status === 'reviewing',
+                          'bg-gray-100 text-gray-600': task.status === 'pending'
+                        }"
+                        x-text="task.status === 'reviewed' ? 'Done' : (task.status === 'reviewing' ? 'Reviewing' : 'Pending')"></span>
+                </td>
+
+                <!-- Human Review Status -->
+                <td class="px-4 py-2.5 text-center">
+                  <span x-show="!humanStatus(task)" class="text-sm text-gray-300">–</span>
+                  <span x-show="humanStatus(task) === 'confirmed'"
+                        class="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-700">Confirmed</span>
+                  <span x-show="humanStatus(task) === 'action-required'"
+                        class="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">Action Required</span>
+                  <span x-show="humanStatus(task) === 'deferred'"
+                        class="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 line-through">Deferred</span>
+                </td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+        <div x-show="tasks.length === 0" class="px-4 py-8 text-center text-sm text-gray-400">
+          No tasks
+        </div>
+      </div>
+
+      <!-- 2. Stats Two Columns -->
+      <div class="grid grid-cols-2 gap-3 mb-6">
+        <!-- Left: Findings Summary -->
+        <div class="bg-white rounded-xl border border-[#F0F0F0] p-4">
+          <h3 class="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-3">Findings</h3>
+          <div class="flex flex-col gap-2 text-sm">
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-green-500 shrink-0"></span>
+              <span class="text-gray-600">Confirmed</span>
+              <span class="font-mono text-xs text-gray-900 ml-auto" x-text="humanReviewStats.confirmed">0</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-red-500 shrink-0"></span>
+              <span class="text-gray-600">Dismissed</span>
+              <span class="font-mono text-xs text-gray-900 ml-auto" x-text="humanReviewStats.dismissed">0</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="w-2 h-2 rounded-full bg-gray-300 shrink-0"></span>
+              <span class="text-gray-600">Pending</span>
+              <span class="font-mono text-xs text-gray-900 ml-auto" x-text="humanReviewStats.pending">0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Human Review Progress -->
+        <div class="bg-white rounded-xl border border-[#F0F0F0] p-4">
+          <h3 class="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-3">Human Confirm Progress</h3>
+          <div class="mt-1">
+            <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div class="h-full bg-indigo-500 rounded-full transition-all duration-500"
+                   :style="'width: ' + humanProgressPercent + '%'"></div>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">
+              <span x-text="humanReviewedCount">0</span>/<span x-text="tasks.length">0</span> tasks confirmed
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Sign-off Section -->
+      <div class="border-t border-[#F0F0F0] pt-6">
+        <h2 class="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-4">Sign-off</h2>
+
+        <div class="bg-white rounded-xl border border-[#F0F0F0] p-4">
+          <!-- Name / Role / Date row -->
+          <div class="grid grid-cols-3 gap-4 mb-4">
+            <div class="">
+              <label for="signoff-name" class="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-1">Name</label>
+              <input id="signoff-name" type="text"
+                     x-model="notes.summary.signoff.name"
+                     @blur="autoSaveSummary()"
+                     class="w-full text-sm text-gray-900 border border-[#F0F0F0] rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-400 transition-all duration-150"
+                     placeholder="Reviewer name">
+            </div>
+            <div class="">
+              <label for="signoff-role" class="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-1">Role</label>
+              <input id="signoff-role" type="text"
+                     x-model="notes.summary.signoff.role"
+                     @blur="autoSaveSummary()"
+                     class="w-full text-sm text-gray-900 border border-[#F0F0F0] rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-400 transition-all duration-150"
+                     placeholder="e.g. Senior Engineer">
+            </div>
+            <div class="">
+              <label for="signoff-date" class="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-1">Date</label>
+              <input id="signoff-date" type="date"
+                     x-model="notes.summary.signoff.date"
+                     @blur="autoSaveSummary()"
+                     @change="autoSaveSummary()"
+                     class="w-full text-sm text-gray-900 border border-[#F0F0F0] rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-400 transition-all duration-150">
+            </div>
+          </div>
+
+          <!-- Summary Notes -->
+          <div class="mb-4">
+            <label for="signoff-notes" class="block text-xs font-semibold uppercase tracking-widest text-gray-500 mb-1">Summary Notes</label>
+            <textarea id="signoff-notes" x-model="notes.summary.notes"
+                      @blur="autoSaveSummary()"
+                      rows="3"
+                      class="w-full text-sm text-gray-900 border border-[#F0F0F0] rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-400 transition-all duration-150 resize-none"
+                      placeholder="Overall review notes..."></textarea>
+          </div>
+
+          <!-- Save button -->
+          <div class="flex justify-end">
+            <button @click="saveSummary()"
+                    :disabled="savingSummary"
+                    class="bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-all duration-150">
+              <span x-show="!savingSummary && !savedSummaryAt">Save</span>
+              <span x-show="savingSummary">Saving...</span>
+              <span x-show="savedSummaryAt && !savingSummary" x-transition>Saved ✓</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================== TASK DETAIL VIEW ======================== -->
+    <div x-show="currentView === 'detail' && currentTask" x-cloak class="flex-1 flex flex-col overflow-hidden">
+
+      <!-- AI Review Placeholder -->
+      <div x-show="currentTask?.status !== 'reviewed'" class="flex flex-col items-center justify-center py-20">
+        <div class="animate-spin w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full mb-4"></div>
+        <p class="text-sm text-gray-400">AI Review in progress...</p>
+      </div>
+
+      <!-- Reviewed content wrapper -->
+      <div x-show="currentTask?.status === 'reviewed'" class="flex-1 flex flex-col overflow-hidden">
+
+        <!-- Scrollable content area -->
+        <div class="flex-1 overflow-y-auto px-6 py-4">
+        <!-- Back link -->
+        <button @click="currentView = 'overview'; currentTask = null"
+                class="text-xs text-gray-400 hover:text-indigo-600 font-medium transition-all duration-150 mb-3 inline-flex items-center gap-1">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+          Back to overview
+        </button>
+
+        <!-- Task Header -->
+        <div class="flex items-center gap-3 mb-4">
+          <!-- Type badge -->
+          <span class="text-xs font-semibold px-2 py-0.5 rounded-full shrink-0"
+                :class="currentTask?.type === 'story' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-700'"
+                x-text="currentTask?.type === 'story' ? 'STORY' : 'CODE'"></span>
+
+          <!-- Task name -->
+          <h1 class="text-lg font-semibold text-gray-900 flex-1 min-w-0 truncate"
+              x-text="currentTask?.name || currentTask?.file"></h1>
+
+          <!-- Score -->
+          <span class="text-3xl font-bold tracking-tight shrink-0"
+                :style="'color: ' + scoreColor(currentTask)">
+            <span x-text="currentTask?.status === 'reviewed' ? (currentTask?.review?.score || 0) : '–'"></span><span class="text-base text-gray-400 font-medium" x-show="currentTask?.status === 'reviewed'">/10</span>
+          </span>
+
+          <!-- AI status pill -->
+          <span class="text-xs font-semibold px-2 py-0.5 rounded-full shrink-0"
+                :class="{
+                  'bg-green-100 text-green-700': currentTask?.status === 'reviewed',
+                  'bg-yellow-100 text-yellow-700': currentTask?.status === 'reviewing',
+                  'bg-gray-100 text-gray-600': currentTask?.status === 'pending'
+                }"
+                x-text="currentTask?.status === 'reviewed' ? 'Done' : (currentTask?.status === 'reviewing' ? 'Reviewing' : 'Pending')"></span>
+        </div>
+
+        <!-- Summary Callout -->
+        <div x-show="currentTask?.review?.summary"
+             class="border-l-4 border-indigo-400 bg-indigo-50/30 p-3 rounded-r-lg mb-4">
+          <p class="text-sm text-gray-600" x-text="currentTask?.review?.summary"></p>
+        </div>
+
+        <!-- Story: Acceptance Criteria -->
+        <div x-show="currentTask?.type === 'story' && currentTask?.acceptance" class="mb-4">
+          <div class="bg-gray-50 border p-3 rounded-lg">
+            <p class="text-xs font-bold text-gray-500 mb-1">Acceptance Criteria</p>
+            <p class="text-sm text-gray-700 whitespace-pre-wrap" x-text="currentTask?.acceptance"></p>
+          </div>
+        </div>
+
+        <!-- Story: Description -->
+        <div x-show="currentTask?.type === 'story' && currentTask?.description" class="mb-4">
+          <p class="text-sm text-gray-600" x-text="currentTask?.description"></p>
+        </div>
+
+        <!-- Findings Section -->
+        <div x-show="currentTask?.review?.findings?.length > 0" class="mb-6">
+          <!-- Section header row -->
+          <div class="flex items-center justify-between mb-3">
+            <div class="flex items-center gap-2">
+              <h2 class="text-xs font-semibold uppercase tracking-widest text-gray-500">
+                Findings (<span x-text="currentTask?.review?.findings?.length || 0"></span>)
+              </h2>
+              <span x-show="dismissedCountForTask(currentTask) === 0"
+                    class="text-xs text-gray-400">· All Default ✓</span>
+            </div>
+            <button @click="confirmAll(currentTask)"
+                    :disabled="confirmingAll"
+                    class="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-all duration-150 disabled:opacity-50">
+              <span x-show="!confirmingAll && !confirmedAllAt">Confirm All</span>
+              <span x-show="confirmingAll">Confirming...</span>
+              <span x-show="confirmedAllAt && !confirmingAll" x-transition>Confirmed ✓</span>
+            </button>
+          </div>
+
+          <!-- Severity Groups -->
+          <template x-for="group in groupedFindings(currentTask)" :key="group.severity">
+            <div class="mb-3">
+              <!-- Group header (clickable to collapse/expand) -->
+              <div @click="groupCollapsed[group.severity] = !groupCollapsed[group.severity]"
+                   role="button"
+                   :aria-expanded="!groupCollapsed[group.severity]"
+                   class="flex items-center gap-2 cursor-pointer select-none mb-2 px-2 py-2 rounded-md hover:bg-gray-50 transition-all duration-150">
+                <span class="text-xs text-gray-500" x-text="groupCollapsed[group.severity] ? '▶' : '▼'"></span>
+                <span class="text-xs font-bold uppercase tracking-widest text-gray-500"
+                      x-text="severityLabel(group.severity) + ' (' + group.findings.length + ')'"></span>
+              </div>
+
+              <!-- Group findings (collapsible) -->
+              <div x-show="!groupCollapsed[group.severity]" class="space-y-2">
+                <template x-for="f in group.findings" :key="currentTask.review.findings.indexOf(f)">
+                  <div class="border rounded-lg transition-all duration-150"
+                       :class="isDismissed(currentTask, currentTask.review.findings.indexOf(f))
+                         ? 'opacity-50 border-gray-200 p-3'
+                         : (f.severity === 'critical' || f.severity === 'major' || f.severity === 'not-met'
+                           ? 'border-l-[3px] border-l-red-500 bg-white p-4'
+                           : 'border-gray-200 bg-white p-3')">
+
+                    <!-- Top row: Severity badge + Location + Dismiss button -->
+                    <div class="flex items-start justify-between gap-2 mb-2">
+                      <div class="flex items-center gap-2 min-w-0">
+                        <!-- Severity badge -->
+                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full text-white shrink-0"
+                              :style="'background-color: ' + severityPillColor(f.severity)"
+                              x-text="severityLabel(f.severity)"></span>
+
+                        <!-- Location -->
+                        <span class="text-xs text-gray-500 font-mono truncate"
+                              x-text="(f.file || '') + (f.line ? ':' + f.line : '')"></span>
+
+                        <!-- Criteria (story only) -->
+                        <span x-show="currentTask?.type === 'story' && f.criteria"
+                              class="text-xs text-gray-500 truncate"
+                              x-text="'Criteria: ' + f.criteria"></span>
+                      </div>
+
+                      <!-- Dismiss / Undo button -->
+                      <button @click="openDismiss(currentTask, currentTask.review.findings.indexOf(f))"
+                              class="text-xs shrink-0 transition-all duration-150 px-2.5 py-1 rounded-md border bg-gray-50"
+                              :class="isDismissed(currentTask, currentTask.review.findings.indexOf(f))
+                                ? 'border-indigo-200 text-indigo-600 bg-indigo-50 hover:border-indigo-400 hover:bg-indigo-100 font-medium'
+                                : 'border-gray-200 text-gray-500 bg-gray-50 hover:border-red-300 hover:text-red-600 hover:bg-red-50'"
+                              x-text="isDismissed(currentTask, currentTask.review.findings.indexOf(f)) ? 'Undo' : 'Dismiss'"></button>
+                    </div>
+
+                    <!-- Description -->
+                    <p class="text-sm text-gray-700 mb-2"
+                       :class="isDismissed(currentTask, currentTask.review.findings.indexOf(f)) ? 'line-through' : ''"
+                       x-text="findingDescription(f)"></p>
+
+                    <!-- Show code toggle -->
+                    <div x-show="f.code" class="mb-2">
+                      <button @click="toggleCode(currentTask, currentTask.review.findings.indexOf(f))"
+                              class="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-all duration-150">
+                        ▶ Show code
+                      </button>
+                      <pre x-show="isCodeExpanded(currentTask, currentTask.review.findings.indexOf(f))"
+                           class="mt-1 bg-gray-900 text-emerald-400 text-xs p-3 rounded-lg overflow-x-auto"
+                           x-text="f.code"></pre>
+                    </div>
+
+                    <!-- Suggestion -->
+                    <div x-show="f.suggestion || f.fix" class="text-xs text-gray-600 flex gap-1">
+                      <span class="shrink-0">💡</span>
+                      <span x-text="f.suggestion || f.fix"></span>
+                    </div>
+
+                    <!-- Dismissed reason tag -->
+                    <div x-show="isDismissed(currentTask, currentTask.review.findings.indexOf(f))"
+                         class="mt-2 text-xs">
+                      <span class="inline-block bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full"
+                            x-text="'Dismissed: ' + dismissReason(currentTask, currentTask.review.findings.indexOf(f))"></span>
+                    </div>
+
+                    <!-- Dismiss reason popup (inline) -->
+                    <div x-show="dismissingIndex === currentTask.review.findings.indexOf(f)"
+                         @click.outside="dismissingIndex = null"
+                         class="mt-2 border-t border-gray-100 pt-2">
+                      <p class="text-xs text-gray-500 mb-2">Dismiss reason</p>
+                      <div class="flex items-center gap-1.5 flex-wrap">
+                        <template x-if="currentTask?.type !== 'story'">
+                          <template x-for="opt in [
+                            {reason: 'ai-false-positive', label: 'AI false positive'},
+                            {reason: 'known-issue', label: 'Known issue'},
+                            {reason: 'business-exception', label: 'Business exception'},
+                            {reason: 'will-fix-elsewhere', label: 'Will fix elsewhere'},
+                            {reason: 'acceptable-risk', label: 'Acceptable risk'}
+                          ]" :key="opt.reason">
+                            <button @click="dismissFinding(currentTask, currentTask.review.findings.indexOf(f), opt.reason)"
+                                    class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full px-3 py-1 transition-all duration-150"
+                                    x-text="opt.label"></button>
+                          </template>
+                        </template>
+                        <template x-if="currentTask?.type === 'story'">
+                          <template x-for="opt in [
+                            {reason: 'out-of-scope', label: 'Out of scope'},
+                            {reason: 'known-limitation', label: 'Known limitation'},
+                            {reason: 'business-decision', label: 'Business decision'},
+                            {reason: 'will-fix-elsewhere', label: 'Will fix elsewhere'},
+                            {reason: 'acceptable-risk', label: 'Acceptable risk'}
+                          ]" :key="opt.reason">
+                            <button @click="dismissFinding(currentTask, currentTask.review.findings.indexOf(f), opt.reason)"
+                                    class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full px-3 py-1 transition-all duration-150"
+                                    x-text="opt.label"></button>
+                          </template>
+                        </template>
+                        <button @click="dismissingIndex = null"
+                                class="text-xs text-gray-400 hover:text-gray-600 px-2 py-1 transition-all duration-150">
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- Empty findings state -->
+        <div x-show="!currentTask?.review?.findings?.length" class="text-sm text-gray-400 py-6 text-center">
+          No findings — looks good ✓
+        </div>
+
+        <!-- Positives & Gaps -->
+        <div x-show="(currentTask?.review?.positives?.length > 0) || (currentTask?.type === 'story' && currentTask?.review?.gaps?.length > 0)"
+             class="grid grid-cols-2 gap-6 mb-6">
+
+          <!-- Positives column -->
+          <div x-show="currentTask?.review?.positives?.length > 0">
+            <h3 class="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-2">Positives</h3>
+            <ul class="space-y-1">
+              <template x-for="(p, pi) in currentTask?.review?.positives?.slice(0, 3)" :key="pi">
+                <li class="text-sm text-gray-600 flex gap-2">
+                  <span class="text-green-500 shrink-0 mt-0.5">✓</span>
+                  <span x-text="p"></span>
+                </li>
+              </template>
+            </ul>
+            <div x-show="(currentTask?.review?.positives?.length || 0) > 3" x-cloak>
+              <div x-show="!positivesExpanded">
+                <button @click="positivesExpanded = true"
+                        class="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-all duration-150 mt-1">
+                  + <span x-text="currentTask?.review?.positives.length - 3"></span> more
+                </button>
+              </div>
+              <ul x-show="positivesExpanded" class="space-y-1 mt-1">
+                <template x-for="(p, pi) in currentTask?.review?.positives?.slice(3)" :key="pi">
+                  <li class="text-sm text-gray-600 flex gap-2">
+                    <span class="text-green-500 shrink-0 mt-0.5">✓</span>
+                    <span x-text="p"></span>
+                  </li>
+                </template>
+              </ul>
+            </div>
+          </div>
+
+          <!-- Gaps column (story only) -->
+          <div x-show="currentTask?.type === 'story' && currentTask?.review?.gaps?.length > 0">
+            <h3 class="text-xs font-semibold uppercase tracking-widest text-gray-500 mb-2">Gaps</h3>
+            <ul class="space-y-1">
+              <template x-for="(g, gi) in currentTask?.review?.gaps?.slice(0, 3)" :key="gi">
+                <li class="text-sm text-orange-600 flex gap-2">
+                  <span class="text-orange-500 shrink-0 mt-0.5">!</span>
+                  <span x-text="g"></span>
+                </li>
+              </template>
+            </ul>
+            <div x-show="(currentTask?.review?.gaps?.length || 0) > 3" x-cloak>
+              <div x-show="!gapsExpanded">
+                <button @click="gapsExpanded = true"
+                        class="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-all duration-150 mt-1">
+                  + <span x-text="currentTask?.review?.gaps.length - 3"></span> more
+                </button>
+              </div>
+              <ul x-show="gapsExpanded" class="space-y-1 mt-1">
+                <template x-for="(g, gi) in currentTask?.review?.gaps?.slice(3)" :key="gi">
+                  <li class="text-sm text-orange-600 flex gap-2">
+                    <span class="text-orange-500 shrink-0 mt-0.5">!</span>
+                    <span x-text="g"></span>
+                  </li>
+                </template>
+              </ul>
+            </div>
+          </div>
+        </div>
+        </div><!-- end scrollable content -->
+
+        <!-- Action Bar -->
+        <div x-show="currentTask?.status === 'reviewed'"
+             class="shrink-0 bg-white border-t border-[#F0F0F0] p-4">
+
+          <!-- Status buttons row -->
+          <div class="flex items-center gap-2 mb-2">
+            <button @click="setTaskStatus(currentTask, 'confirmed')"
+                    :disabled="saving"
+                    class="text-sm px-4 py-2 rounded-lg font-medium transition-all duration-150 disabled:opacity-50"
+                    :class="getOrCreateNote(currentTask).status === 'confirmed'
+                      ? 'bg-green-100 text-green-700 ring-1 ring-green-300'
+                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100'">
+              ✓ Confirmed
+            </button>
+            <button @click="setTaskStatus(currentTask, 'action-required')"
+                    :disabled="saving"
+                    class="text-sm px-4 py-2 rounded-lg font-medium transition-all duration-150 disabled:opacity-50"
+                    :class="getOrCreateNote(currentTask).status === 'action-required'
+                      ? 'bg-amber-100 text-amber-700 ring-1 ring-amber-300'
+                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100'">
+              ⚠ Action Required
+            </button>
+            <button @click="setTaskStatus(currentTask, 'deferred')"
+                    :disabled="saving"
+                    class="text-sm px-4 py-2 rounded-lg font-medium transition-all duration-150 disabled:opacity-50"
+                    :class="getOrCreateNote(currentTask).status === 'deferred'
+                      ? 'bg-gray-200 text-gray-500 ring-1 ring-gray-300'
+                      : 'bg-gray-50 text-gray-600 hover:bg-gray-100'">
+              ⏸ Deferred
+            </button>
+          </div>
+
+          <!-- Smart hint -->
+          <p class="text-xs text-gray-400 mb-2">
+            💡 <span x-text="smartHint(currentTask)"></span>
+          </p>
+
+          <!-- Notes textarea -->
+          <div class="mb-3">
+            <label for="task-notes" class="block text-xs text-gray-500 mb-1">Notes:</label>
+            <textarea id="task-notes" x-model="getOrCreateNote(currentTask).notes"
+                      @blur="autoSaveNote(currentTask)"
+                      rows="2"
+                      class="w-full text-sm text-gray-900 border border-[#F0F0F0] rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-400 transition-all duration-150 resize-none"
+                      placeholder="Optional notes..."></textarea>
+          </div>
+
+
+          <!-- Navigation row -->
+          <div class="flex items-center justify-between">
+            <button @click="navigateTask(-1)"
+                    class="text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg px-3 py-1.5 transition-all duration-150">
+              ← Prev
+            </button>
+            <span class="text-xs text-gray-400"
+                  x-text="(currentTask ? sortedTasks.findIndex(t => t.file === currentTask.file) + 1 : 0) + '/' + sortedTasks.length"></span>
+            <button @click="navigateTask(1)"
+                    class="text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg px-3 py-1.5 transition-all duration-150">
+              Next →
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Undo Bar -->
+      <div x-show="undoBar !== null"
+           class="fixed top-14 left-1/2 -translate-x-1/2 bg-gray-900 text-white rounded-lg px-4 py-2 shadow-lg z-40 flex items-center gap-3"
+           x-transition>
+        <span class="text-sm">Finding dismissed</span>
+        <button @click="undoDismissFinding(currentTask, undoBar?.findingIndex)"
+                class="text-sm font-medium text-indigo-400 hover:text-indigo-300 transition-all duration-150">
+          Undo
+        </button>
+      </div>
+    </div>
+
+  </main>
+
+  <script>
+document.addEventListener('alpine:init', () => {
+  Alpine.data('auditReport', () => ({
+    // Core state
+    session: null,
+    tasks: [],
+    notes: { tasks: [], summary: { notes: '', signoff: { name: '', role: '', date: '' } } },
+    currentView: 'overview',
+    currentTask: null,
+    error: null,
+    loading: true,
+    savingSummary: false,
+    savedSummaryAt: null,
+    showHelp: false,
+    pollTimer: null,
+    lastSaved: null,
+    confirmingAll: false,
+    confirmedAllAt: null,
+
+    // Task Detail state
+    dismissingIndex: null,       // finding index with open dismiss popup (null = closed)
+    undoBar: null,               // {findingIndex, timer} or null
+    expandedCode: {},            // key: findingIndex -> true
+    saving: false,               // save-in-progress flag
+    groupCollapsed: {},          // key: severity -> bool
+    positivesExpanded: false,
+    gapsExpanded: false,
+
+    // ========== COMPUTED GETTERS ==========
+
+    get sortedTasks() {
+      const getNote = (t) => this.notes.tasks.find(n => n.file === t.file);
+      const reviewing = [];
+      const unreviewed = [];
+      const reviewed = [];
+      for (const t of this.tasks) {
+        if (t.status === 'reviewing') reviewing.push(t);
+        else {
+          const note = getNote(t);
+          if (note && note.status) reviewed.push(t);
+          else unreviewed.push(t);
+        }
+      }
+      const sorted = [...reviewed].sort((a, b) => (a.review?.score || 0) - (b.review?.score || 0));
+      return [...reviewing, ...unreviewed, ...sorted];
+    },
+
+    get grade() {
+      const scores = this.tasks.filter(t => t.status === 'reviewed' && t.review?.score);
+      if (scores.length === 0) return { letter: '–', color: '#9CA3AF' };
+      const avg = scores.reduce((s, t) => s + t.review.score, 0) / scores.length;
+      if (avg >= 9) return { letter: 'A', color: '#16A34A' };
+      if (avg >= 7) return { letter: 'B', color: '#2563EB' };
+      if (avg >= 5) return { letter: 'C', color: '#CA8A04' };
+      return { letter: 'D', color: '#DC2626' };
+    },
+
+    get severityCounts() {
+      const counts = { critical: 0, major: 0, minor: 0, info: 0, 'not-met': 0, 'partially-met': 0, met: 0 };
+      for (const t of this.tasks) {
+        const findings = t.review?.findings || [];
+        for (const f of findings) {
+          const sev = f.severity || 'info';
+          counts[sev] = (counts[sev] || 0) + 1;
+        }
+      }
+      return counts;
+    },
+
+    get totalFindings() {
+      const c = this.severityCounts;
+      return c.critical + c.major + c.minor + c.info + c['not-met'] + c['partially-met'];
+    },
+
+    get needsAttention() {
+      return this.tasks.filter(t => {
+        if (!t.review) return false;
+        const score = t.review.score || 0;
+        if (t.status !== 'reviewed') return false;
+        const hasCritical = (t.review.findings || []).some(
+          f => f.severity === 'critical' || f.severity === 'not-met'
+        );
+        return score < 4 || hasCritical;
+      });
+    },
+
+    get humanReviewStats() {
+      let confirmed = 0, dismissed = 0, pending = 0;
+      for (const n of this.notes.tasks) {
+        for (const f of (n.findings || [])) {
+          const s = typeof f === 'string' ? f : f.status;
+          if (s === 'confirmed') confirmed++;
+          else if (s === 'dismissed') dismissed++;
+          else pending++;
+        }
+      }
+      return { confirmed, dismissed, pending };
+    },
+
+    get avgScore() {
+      const scores = this.tasks.filter(t => t.status === 'reviewed' && t.review?.score);
+      if (scores.length === 0) return '–';
+      return (scores.reduce((s, t) => s + t.review.score, 0) / scores.length).toFixed(1);
+    },
+
+    get humanReviewedCount() {
+      return this.notes.tasks.filter(n => n.status).length;
+    },
+
+    get humanProgressPercent() {
+      if (!this.tasks.length) return 0;
+      return Math.round(this.humanReviewedCount / this.tasks.length * 100);
+    },
+
+    // ========== METHODS ==========
+
+    async init() {
+      try {
+        await Promise.all([this.fetchSession(), this.fetchTasks(), this.fetchNotes()]);
+        if (!this.notes.summary.signoff.date) {
+          this.notes.summary.signoff.date = new Date().toISOString().slice(0, 10);
+        }
+      } finally {
+        this.loading = false;
+        window.addEventListener('keydown', (e) => {
+          if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+
+          if (e.key === 'ArrowLeft' || (e.key === 'k' && !e.metaKey && !e.ctrlKey)) {
+            e.preventDefault();
+            this.navigateTask(-1);
+          } else if (e.key === 'ArrowRight' || (e.key === 'j' && !e.metaKey && !e.ctrlKey)) {
+            e.preventDefault();
+            this.navigateTask(1);
+          } else if (e.key === 'o' && !e.metaKey && !e.ctrlKey) {
+            this.currentView = 'overview'; this.currentTask = null;
+          } else if (e.key === 's' && !e.metaKey && !e.ctrlKey) {
+            this.currentView = 'summary'; this.currentTask = null;
+          } else if (e.key === '?' && !e.metaKey && !e.ctrlKey) {
+            this.showHelp = !this.showHelp;
+          } else if (e.key === 'Escape') {
+            this.showHelp = false;
+          }
+        });
+        // Poll for AI review progress
+        this.pollTimer = setInterval(async () => {
+          if (this.saving) return;
+          const active = document.activeElement;
+          if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.tagName === 'SELECT')) return;
+          const hasPending = this.tasks.some(t => t.status !== 'reviewed');
+          if (!hasPending) { clearInterval(this.pollTimer); return; }
+          await this.fetchTasks();
+        }, 5000);
+      }
+    },
+
+    async fetchSession() {
+      try {
+        const r = await fetch('/api/session');
+        if (r.ok) { this.session = await r.json(); this.error = null; return; }
+        this.error = 'Failed to load session data (HTTP ' + r.status + ')';
+      } catch (e) {
+        this.error = 'Failed to connect to report server';
+      }
+    },
+
+    async fetchTasks() {
+      try {
+        const r = await fetch('/api/tasks');
+        if (r.ok) { this.tasks = await r.json(); this.error = null; return; }
+        this.error = 'Failed to load tasks (HTTP ' + r.status + ')';
+      } catch (e) {
+        this.error = 'Failed to connect to report server';
+      }
+    },
+
+    async fetchNotes() {
+      try {
+        const r = await fetch('/api/notes');
+        if (r.ok) { this.notes = await r.json(); this.error = null; return; }
+        this.error = 'Failed to load review notes (HTTP ' + r.status + ')';
+      } catch (e) {
+        this.error = 'Failed to connect to report server';
+      }
+    },
+
+    openTask(task) {
+      this.dismissingIndex = null;
+      if (this.undoBar && this.undoBar.timer) clearTimeout(this.undoBar.timer);
+      this.undoBar = null;
+      this.expandedCode = {};
+      this.positivesExpanded = false;
+      this.gapsExpanded = false;
+      this.currentTask = task;
+      this.currentView = 'detail';
+      this.initGroupCollapse(task);
+      this.$nextTick(() => {
+        const active = this.$refs.taskList?.querySelector('.border-l-indigo-500');
+        if (active) active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
+    },
+
+    navigateTask(direction) {
+      const list = this.sortedTasks;
+      if (!list.length) return;
+      let idx = this.currentTask ? list.findIndex(t => t.file === this.currentTask.file) : -1;
+
+      // Sequential navigation with wrap-around
+      if (idx === -1) idx = 0;
+      else {
+        idx = idx + direction;
+        if (idx >= list.length) idx = 0;
+        if (idx < 0) idx = list.length - 1;
+      }
+      this.openTask(list[idx]);
+    },
+
+    findingDescription(f) {
+      return f.description || f.summary || '';
+    },
+
+    taskScore(task) {
+      if (!task.review || task.status !== 'reviewed') return '–';
+      return task.review.score || 0;
+    },
+
+    getNoteForTask(task) {
+      return this.notes.tasks.find(n => n.file === task.file);
+    },
+
+    getOrCreateNote(task) {
+      let note = this.notes.tasks.find(n => n.file === task.file);
+      if (!note) {
+        note = {
+          file: task.file,
+          status: '',
+          notes: '',
+          findings: (task.review?.findings || []).map(() => ({ status: 'confirmed', reason: '' }))
+        };
+        this.notes.tasks.push(note);
+      }
+      if (!note.findings) {
+        note.findings = (task.review?.findings || []).map(() => ({ status: 'confirmed', reason: '' }));
+      }
+      // Ensure findings array matches task findings length (lazy backfill)
+      const tf = task.review?.findings || [];
+      while (note.findings.length < tf.length) {
+        note.findings.push({ status: 'confirmed', reason: '' });
+      }
+      return note;
+    },
+
+    findingNote(task, index) {
+      const note = this.getOrCreateNote(task);
+      return note.findings[index] || { status: 'confirmed', reason: '' };
+    },
+
+    isDismissed(task, index) {
+      return this.findingNote(task, index).status === 'dismissed';
+    },
+
+    dismissReason(task, index) {
+      return this.findingNote(task, index).reason || '';
+    },
+
+    isCodeExpanded(task, index) {
+      return !!this.expandedCode[index];
+    },
+
+    toggleCode(task, index) {
+      if (this.expandedCode[index]) {
+        delete this.expandedCode[index];
+      } else {
+        this.expandedCode[index] = true;
+      }
+    },
+
+    groupedFindings(task) {
+      const findings = task.review?.findings || [];
+      const groups = {};
+      const isStory = task.type === 'story';
+      const order = isStory
+        ? ['not-met', 'partially-met', 'met']
+        : ['critical', 'major', 'minor', 'info'];
+
+      for (const f of findings) {
+        const sev = f.severity || 'info';
+        if (!groups[sev]) groups[sev] = [];
+        groups[sev].push(f);
+      }
+
+      return order.filter(k => groups[k] && groups[k].length > 0).map(k => ({
+        severity: k,
+        findings: groups[k],
+      }));
+    },
+
+    dismissedCountForTask(task) {
+      let count = 0;
+      const note = this.notes.tasks.find(n => n.file === task.file);
+      if (!note || !note.findings) return 0;
+      for (const f of note.findings) {
+        if ((typeof f === 'string' ? f : f.status) === 'dismissed') count++;
+      }
+      return count;
+    },
+
+    allFindingsDismissed(task) {
+      const total = (task.review?.findings || []).length;
+      if (total === 0) return false;
+      return this.dismissedCountForTask(task) === total;
+    },
+
+    confirmedCriticalCount(task) {
+      let count = 0;
+      const findings = task.review?.findings || [];
+      const isStory = task.type === 'story';
+      for (let i = 0; i < findings.length; i++) {
+        const f = findings[i];
+        const isHigh = isStory ? (f.severity === 'not-met' || f.severity === 'partially-met') : (f.severity === 'critical' || f.severity === 'major');
+        if (isHigh && !this.isDismissed(task, i)) count++;
+      }
+      return count;
+    },
+
+    smartHint(task) {
+      const critical = this.confirmedCriticalCount(task);
+      if (critical > 0) {
+        return critical + ' critical confirmed → suggest "Action Required"';
+      }
+      if (this.allFindingsDismissed(task)) {
+        return 'All findings dismissed → suggest "Confirmed"';
+      }
+      return 'Looks good → suggest "Confirmed"';
+    },
+
+    initGroupCollapse(task) {
+      const isStory = task.type === 'story';
+      const defaultExpanded = isStory ? ['not-met', 'partially-met'] : ['critical', 'major', 'minor'];
+      const groups = this.groupedFindings(task);
+      for (const g of groups) {
+        if (!(g.severity in this.groupCollapsed)) {
+          this.groupCollapsed[g.severity] = !defaultExpanded.includes(g.severity);
+        }
+      }
+    },
+
+    openDismiss(task, index) {
+      const f = (task.review?.findings || [])[index];
+      if (!f) return;
+      const isStory = task.type === 'story';
+      const isHigh = isStory ? (f.severity === 'not-met' || f.severity === 'partially-met') : (f.severity === 'critical' || f.severity === 'major');
+
+      // Close any existing popup first
+      if (this.dismissingIndex !== null) {
+        this.dismissingIndex = null;
+      }
+
+      // Already dismissed — undo directly
+      if (this.isDismissed(task, index)) {
+        this.undoDismissFinding(task, index);
+        return;
+      }
+
+      if (isHigh) {
+        // Show inline reason selector
+        this.dismissingIndex = index;
+      } else {
+        // Direct dismiss with auto-reason
+        this.dismissFinding(task, index, 'low-priority');
+      }
+    },
+
+    async dismissFinding(task, index, reason) {
+      const note = this.getOrCreateNote(task);
+      note.findings[index] = { status: 'dismissed', reason };
+
+      // Show undo bar for high-severity findings
+      const f = (task.review?.findings || [])[index];
+      const isStory = task.type === 'story';
+      const isHigh = isStory ? f && (f.severity === 'not-met' || f.severity === 'partially-met') : (f && (f.severity === 'critical' || f.severity === 'major'));
+      if (isHigh) {
+        if (this.undoBar && this.undoBar.timer) clearTimeout(this.undoBar.timer);
+        this.undoBar = { findingIndex: index, timer: null };
+        this.undoBar.timer = setTimeout(() => { this.undoBar = null; }, 2000);
+      }
+
+      this.dismissingIndex = null;
+      await this.saveNote(task);
+    },
+
+    async undoDismissFinding(task, index) {
+      const note = this.getOrCreateNote(task);
+      note.findings[index] = { status: 'confirmed', reason: '' };
+      if (this.undoBar) {
+        if (this.undoBar.timer) clearTimeout(this.undoBar.timer);
+        this.undoBar = null;
+      }
+      await this.saveNote(task);
+    },
+
+    async confirmAll(task) {
+      this.confirmingAll = true;
+      try {
+        const note = this.getOrCreateNote(task);
+        for (let i = 0; i < note.findings.length; i++) {
+          if (!note.findings[i].status || note.findings[i].status === '') {
+            note.findings[i] = { status: 'confirmed', reason: '' };
+          }
+        }
+        await this.saveNote(task);
+        this.confirmingAll = false;
+        this.confirmedAllAt = Date.now();
+        setTimeout(() => { this.confirmedAllAt = null; }, 500);
+      } catch (e) {
+        this.confirmingAll = false;
+        this.error = e.message;
+      }
+    },
+
+    async setTaskStatus(task, status) {
+      const note = this.getOrCreateNote(task);
+      note.status = status;
+      await this.saveNote(task);
+    },
+
+    async saveNote(task) {
+      this.saving = true;
+      try {
+        const note = this.getOrCreateNote(task);
+        const r = await fetch('/api/notes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            file: note.file,
+            status: note.status,
+            notes: note.notes || '',
+            findings: note.findings,
+          }),
+        });
+        if (!r.ok) {
+          const data = await r.json().catch(() => ({}));
+          if (r.status === 409) throw new Error('Task AI review not yet completed');
+          throw new Error(data.error || 'Failed to save (HTTP ' + r.status + ')');
+        }
+      } catch (e) {
+        this.error = e.message;
+        setTimeout(() => { this.error = null; }, 5000);
+      } finally {
+        this.saving = false;
+        this.lastSaved = Date.now();
+        setTimeout(() => { this.lastSaved = null; }, 1000);
+      }
+    },
+
+    async autoSaveNote(task) {
+      await this.saveNote(task);
+    },
+
+    humanStatus(task) {
+      const note = this.getNoteForTask(task);
+      if (!note || !note.status) return null;
+      return note.status;
+    },
+
+    humanStatusLabel(task) {
+      const s = this.humanStatus(task);
+      if (!s) return '–';
+      if (s === 'confirmed') return 'Confirmed';
+      if (s === 'action-required') return 'Action Required';
+      if (s === 'deferred') return 'Deferred';
+      return s;
+    },
+
+    severityColor(task) {
+      if (!task.review?.findings?.length) return '#9CA3AF';
+      const sevs = task.review.findings.map(f => f.severity);
+      if (task.type === 'story') {
+        if (sevs.includes('not-met')) return '#DC2626';
+        if (sevs.includes('partially-met')) return '#CA8A04';
+        if (sevs.every(s => s === 'met')) return '#16A34A';
+      }
+      if (sevs.includes('critical')) return '#DC2626';
+      if (sevs.includes('major')) return '#EA580C';
+      if (sevs.includes('minor')) return '#CA8A04';
+      if (sevs.includes('info')) return '#2563EB';
+      return '#9CA3AF';
+    },
+
+    severityCountsForTask(task) {
+      const counts = { critical: 0, major: 0, minor: 0, info: 0, 'not-met': 0, 'partially-met': 0 };
+      for (const f of (task.review?.findings || [])) {
+        counts[f.severity] = (counts[f.severity] || 0) + 1;
+      }
+      return counts;
+    },
+
+    worstFinding(task) {
+      const findings = task.review?.findings || [];
+      if (!findings.length) return '';
+      const sevOrder = ['critical', 'not-met', 'major', 'partially-met', 'minor', 'info'];
+      for (const sev of sevOrder) {
+        const f = findings.find(f => f.severity === sev);
+        if (f) return this.findingDescription(f);
+      }
+      return this.findingDescription(findings[0]);
+    },
+
+    scoreColor(task) {
+      const score = task.review?.score || 0;
+      if (score >= 9) return '#16A34A';
+      if (score >= 7) return '#2563EB';
+      if (score >= 5) return '#CA8A04';
+      return '#DC2626';
+    },
+
+    severityLabel(sev) {
+      const labels = { critical: 'Critical', major: 'Major', minor: 'Minor', info: 'Info',
+                       'not-met': 'Not Met', 'partially-met': 'Partially Met', met: 'Met' };
+      return labels[sev] || sev;
+    },
+
+    severityPillColor(sev) {
+      if (sev === 'critical' || sev === 'not-met') return '#DC2626';
+      if (sev === 'major') return '#EA580C';
+      if (sev === 'minor' || sev === 'partially-met') return '#CA8A04';
+      if (sev === 'info') return '#2563EB';
+      if (sev === 'met') return '#16A34A';
+      return '#9CA3AF';
+    },
+
+    findingStatus(task, index) {
+      const note = this.getNoteForTask(task);
+      if (!note || !note.findings || !note.findings[index]) return null;
+      const f = note.findings[index];
+      const s = typeof f === 'string' ? f : f.status;
+      if (s === 'confirmed') return 'Confirmed';
+      if (s === 'dismissed') return 'Dismissed';
+      return null;
+    },
+
+    async saveSummary() {
+      this.savingSummary = true;
+      try {
+        const r = await fetch('/api/summary', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notes: this.notes.summary.notes, signoff: this.notes.summary.signoff }),
+        });
+        if (!r.ok) throw new Error('Failed to save summary (HTTP ' + r.status + ')');
+        this.savingSummary = false;
+        this.savedSummaryAt = Date.now();
+        this.lastSaved = Date.now();
+        setTimeout(() => { this.savedSummaryAt = null; }, 1000);
+        setTimeout(() => { this.lastSaved = null; }, 1000);
+      } catch (e) {
+        this.savingSummary = false;
+        console.error('Failed to save summary', e);
+        this.error = 'Failed to save sign-off';
+      }
+    },
+
+    async autoSaveSummary() {
+      await this.saveSummary();
+    },
+  }));
+});
+</script>
+
+  <!-- Keyboard Shortcuts Help Overlay -->
+  <div x-show="showHelp" @click.self="showHelp = false"
+       class="fixed inset-0 bg-black/30 z-50 flex items-center justify-center no-print"
+       x-cloak>
+    <div class="bg-white rounded-xl shadow-lg p-6 max-w-sm w-full mx-4">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-sm font-semibold text-gray-900">Keyboard Shortcuts</h2>
+        <button @click="showHelp = false" class="text-gray-400 hover:text-gray-600">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <table class="w-full text-sm">
+        <tr class="border-b border-gray-100"><td class="py-2 pr-4"><kbd class="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">&larr;</kbd> <kbd class="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">&rarr;</kbd></td><td class="py-2 text-gray-600">Previous / Next task</td></tr>
+        <tr class="border-b border-gray-100"><td class="py-2 pr-4"><kbd class="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">J</kbd></td><td class="py-2 text-gray-600">Next task</td></tr>
+        <tr class="border-b border-gray-100"><td class="py-2 pr-4"><kbd class="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">K</kbd></td><td class="py-2 text-gray-600">Previous task</td></tr>
+        <tr class="border-b border-gray-100"><td class="py-2 pr-4"><kbd class="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">O</kbd></td><td class="py-2 text-gray-600">Overview</td></tr>
+        <tr class="border-b border-gray-100"><td class="py-2 pr-4"><kbd class="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">S</kbd></td><td class="py-2 text-gray-600">Summary</td></tr>
+        <tr class="border-b border-gray-100"><td class="py-2 pr-4"><kbd class="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">?</kbd></td><td class="py-2 text-gray-600">Toggle this help</td></tr>
+        <tr><td class="py-2 pr-4"><kbd class="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono">Esc</kbd></td><td class="py-2 text-gray-600">Close overlay</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- ======================== PRINT-ONLY SECTION ======================== -->
+  <div class="print-only" style="display: none;">
+    <!-- Cover Page -->
+    <section>
+      <h1 class="text-2xl font-bold mb-4">A-Solid Audit Report</h1>
+      <table class="w-full max-w-md">
+        <tr><td class="font-medium py-1 pr-4">Grade:</td><td x-text="grade.letter"></td></tr>
+        <tr><td class="font-medium py-1 pr-4">Score:</td><td x-text="avgScore"></td></tr>
+        <tr><td class="font-medium py-1 pr-4">Session:</td><td x-text="session?.name || session?.id || '–'"></td></tr>
+        <tr><td class="font-medium py-1 pr-4">Date:</td><td x-text="session?.date || '–'"></td></tr>
+        <tr><td class="font-medium py-1 pr-4">Reviewer:</td><td x-text="notes.summary.signoff.name || '–'"></td></tr>
+      </table>
+    </section>
+
+    <!-- Findings Summary -->
+    <section>
+      <h2 class="text-lg font-bold mb-4">Findings Summary</h2>
+      <table class="w-full max-w-md">
+        <thead><tr><th class="text-left">Severity</th><th class="text-right">Count</th></tr></thead>
+        <tbody>
+          <template x-for="s in [
+            {key:'critical', label:'Critical'},
+            {key:'major', label:'Major'},
+            {key:'minor', label:'Minor'},
+            {key:'info', label:'Info'},
+            {key:'not-met', label:'Not Met'},
+            {key:'partially-met', label:'Partially Met'}
+          ]" :key="s.key">
+            <tr x-show="(severityCounts[s.key] || 0) > 0">
+              <td x-text="s.label"></td>
+              <td class="text-right font-mono" x-text="severityCounts[s.key] || 0"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+      <div class="mt-4">
+        <p><strong>Confirmed:</strong> <span x-text="humanReviewStats.confirmed"></span></p>
+        <p><strong>Dismissed:</strong> <span x-text="humanReviewStats.dismissed"></span></p>
+        <p><strong>Pending:</strong> <span x-text="humanReviewStats.pending"></span></p>
+      </div>
+    </section>
+
+    <!-- Task Status Table -->
+    <section>
+      <h2 class="text-lg font-bold mb-4">Task Status</h2>
+      <table class="w-full">
+        <thead><tr><th class="text-left">Task</th><th class="text-right">Score</th><th>AI Review</th><th>Human Confirm</th></tr></thead>
+        <tbody>
+          <template x-for="task in sortedTasks" :key="task.file">
+            <tr>
+              <td x-text="task.name || task.file"></td>
+              <td class="text-right font-mono" x-text="taskScore(task)"></td>
+              <td x-text="task.status"></td>
+              <td x-text="humanStatusLabel(task)"></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Per-Task Detail -->
+    <template x-for="task in tasks" :key="task.file">
+      <section>
+        <h2 class="text-lg font-bold mb-1" x-text="task.name || task.file"></h2>
+        <p class="text-sm text-gray-600 mb-4">
+          Type: <span x-text="task.type || 'code'"></span> |
+          Score: <span x-text="taskScore(task)"></span> |
+          AI Status: <span x-text="task.status"></span> |
+          Human Status: <span x-text="humanStatusLabel(task)"></span>
+        </p>
+
+        <!-- Summary -->
+        <div x-show="task.review?.summary" class="mb-4">
+          <p class="text-sm text-gray-700" x-text="task.review.summary"></p>
+        </div>
+
+        <!-- Acceptance Criteria (story) -->
+        <div x-show="task.type === 'story' && task.acceptance" class="mb-4">
+          <h3 class="font-semibold text-sm mb-1">Acceptance Criteria</h3>
+          <p class="text-sm text-gray-700 whitespace-pre-wrap" x-text="task.acceptance"></p>
+        </div>
+
+        <!-- Findings -->
+        <h3 class="font-semibold text-sm mb-2">Findings</h3>
+        <table class="w-full mb-4 findings-table">
+          <thead><tr><th>Severity</th><th>Description</th><th>Location</th><th>Status</th></tr></thead>
+          <tbody>
+            <template x-for="(f, fi) in (task.review?.findings || [])" :key="fi">
+              <tr>
+                <td>
+                  <span class="inline-block px-1 py-0.5 rounded text-xs font-semibold text-white"
+                        :style="'background-color: ' + severityPillColor(f.severity)"
+                        x-text="severityLabel(f.severity)"></span>
+                </td>
+                <td class="finding-desc" x-text="findingDescription(f)"></td>
+                <td>
+                  <span x-text="(f.file || '') + (f.line ? ':' + f.line : '')"></span>
+                  <span x-show="f.criteria" class="text-gray-400" x-text="' (Criteria: ' + f.criteria + ')'"></span>
+                </td>
+                <td x-text="findingStatus(task, fi) || '–'"></td>
+              </tr>
+            </template>
+          </tbody>
+        </table>
+
+        <!-- Suggestions -->
+        <template x-for="(f, fi) in (task.review?.findings || [])" :key="'sugg-' + fi">
+          <div x-show="f.suggestion || f.fix" class="mb-1 text-xs text-gray-600">
+            💡 <span x-text="f.suggestion || f.fix"></span>
+          </div>
+        </template>
+
+        <!-- Positives -->
+        <div x-show="(task.review?.positives || []).length > 0" class="mb-4">
+          <h3 class="font-semibold text-sm mb-1">Positives</h3>
+          <ul class="list-disc list-inside text-sm text-gray-700">
+            <template x-for="(p, pi) in (task.review?.positives || [])" :key="pi">
+              <li x-text="p"></li>
+            </template>
+          </ul>
+        </div>
+
+        <!-- Gaps (story) -->
+        <div x-show="task.type === 'story' && (task.review?.gaps || []).length > 0" class="mb-4">
+          <h3 class="font-semibold text-sm mb-1">Gaps</h3>
+          <ul class="list-disc list-inside text-sm text-gray-700">
+            <template x-for="(g, gi) in (task.review?.gaps || [])" :key="gi">
+              <li x-text="g"></li>
+            </template>
+          </ul>
+        </div>
+      </section>
+    </template>
+
+    <!-- Sign-off -->
+    <section>
+      <h2 class="text-lg font-bold mb-4">Sign-off</h2>
+      <p><strong>Name:</strong> <span x-text="notes.summary.signoff.name || '–'"></span></p>
+      <p><strong>Role:</strong> <span x-text="notes.summary.signoff.role || '–'"></span></p>
+      <p><strong>Date:</strong> <span x-text="notes.summary.signoff.date || '–'"></span></p>
+      <div class="mt-12 pt-4 border-t border-gray-300 w-48">
+        <p class="text-sm text-gray-500">Signature</p>
+      </div>
+    </section>
+  </div>
+</body>
+</html>

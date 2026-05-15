@@ -1,0 +1,9 @@
+{
+  "name": "a-solid-audit",
+  "description": "Orchestrates code quality reviews and story alignment reviews for git changes. Generates structured YAML findings with scoring, supports JIRA integration, and provides a web report UI.",
+  "version": "1.0.0",
+  "author": { "name": "BG307435" },
+  "license": "MIT",
+  "keywords": ["audit", "code-review", "story-review", "quality"],
+  "skills": ["./skills/audit"]
+}

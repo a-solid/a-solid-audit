@@ -30,7 +30,8 @@ digraph audit_flow {
     "Init session\n+ start server" [shape=box];
     "Generate git diff" [shape=box];
     "Story review or all?" [shape=diamond];
-    "Collect & map stories" [shape=box];
+    "Collect stories" [shape=box];
+    "Map stories\nto code changes" [shape=box];
     "Code review loop" [shape=box];
     "Story review loop" [shape=box];
     "Completion +\nUser review phase" [shape=doublecircle];
@@ -40,9 +41,10 @@ digraph audit_flow {
     "Ask review type\n+ git scope" -> "Init session\n+ start server";
     "Init session\n+ start server" -> "Generate git diff";
     "Generate git diff" -> "Story review or all?";
-    "Story review or all?" -> "Collect & map stories" [label="yes"];
+    "Story review or all?" -> "Collect stories" [label="yes"];
     "Story review or all?" -> "Code review loop" [label="no"];
-    "Collect & map stories" -> "Code review loop";
+    "Collect stories" -> "Map stories\nto code changes";
+    "Map stories\nto code changes" -> "Code review loop";
     "Code review loop" -> "Story review loop";
     "Story review loop" -> "Completion +\nUser review phase";
 }
@@ -59,9 +61,12 @@ digraph audit_flow {
 
 ### 2. Ask Review Type + Git Scope
 
-Ask: "What type of review? **code review** / **story review** / **all**"
+- Ask User: "What type of review? 
+1. **code review** 
+2. **story review** 
+3. **all**"
 
-Ask: "What git scope to review?
+- Ask User: "What git scope to review?"
 1. **Uncommitted changes** — working directory + staged
 2. **Two commits** — provide two commit IDs
 3. **Branch diff** — compare branch against base (default: main...HEAD)"
@@ -79,29 +84,43 @@ Run: `node scripts/cli.mjs git-diff <session-id> <scope-type> [scope-ref]`
 
 If no changes returned, inform user and exit gracefully.
 
-### 5. Collect & Map Stories (if story review or all)
+### 5. Collect Stories (if story review or all)
 
-1. Discover available providers:
-   - Run: `node scripts/cli.mjs list-providers`
-2. Ask user a single binary question:
-   - If providers available: "Fetch stories from [provider names] or paste story text?"
-   - If no providers: "Paste your story text in the next message."
-3. If user chooses a provider:
-   - Ask for story IDs
-   - Run: `node scripts/cli.mjs provider-fetch <provider-name> <story-id> [<story-id> ...]`
-   - For each story in the returned JSON array, run: `node scripts/cli.mjs story-init <session-id> '{"name":"<story.id || story.name>","description":"<story.description>","acceptance":"<story.acceptance>"}'`
-4. If user chooses paste (or no providers exist):
-   - Say: "Please paste your story text in the next message."
-   - **STOP and wait for the user's message.** Do not ask follow-up questions about format, acceptance criteria, or details.
-   - When user pastes text: auto-generate a short kebab-case name from the content (3-5 keywords)
-   - Run: `node scripts/cli.mjs story-init <session-id> '{"name":"<name>","description":"<text>","acceptance":""}'`
+This step has two branches. Run step A to discover providers, then follow **Branch Provider** or **Branch Paste** based on availability and user choice.
 
-**Critical:** When the user chooses paste, say "Please paste your story text in the next message." and STOP. The user's next message IS the story text — do not ask any additional questions before processing it.
+#### A. Discover providers
 
-5. Read all code task YAMLs from `.audit/<session-id>/code-tasks/`, analyze which changed files are relevant to each story, produce mapping JSON: `[{"storyName":"<name>","description":"...","acceptance":"...","files":["path/to/file"]}]`
-6. Run: `node scripts/cli.mjs map-stories <session-id> '<mapping-json>'`
+Run: `node scripts/cli.mjs list-providers`
 
-### 6. Code Review Loop
+- If providers are listed: ask user "Fetch stories from [provider names] or paste story text?"
+  - User picks provider → follow **Branch Provider**
+  - User picks paste → follow **Branch Paste**
+- If no providers: follow **Branch Paste** directly (no question needed)
+
+#### Branch Provider: fetch from external source
+
+1. Ask user for story IDs (e.g. JIRA ticket keys)
+2. Run: `node scripts/cli.mjs provider-fetch <provider-name> <story-id> [<story-id> ...]`
+3. For each story object in the returned JSON array, run:
+   `node scripts/cli.mjs story-init <session-id> '{"name":"<story.id || story.name>","description":"<story.description>","acceptance":"<story.acceptance>"}'`
+
+#### Branch Paste: user provides story text
+
+1. Say to user: **"Please paste your story text in the next message."** Then STOP — do not ask any further questions.
+2. The user's next message IS the story text. Process it as follows:
+   - Auto-generate a short kebab-case name from the content (3-5 keywords)
+   - Run: `node scripts/cli.mjs story-init <session-id> '{"name":"<name>","description":"<full pasted text>","acceptance":""}'`
+
+### 6. Map Stories to Code Changes
+
+After stories are collected (from either branch):
+
+1. Read all code task YAMLs from `.audit/<session-id>/code-tasks/`
+2. Analyze which changed files are relevant to each story
+3. Produce mapping JSON: `[{"storyName":"<name>","description":"...","acceptance":"...","files":["path/to/file"]}]`
+4. Run: `node scripts/cli.mjs map-stories <session-id> '<mapping-json>'`
+
+### 7. Code Review Loop
 
 For each task in `codeTasks` with status `pending` (process sequentially, one at a time):
 
@@ -111,7 +130,7 @@ For each task in `codeTasks` with status `pending` (process sequentially, one at
 4. The sub-agent writes results under `review:` in the task YAML
 5. Verify the task file was updated (read back to confirm `status: reviewed`)
 
-### 7. Story Review Loop (if story review or all)
+### 8. Story Review Loop (if story review or all)
 
 For each task in `storyTasks` with status `pending` (process sequentially, one at a time):
 
@@ -122,7 +141,7 @@ For each task in `storyTasks` with status `pending` (process sequentially, one a
 5. The sub-agent writes results under `review:` in the task YAML
 6. Verify the task file was updated
 
-### 8. Completion + User Review Phase
+### 9. Completion + User Review Phase
 
 1. Inform user: "Review complete. YAML data is in `.audit/<session-id>/`."
 2. Inform user: "Open http://localhost:3456 to review findings, add notes, and sign off."

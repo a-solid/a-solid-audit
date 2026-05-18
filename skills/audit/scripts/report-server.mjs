@@ -158,37 +158,6 @@ async function handlePostSummary(req, res, sessionDir) {
   jsonResponse(res, { ok: true });
 }
 
-async function handleBatchConfirm(req, res, sessionDir) {
-  const body = JSON.parse(await readBody(req));
-  if (!body || typeof body.file !== 'string' || !body.file) {
-    return jsonResponse(res, { error: "Missing required field: file" }, 400);
-  }
-  const index = readYaml(path.join(sessionDir, "index.yaml"));
-  const allRefs = [...(index.codeTasks || []), ...(index.storyTasks || [])];
-  const ref = allRefs.find(t => t.file === body.file);
-  if (!ref || ref.status !== "reviewed") {
-    jsonResponse(res, { error: "Task AI review not yet completed" }, 409);
-    return;
-  }
-
-  const notes = readNotes(sessionDir);
-  let entry = notes.tasks.find(t => t.file === body.file);
-  if (!entry) {
-    jsonResponse(res, { error: "No note entry found" }, 404);
-    return;
-  }
-
-  let count = 0;
-  entry.findings = (entry.findings || []).map(f => {
-    const status = typeof f === "string" ? f : (f.status || "");
-    if (!status) { count++; return { status: "confirmed", reason: "" }; }
-    return typeof f === "string" ? { status: f, reason: "" } : f;
-  });
-
-  writeNotes(sessionDir, notes);
-  jsonResponse(res, { ok: true, confirmed: count });
-}
-
 function serveTemplate(req, res) {
   const templatePath = path.join(import.meta.dirname, "report-template.html");
   if (!fs.existsSync(templatePath)) {
@@ -220,7 +189,6 @@ export function startReportServer(sessionId, port = 3456) {
       return handleGetTask(req, res, sessionDir, decodeURIComponent(url.pathname.slice("/api/tasks/".length)));
     }
     if (req.method === "POST" && url.pathname === "/api/notes") return handlePostNotes(req, res, sessionDir);
-    if (req.method === "POST" && url.pathname === "/api/notes/batch-confirm") return handleBatchConfirm(req, res, sessionDir);
     if (req.method === "POST" && url.pathname === "/api/summary") return handlePostSummary(req, res, sessionDir);
 
     res.writeHead(404);

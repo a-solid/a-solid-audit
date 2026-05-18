@@ -567,13 +567,6 @@
               <span x-show="dismissedCountForTask(currentTask) === 0"
                     class="text-xs text-gray-400">· All Default ✓</span>
             </div>
-            <button @click="confirmAll(currentTask)"
-                    :disabled="confirmingAll"
-                    class="text-xs text-indigo-600 hover:text-indigo-800 font-medium transition-all duration-150 disabled:opacity-50">
-              <span x-show="!confirmingAll && !confirmedAllAt">Confirm All</span>
-              <span x-show="confirmingAll">Confirming...</span>
-              <span x-show="confirmedAllAt && !confirmingAll" x-transition>Confirmed ✓</span>
-            </button>
           </div>
 
           <!-- Severity Groups -->
@@ -863,8 +856,7 @@ document.addEventListener('alpine:init', () => {
     showHelp: false,
     pollTimer: null,
     lastSaved: null,
-    confirmingAll: false,
-    confirmedAllAt: null,
+
 
     // Task Detail state
     dismissingIndex: null,       // finding index with open dismiss popup (null = closed)
@@ -1247,28 +1239,14 @@ document.addEventListener('alpine:init', () => {
       await this.saveNote(task);
     },
 
-    async confirmAll(task) {
-      this.confirmingAll = true;
-      try {
-        const note = this.getOrCreateNote(task);
-        for (let i = 0; i < note.findings.length; i++) {
-          if (!note.findings[i].status || note.findings[i].status === '') {
-            note.findings[i] = { status: 'confirmed', reason: '' };
-          }
-        }
-        await this.saveNote(task);
-        this.confirmingAll = false;
-        this.confirmedAllAt = Date.now();
-        setTimeout(() => { this.confirmedAllAt = null; }, 500);
-      } catch (e) {
-        this.confirmingAll = false;
-        this.error = e.message;
-      }
-    },
-
     async setTaskStatus(task, status) {
       const note = this.getOrCreateNote(task);
       note.status = status;
+      for (let i = 0; i < note.findings.length; i++) {
+        if (!note.findings[i].status || note.findings[i].status === '') {
+          note.findings[i] = { status: 'confirmed', reason: '' };
+        }
+      }
       await this.saveNote(task);
     },
 

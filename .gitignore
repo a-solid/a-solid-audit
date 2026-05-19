@@ -21,3 +21,6 @@ Thumbs.db
 # Superpowers (local tooling, not part of the project)
 .superpowers/
 docs/superpowers/
+
+# Git worktrees
+.worktrees/

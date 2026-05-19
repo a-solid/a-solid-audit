@@ -1,0 +1,122 @@
+// skills/audit/scripts/server/handlers/notes.mjs
+import fs from "node:fs";
+import path from "node:path";
+import { sanitizePath } from "../../lib/session.mjs";
+import { readYaml, writeYaml } from "../../lib/yaml.mjs";
+import { jsonResponse, readBody, errorResponse } from "../index.mjs";
+
+const NOTES_FILE = "review-notes.yaml";
+
+const OLD_TASK_STATUS_MAP = {
+  accept: "confirmed", reviewed: "confirmed",
+  "needs-work": "action-required", skip: "deferred",
+};
+
+function migrateNoteEntry(entry) {
+  if (!entry) return entry;
+  if (OLD_TASK_STATUS_MAP[entry.status]) entry.status = OLD_TASK_STATUS_MAP[entry.status];
+  if (Array.isArray(entry.findings)) {
+    entry.findings = entry.findings.map(f => {
+      if (typeof f === "string") return { status: f, reason: "" };
+      return f;
+    });
+  }
+  return entry;
+}
+
+function readNotes(sessionDir) {
+  const p = path.join(sessionDir, NOTES_FILE);
+  if (!fs.existsSync(p)) return { tasks: [], summary: { notes: "", signoff: { name: "", role: "", date: "" } } };
+  const notes = readYaml(p);
+  if (notes && notes.tasks) notes.tasks = notes.tasks.map(migrateNoteEntry);
+  return notes;
+}
+
+function writeNotes(sessionDir, data) {
+  writeYaml(path.join(sessionDir, NOTES_FILE), data);
+}
+
+export function registerNoteRoutes(router, reportsDir) {
+  // GET /api/sessions/:id/notes
+  router.get("/api/sessions/:id/notes", (req, res, params) => {
+    try {
+      const safeSid = sanitizePath(params.id);
+      const sessionDir = path.join(reportsDir, safeSid);
+      if (!fs.existsSync(path.join(sessionDir, "index.yaml"))) {
+        return errorResponse(res, "Session not found", "NOT_FOUND", 404);
+      }
+      jsonResponse(res, readNotes(sessionDir));
+    } catch (e) {
+      if (e.message.includes("Invalid path")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
+      throw e;
+    }
+  });
+
+  // POST /api/sessions/:id/notes — update task review
+  router.post("/api/sessions/:id/notes", async (req, res, params) => {
+    try {
+      const safeSid = sanitizePath(params.id);
+      const sessionDir = path.join(reportsDir, safeSid);
+      if (!fs.existsSync(path.join(sessionDir, "index.yaml"))) {
+        return errorResponse(res, "Session not found", "NOT_FOUND", 404);
+      }
+
+      const body = JSON.parse(await readBody(req));
+      if (!body || typeof body.file !== "string" || !body.file) {
+        return errorResponse(res, "Missing required field: file", "VALIDATION_ERROR", 400);
+      }
+      if (body.status !== undefined && !["confirmed", "action-required", "deferred", ""].includes(body.status)) {
+        return errorResponse(res, "Invalid status value", "VALIDATION_ERROR", 400);
+      }
+      if (body.findings !== undefined && !Array.isArray(body.findings)) {
+        return errorResponse(res, "findings must be an array", "VALIDATION_ERROR", 400);
+      }
+
+      const notes = readNotes(sessionDir);
+      let entry = notes.tasks.find(t => t.file === body.file);
+      if (!entry) {
+        const taskPath = path.join(sessionDir, body.file);
+        const task = fs.existsSync(taskPath) ? readYaml(taskPath) : null;
+        const findingCount = (task?.review?.findings || []).length;
+        const findings = Array.from({ length: findingCount }, () => ({ status: "confirmed", reason: "" }));
+        entry = { file: body.file, status: "", notes: "", findings };
+        notes.tasks.push(entry);
+      }
+
+      if (body.status !== undefined) entry.status = body.status;
+      if (body.notes !== undefined) entry.notes = body.notes;
+      if (body.findings !== undefined) entry.findings = body.findings;
+
+      writeNotes(sessionDir, notes);
+      jsonResponse(res, { ok: true });
+    } catch (e) {
+      if (e.message.includes("Invalid path")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
+      throw e;
+    }
+  });
+
+  // POST /api/sessions/:id/summary — update summary + sign-off
+  router.post("/api/sessions/:id/summary", async (req, res, params) => {
+    try {
+      const safeSid = sanitizePath(params.id);
+      const sessionDir = path.join(reportsDir, safeSid);
+      if (!fs.existsSync(path.join(sessionDir, "index.yaml"))) {
+        return errorResponse(res, "Session not found", "NOT_FOUND", 404);
+      }
+
+      const body = JSON.parse(await readBody(req));
+      if (!body) return errorResponse(res, "Empty request body", "VALIDATION_ERROR", 400);
+
+      const notes = readNotes(sessionDir);
+      if (!notes.summary) notes.summary = { notes: "", signoff: { name: "", role: "", date: "" } };
+      if (body.notes !== undefined) notes.summary.notes = body.notes;
+      if (body.signoff) Object.assign(notes.summary.signoff, body.signoff);
+
+      writeNotes(sessionDir, notes);
+      jsonResponse(res, { ok: true });
+    } catch (e) {
+      if (e.message.includes("Invalid path")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
+      throw e;
+    }
+  });
+}

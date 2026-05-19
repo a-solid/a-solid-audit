@@ -16,6 +16,10 @@ export function setProjectDir(dir) {
   projectDir = dir;
 }
 
+export function getProjectDir() {
+  return projectDir;
+}
+
 export function getReportsDir() {
   return path.join(projectDir, ".audit");
 }

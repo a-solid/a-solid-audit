@@ -403,7 +403,7 @@ export async function renderWizard(container, params) {
 
         <div class="mt-4 info-banner info-banner-amber">
           ${icon("zap", 16)}
-          <span>AI review runs in the Claude Code terminal. Keep the terminal open.</span>
+          <span>Click "Start AI Review" below, then go back to the Claude Code terminal and type <strong>start review</strong> to begin.</span>
         </div>
       </div>
       <div class="flex justify-between">
@@ -458,10 +458,22 @@ export async function renderWizard(container, params) {
       try {
         const btn = document.getElementById("start-review-btn");
         btn.disabled = true;
-        btn.innerHTML = `<span class="spinner spinner-sm"></span> Starting...`;
+        btn.innerHTML = `<span class="spinner spinner-sm"></span> Preparing...`;
         await api.updateSessionStatus(sessionId, "ready");
         localStorage.removeItem(savedKey);
-        location.hash = `#/progress/${sessionId}`;
+        // Show confirmation instead of navigating away
+        const content = document.getElementById("wizard-content");
+        content.innerHTML = `
+          <div class="card" style="text-align:center;padding:var(--space-8) var(--space-6)">
+            <div style="margin-bottom:var(--space-4);color:var(--accent)">${icon("check", 48)}</div>
+            <h2 class="text-xl mb-3">Audit Ready</h2>
+            <p class="text-secondary mb-4">Session is prepared. Go back to the Claude Code terminal and type:</p>
+            <code style="font-size:var(--text-lg);background:var(--bg-elevated);padding:var(--space-2) var(--space-4);border-radius:var(--radius-md);display:inline-block">start review</code>
+            <div class="mt-4">
+              <a href="#/progress/${sessionId}" class="btn btn-ghost">View Progress ${icon("chevronRight", 14)}</a>
+            </div>
+          </div>`;
+      } catch (e) {
       } catch (e) {
         showToast("Failed to start review: " + e.message);
         const btn = document.getElementById("start-review-btn");

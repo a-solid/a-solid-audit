@@ -20,25 +20,18 @@ All commands are run via `node scripts/cli.mjs [--project-dir <path>] <command>`
 ### 1. Startup
 
 1. Start the server: `node scripts/cli.mjs server` (background process)
-2. Tell the user: "A-Solid Audit server running at http://localhost:3456 — open this URL in your browser."
-3. The server serves all sessions in `.audit/`. The user creates a new audit, configures scope, and adds stories in the browser.
+2. Tell the user: "A-Solid Audit server running at http://localhost:3456 — open this URL in your browser. When you finish configuring scope and stories, come back here and type `start review`."
+3. **Stop and wait.** Do NOT poll. The user will return to the terminal when ready.
 
-### 2. Poll for Ready
+### 2. Begin Review (triggered by user saying `start review`)
 
-After telling the user to open the browser:
+1. Call `GET /api/sessions` to find sessions. Pick the one with status `ready` (or `reviewing` for a resumed session).
+2. If no session is `ready`, tell the user: "No ready session found. Please finish configuring in the browser first."
+3. If a session is `ready`, update its status via API: `PUT /api/sessions/:id/status` with `{ status: "reviewing" }`
+4. Read `GET /api/sessions/:id/tasks` to get the task list. Filter for `type === "code"` to get code tasks.
+5. Confirm there are code tasks. If none, tell user to check scope.
 
-1. Poll `GET /api/sessions` every 3-5 seconds to discover the session the user creates.
-2. Once a session is found, poll `GET /api/sessions/:id` every 3-5 seconds.
-3. Wait until `session.status === "ready"`.
-4. If a session already has status `reviewing` (resumed session), skip to step 4.
-
-### 3. Begin Review
-
-1. When status is `ready`, update session status via API: `PUT /api/sessions/:id/status` with `{ status: "reviewing" }`
-2. Read `GET /api/sessions/:id/tasks` to get the task list. Filter for `type === "code"` to get code tasks.
-3. Confirm there are code tasks. If none, tell user to check scope.
-
-### 4. Code Review Loop
+### 3. Code Review Loop
 
 For each task with `type === "code"` and status `pending` (process sequentially, one at a time):
 
@@ -48,7 +41,7 @@ For each task with `type === "code"` and status `pending` (process sequentially,
 4. The sub-agent writes results under `review:` in the task YAML
 5. Verify the task file was updated (read back to confirm `status: reviewed`)
 
-### 5. Story Review Loop (if tasks with `type === "story"` exist)
+### 4. Story Review Loop (if tasks with `type === "story"` exist)
 
 For each story task with status `pending` (process sequentially, one at a time):
 
@@ -59,7 +52,7 @@ For each story task with status `pending` (process sequentially, one at a time):
 5. The sub-agent writes results under `review:` in the task YAML
 6. Verify the task file was updated
 
-### 6. Completion
+### 5. Completion
 
 1. When all tasks are reviewed, the `update-task` command automatically sets session status to `completed`.
 2. Inform user: "Review complete. Findings are available in the browser at http://localhost:3456."

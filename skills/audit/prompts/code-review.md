@@ -86,15 +86,15 @@ review:
 
 ## Review Context File
 
-The orchestra agent may pass you a `review-context.md` file path alongside the task file. If it exists:
+The orchestra agent passes you the session directory path alongside the task file. Read `review-context.md` from the session directory.
 
 1. Read the file. The `## User Context` section contains project background, requirements, and focus areas provided by the user.
 2. Use this context to prioritize your review — pay extra attention to areas the user flagged (security, performance, specific patterns, etc.).
-3. After completing your review, you MAY append useful observations to the `## Review Notes` section of `review-context.md`. Append things like:
+3. After completing your review, append useful observations to the `## Review Notes` section. Append things like:
    - Cross-file patterns you noticed ("Multiple files have the same error handling gap...")
    - Shared risks or dependencies between files
    - Anything that would help a reviewer reviewing subsequent files
-4. When appending, preserve all existing content. Only add to the Review Notes section, never modify User Context.
+4. When appending, preserve all existing content. Only add below the existing Review Notes content, never modify User Context.
 
 ## After Review
 

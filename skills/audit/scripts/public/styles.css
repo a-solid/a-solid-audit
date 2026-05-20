@@ -549,8 +549,8 @@ code {
   padding: var(--space-2) 0;
 }
 .severity-bar-label {
-  width: 72px; font-size: var(--text-xs); text-transform: uppercase;
-  letter-spacing: 0.5px; font-weight: 600;
+  min-width: 72px; font-size: var(--text-xs); text-transform: uppercase;
+  letter-spacing: 0.5px; font-weight: 600; white-space: nowrap;
 }
 .severity-bar-track {
   flex: 1; height: 6px; background: var(--bg-active);

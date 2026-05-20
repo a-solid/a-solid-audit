@@ -2,6 +2,12 @@
 import { api } from "../api.mjs";
 import { showToast, setBreadcrumb, icon, escapeHtml } from "../app.mjs";
 
+const SEVERITY_LABELS = {
+  'partially-met': 'Partial',
+  'not-met': 'Not Met',
+  'met': 'Met',
+};
+
 export async function renderSummary(container, params) {
   const sessionId = params[0];
   let tasks = [];
@@ -103,7 +109,7 @@ export async function renderSummary(container, params) {
       <div class="font-medium mb-4">Findings by Severity</div>
       ${Object.entries(bySeverity).map(([sev, count]) => `
         <div class="severity-bar-row">
-          <span class="badge severity-${sev} severity-bar-label">${sev}</span>
+          <span class="badge severity-${sev} severity-bar-label">${SEVERITY_LABELS[sev] || sev}</span>
           <div class="severity-bar-track">
             <div class="severity-bar-fill" style="width:${(count / maxSevCount) * 100}%;background:${sevColors[sev] || "var(--info)"}"></div>
           </div>

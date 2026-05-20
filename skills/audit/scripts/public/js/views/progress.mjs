@@ -1,24 +1,44 @@
 // skills/audit/scripts/public/js/views/progress.mjs
 import { api } from "../api.mjs";
-import { showToast } from "../app.mjs";
+import { showToast, setBreadcrumb, icon, escapeHtml, onNavigateCleanup } from "../app.mjs";
 
 export async function renderProgress(container, params) {
   const sessionId = params[0];
   let pollFailures = 0;
   let pollTimer = null;
 
+  setBreadcrumb([
+    { label: "Sessions", href: "#/home" },
+    { label: "In Progress" },
+  ]);
+
   container.innerHTML = `
-    <h1 class="text-2xl font-bold text-gray-900 mb-2">AI Review in Progress</h1>
-    <p class="text-sm text-gray-500 mb-6">Keep the Claude Code terminal open.</p>
-    <div class="card mb-4">
-      <div id="progress-overview"></div>
-      <div class="progress-bar mt-3"><div id="progress-fill" class="progress-fill" style="width:0%"></div></div>
-      <div id="progress-text" class="text-sm text-gray-500 mt-2"></div>
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-2xl">AI Review in Progress</h1>
+        <p class="text-sm text-muted mt-1">Keep the Claude Code terminal open.</p>
+      </div>
+      <div id="session-badge"></div>
     </div>
+
+    <div class="card mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <div id="progress-text" class="text-sm text-secondary"></div>
+        <div id="progress-pct" class="text-sm font-mono font-semibold"></div>
+      </div>
+      <div class="progress-bar progress-bar-lg">
+        <div id="progress-fill" class="progress-fill" style="width:0%"></div>
+      </div>
+    </div>
+
     <div id="task-list" class="space-y-2"></div>
-    <div id="poll-warning" class="hidden mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
-      <span class="text-sm text-yellow-700">Connection issues detected.</span>
-      <button id="manual-refresh-btn" class="btn text-sm ml-2">Refresh</button>
+
+    <div id="poll-warning" class="hidden mt-4">
+      <div class="info-banner info-banner-amber">
+        ${icon("alertTriangle", 16)}
+        <span>Connection issues detected.</span>
+        <button id="manual-refresh-btn" class="btn btn-sm ml-3">Refresh</button>
+      </div>
     </div>
   `;
 
@@ -34,30 +54,38 @@ export async function renderProgress(container, params) {
       const pct = total ? Math.round((reviewed / total) * 100) : 0;
 
       document.getElementById("progress-fill").style.width = pct + "%";
-      document.getElementById("progress-text").textContent = `${reviewed}/${total} tasks reviewed`;
+      document.getElementById("progress-text").textContent = `${reviewed} of ${total} tasks reviewed`;
+      document.getElementById("progress-pct").textContent = pct + "%";
+      document.getElementById("session-badge").innerHTML = `<span class="badge badge-${session.status}">${session.status}</span>`;
 
-      document.getElementById("progress-overview").innerHTML = `
-        <span class="badge badge-${session.status}">${session.status}</span>
-        <span class="text-sm text-gray-500 ml-3">${session.type} review</span>`;
+      document.getElementById("task-list").innerHTML = tasks.map(t => {
+        const isReviewing = t.status === "reviewing";
+        const isReviewed = t.status === "reviewed";
+        const scoreColor = t.review?.score >= 7 ? "text-success" : t.review?.score >= 4 ? "text-warning" : "text-danger";
+        return `
+          <div class="card flex items-center justify-between" style="padding:var(--space-3) var(--space-4)">
+            <div class="flex items-center gap-3" style="min-width:0">
+              ${isReviewing
+                ? `<span class="spinner spinner-sm" style="flex-shrink:0"></span>`
+                : isReviewed
+                  ? `<span style="color:var(--accent);flex-shrink:0">${icon("check", 16)}</span>`
+                  : `<span style="color:var(--text-muted);flex-shrink:0">${icon("clock", 16)}</span>`
+              }
+              <span class="text-sm font-mono truncate">${escapeHtml(t.name || t.file)}</span>
+            </div>
+            <div class="flex items-center gap-3" style="flex-shrink:0">
+              ${t.review?.score ? `<span class="text-sm font-mono ${scoreColor}">${t.review.score}/10</span>` : ""}
+              <span class="badge badge-${t.status === "reviewing" ? "reviewing-task" : t.status}">${t.status}</span>
+            </div>
+          </div>`;
+      }).join("");
 
-      document.getElementById("task-list").innerHTML = tasks.map(t => `
-        <div class="card flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <span class="badge badge-${t.status}-task">${t.status}</span>
-            <span class="text-sm font-mono">${t.name || t.file}</span>
-          </div>
-          <span class="text-sm text-gray-500">${t.review?.score ? 'Score: ' + t.review.score : ''}</span>
-        </div>
-      `).join("");
-
-      // Auto-navigate when all reviewed
       if (reviewed === total && total > 0 && session.status === "completed") {
         clearInterval(pollTimer);
         location.hash = `#/review/${sessionId}`;
         return;
       }
 
-      // If still waiting for AI review to begin
       if (session.status === "scoped") {
         document.getElementById("progress-text").textContent = "Waiting for AI review to begin...";
       }
@@ -79,6 +107,8 @@ export async function renderProgress(container, params) {
   await poll();
   pollTimer = setInterval(poll, 3000);
 
-  // Cleanup on navigation away
-  window.addEventListener("hashchange", () => clearInterval(pollTimer), { once: true });
+  // Cleanup on navigation
+  onNavigateCleanup(() => {
+    if (pollTimer) clearInterval(pollTimer);
+  });
 }

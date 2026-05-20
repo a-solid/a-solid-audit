@@ -24,3 +24,4 @@ docs/superpowers/
 
 # Git worktrees
 .worktrees/
+.audit/

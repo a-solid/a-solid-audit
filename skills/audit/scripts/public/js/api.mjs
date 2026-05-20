@@ -56,8 +56,8 @@ export const api = {
 
   // Notes
   getNotes: (id) => request("GET", `/api/sessions/${encodeURIComponent(id)}/notes`),
-  updateNotes: (id, data) =>
-    request("POST", `/api/sessions/${encodeURIComponent(id)}/notes`, data),
+  updateTaskNote: (id, file, data) =>
+    request("POST", `/api/sessions/${encodeURIComponent(id)}/notes`, { file, ...data }),
   updateSummary: (id, data) =>
     request("POST", `/api/sessions/${encodeURIComponent(id)}/summary`, data),
 };

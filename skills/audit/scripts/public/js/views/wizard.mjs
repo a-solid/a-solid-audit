@@ -1,20 +1,18 @@
 // skills/audit/scripts/public/js/views/wizard.mjs
 import { api } from "../api.mjs";
+import { showToast, setBreadcrumb, icon, escapeHtml } from "../app.mjs";
 import { renderStoryCard } from "../components/story-card.mjs";
 import { renderFileTree } from "../components/file-tree.mjs";
-import { showToast } from "../app.mjs";
 
 export async function renderWizard(container, params) {
   const sessionId = params[0];
   let step = 1;
-  let reviewType = "code"; // "code" or "all"
+  let reviewType = "code";
   let scopeMethod = "uncommitted";
   let scopeRef = "";
   let stories = [];
   let storyMappings = [];
-  let diffFiles = [];
 
-  // Restore from localStorage if available
   const savedKey = `audit-wizard-${sessionId}`;
   const saved = localStorage.getItem(savedKey);
   if (saved) {
@@ -33,42 +31,73 @@ export async function renderWizard(container, params) {
     }));
   }
 
+  const totalSteps = reviewType === "all" ? 4 : 3;
+  const stepLabels = reviewType === "all"
+    ? ["Review Type", "Scope", "Stories", "Ready"]
+    : ["Review Type", "Scope", "Ready"];
+
   function render() {
+    setBreadcrumb([
+      { label: "Sessions", href: "#/home" },
+      { label: "New Audit" },
+    ]);
+
     container.innerHTML = `
-      <h1 class="text-2xl font-bold text-gray-900 mb-6">New Audit</h1>
-      <div class="steps mb-8">
-        <div class="step ${step === 1 ? 'active' : step > 1 ? 'done' : ''}">1. Review Type</div>
-        <div class="step ${step === 2 ? 'active' : step > 2 ? 'done' : ''}">2. Scope</div>
-        <div class="step ${step === 3 ? 'active' : step > 3 ? 'done' : ''} ${reviewType === 'code' ? 'hidden' : ''}">3. Stories</div>
-        <div class="step ${step === 4 ? 'active' : ''}">4. Ready</div>
+      <h1 class="text-2xl mb-6">New Audit</h1>
+      <div class="steps">
+        ${stepLabels.map((label, i) => {
+          const num = i + 1;
+          const isActive = step === num;
+          const isDone = step > num;
+          const isLast = i === stepLabels.length - 1;
+          return `
+            <div class="step ${isActive ? "active" : ""} ${isDone ? "done" : ""}">
+              <div class="step-dot">
+                ${isDone ? icon("check", 14) : num}
+              </div>
+              <span class="step-label">${label}</span>
+            </div>
+            ${!isLast ? `<div class="step-line ${isDone ? "done" : ""}"></div>` : ""}
+          `;
+        }).join("")}
       </div>
       <div id="wizard-content"></div>
     `;
 
-    if (step === 1) renderStep1();
-    else if (step === 2) renderStep2();
-    else if (step === 3) renderStep3();
-    else if (step === 4) renderStep4();
+    const actualStep = reviewType === "code" && step === 4 ? 3 : step;
+    // Map step numbers to renderers (code-only mode compresses steps)
+    if (actualStep === 1) renderStep1();
+    else if (actualStep === 2) renderStep2();
+    else if (actualStep === 3 && reviewType === "all") renderStep3();
+    else renderStep4();
   }
 
   function renderStep1() {
     const content = document.getElementById("wizard-content");
     content.innerHTML = `
       <div class="card mb-4">
-        <h2 class="font-semibold text-gray-900 mb-4">Choose Review Type</h2>
+        <h2 class="font-semibold mb-4">Choose Review Type</h2>
         <div class="grid grid-cols-2 gap-4">
-          <div class="card cursor-pointer ${reviewType === 'code' ? 'border-blue-500 bg-blue-50' : ''}" data-type="code">
-            <div class="font-medium">Code Review Only</div>
-            <div class="text-sm text-gray-500 mt-1">Review code changes for quality, security, and best practices.</div>
+          <div class="card card-clickable ${reviewType === "code" ? "selected" : ""}" data-type="code"
+               style="${reviewType === "code" ? "border-color:var(--accent);background:var(--accent-dim);box-shadow:inset 0 0 0 1px var(--border-accent)" : ""}">
+            <div class="flex items-center gap-2 mb-2">
+              ${icon("eye", 20)}
+              <span class="font-medium">Code Review Only</span>
+            </div>
+            <div class="text-sm text-secondary">Review code changes for quality, security, and best practices.</div>
           </div>
-          <div class="card cursor-pointer ${reviewType === 'all' ? 'border-blue-500 bg-blue-50' : ''}" data-type="all">
-            <div class="font-medium">Code + Story Alignment</div>
-            <div class="text-sm text-gray-500 mt-1">Also check that code changes align with story requirements.</div>
+          <div class="card card-clickable ${reviewType === "all" ? "selected" : ""}" data-type="all"
+               style="${reviewType === "all" ? "border-color:var(--accent);background:var(--accent-dim);box-shadow:inset 0 0 0 1px var(--border-accent)" : ""}">
+            <div class="flex items-center gap-2 mb-2">
+              ${icon("clipboard", 20)}
+              <span class="font-medium">Code + Story Alignment</span>
+            </div>
+            <div class="text-sm text-secondary">Also check that code changes align with story requirements.</div>
           </div>
         </div>
       </div>
       <div class="flex justify-end">
-        <button id="step1-next" class="btn btn-primary">Next</button>
+        <button id="step1-next" class="btn btn-primary">Next ${icon("chevronRight", 14)}</button>
       </div>`;
 
     content.querySelectorAll("[data-type]").forEach(card => {
@@ -85,16 +114,16 @@ export async function renderWizard(container, params) {
     const content = document.getElementById("wizard-content");
     content.innerHTML = `
       <div class="card mb-4">
-        <h2 class="font-semibold text-gray-900 mb-4">Select Scope</h2>
+        <h2 class="font-semibold mb-4">Select Scope</h2>
         <div class="tabs" id="scope-tabs">
-          <div class="tab ${scopeMethod === 'uncommitted' ? 'active' : ''}" data-method="uncommitted">Uncommitted</div>
-          <div class="tab ${scopeMethod === 'commits' ? 'active' : ''}" data-method="commits">Commits</div>
-          <div class="tab ${scopeMethod === 'branch' ? 'active' : ''}" data-method="branch">Branch</div>
+          <div class="tab ${scopeMethod === "uncommitted" ? "active" : ""}" data-method="uncommitted">Uncommitted</div>
+          <div class="tab ${scopeMethod === "commits" ? "active" : ""}" data-method="commits">Commits</div>
+          <div class="tab ${scopeMethod === "branch" ? "active" : ""}" data-method="branch">Branch</div>
         </div>
-        <div id="scope-content"></div>
+        <div id="scope-content" class="mt-4"></div>
       </div>
       <div class="flex justify-between">
-        <button id="step2-back" class="btn">Back</button>
+        <button id="step2-back" class="btn btn-ghost">${icon("arrowLeft", 14)} Back</button>
         <button id="step2-confirm" class="btn btn-primary">Confirm Scope</button>
       </div>`;
 
@@ -113,33 +142,46 @@ export async function renderWizard(container, params) {
       try {
         const btn = document.getElementById("step2-confirm");
         btn.disabled = true;
-        btn.textContent = "Generating...";
+        btn.innerHTML = `<span class="spinner spinner-sm"></span> Generating...`;
         await api.setScope(sessionId, scopeMethod, scopeRef);
-        if (reviewType === "code") step = 4;
-        else step = 3;
+        step = reviewType === "code" ? 3 : 3;
         save();
         render();
       } catch (e) {
         showToast("Failed to set scope: " + e.message);
-        document.getElementById("step2-confirm").disabled = false;
-        document.getElementById("step2-confirm").textContent = "Confirm Scope";
+        const btn = document.getElementById("step2-confirm");
+        if (btn) { btn.disabled = false; btn.textContent = "Confirm Scope"; }
       }
     });
   }
 
   async function renderScopeContent() {
     const scopeContent = document.getElementById("scope-content");
+    if (!scopeContent) return;
+
     if (scopeMethod === "uncommitted") {
-      scopeContent.innerHTML = `<p class="text-sm text-gray-500">Review uncommitted changes in the working directory (including staged changes).</p>`;
+      scopeContent.innerHTML = `
+        <div class="info-banner info-banner-blue">
+          ${icon("gitBranch", 16)}
+          <span>Review uncommitted changes in the working directory (including staged changes).</span>
+        </div>`;
     } else if (scopeMethod === "commits") {
       try {
         const commits = await api.getCommits();
         scopeContent.innerHTML = `
-          <div class="grid grid-cols-2 gap-4 mt-2">
-            <div><label class="text-sm font-medium">From</label>
-              <select id="commit-from" class="w-full mt-1 border rounded p-2 text-sm">${commits.map(c => `<option value="${c.hash}">${c.hash.slice(0,7)} ${c.message} (${c.date?.slice(0,10)})</option>`).join("")}</select></div>
-            <div><label class="text-sm font-medium">To</label>
-              <select id="commit-to" class="w-full mt-1 border rounded p-2 text-sm">${commits.map((c, i) => `<option value="${c.hash}" ${i === 0 ? 'selected' : ''}>${c.hash.slice(0,7)} ${c.message} (${c.date?.slice(0,10)})</option>`).join("")}</select></div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label>From</label>
+              <select id="commit-from" class="mt-1">
+                ${commits.map(c => `<option value="${c.hash}">${c.hash.slice(0, 7)} ${escapeHtml(c.message)} (${c.date?.slice(0, 10)})</option>`).join("")}
+              </select>
+            </div>
+            <div>
+              <label>To</label>
+              <select id="commit-to" class="mt-1">
+                ${commits.map((c, i) => `<option value="${c.hash}" ${i === 0 ? "selected" : ""}>${c.hash.slice(0, 7)} ${escapeHtml(c.message)} (${c.date?.slice(0, 10)})</option>`).join("")}
+              </select>
+            </div>
           </div>`;
         document.getElementById("commit-from").addEventListener("change", updateCommitRef);
         document.getElementById("commit-to").addEventListener("change", updateCommitRef);
@@ -149,29 +191,35 @@ export async function renderWizard(container, params) {
         }
         updateCommitRef();
       } catch (e) {
-        scopeContent.innerHTML = `<p class="text-red-600 text-sm">Failed to load commits: ${e.message}</p>`;
+        scopeContent.innerHTML = `<p class="text-danger text-sm">${icon("alertTriangle", 14)} Failed to load commits: ${escapeHtml(e.message)}</p>`;
       }
     } else if (scopeMethod === "branch") {
       try {
         const branches = await api.getBranches();
         scopeContent.innerHTML = `
-          <div class="grid grid-cols-2 gap-4 mt-2">
-            <div><label class="text-sm font-medium">Base</label>
-              <select id="branch-base" class="w-full mt-1 border rounded p-2 text-sm">${branches.map(b => `<option value="${b}" ${b === 'main' || b === 'master' ? 'selected' : ''}>${b}</option>`).join("")}</select></div>
-            <div><label class="text-sm font-medium">Compare</label>
-              <select id="branch-compare" class="w-full mt-1 border rounded p-2 text-sm">${branches.map(b => `<option value="${b}">${b}</option>`).join("")}</select></div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label>Base</label>
+              <select id="branch-base" class="mt-1">
+                ${branches.map(b => `<option value="${b}" ${b === "main" || b === "master" ? "selected" : ""}>${escapeHtml(b)}</option>`).join("")}
+              </select>
+            </div>
+            <div>
+              <label>Compare</label>
+              <select id="branch-compare" class="mt-1">
+                ${branches.map(b => `<option value="${b}">${escapeHtml(b)}</option>`).join("")}
+              </select>
+            </div>
           </div>`;
         document.getElementById("branch-base").addEventListener("change", updateBranchRef);
         document.getElementById("branch-compare").addEventListener("change", updateBranchRef);
         function updateBranchRef() {
-          const base = document.getElementById("branch-base").value;
-          const compare = document.getElementById("branch-compare").value;
-          scopeRef = base + "..." + compare;
+          scopeRef = document.getElementById("branch-base").value + "..." + document.getElementById("branch-compare").value;
           save();
         }
         updateBranchRef();
       } catch (e) {
-        scopeContent.innerHTML = `<p class="text-red-600 text-sm">Failed to load branches: ${e.message}</p>`;
+        scopeContent.innerHTML = `<p class="text-danger text-sm">${icon("alertTriangle", 14)} Failed to load branches: ${escapeHtml(e.message)}</p>`;
       }
     }
   }
@@ -180,30 +228,31 @@ export async function renderWizard(container, params) {
     const content = document.getElementById("wizard-content");
     content.innerHTML = `
       <div class="card mb-4">
-        <h2 class="font-semibold text-gray-900 mb-4">Story Collection</h2>
+        <h2 class="font-semibold mb-4">Story Collection</h2>
         <div id="story-collection">
-          <div class="mb-3"><label class="text-sm font-medium">Add Story</label>
+          <div class="mb-3">
+            <label>Add Story</label>
             <div class="flex gap-2 mt-1">
-              <select id="story-source" class="border rounded p-2 text-sm">
+              <select id="story-source">
                 <option value="manual">Manual Input</option>
               </select>
-              <button id="add-story-btn" class="btn">Add Story</button>
+              <button id="add-story-btn" class="btn">${icon("plus", 14)} Add Story</button>
             </div>
           </div>
-          <div id="story-form" class="hidden mt-3 border rounded p-3 bg-gray-50">
-            <input id="story-name" class="w-full border rounded p-2 mb-2 text-sm" placeholder="Story name">
-            <textarea id="story-desc" class="w-full border rounded p-2 mb-2 text-sm" rows="2" placeholder="Description"></textarea>
-            <textarea id="story-ac" class="w-full border rounded p-2 mb-2 text-sm" rows="2" placeholder="Acceptance criteria"></textarea>
-            <button id="save-story-btn" class="btn btn-primary text-sm">Save</button>
+          <div id="story-form" class="hidden mt-3 card">
+            <input id="story-name" class="mb-2" placeholder="Story name">
+            <textarea id="story-desc" class="mb-2" rows="2" placeholder="Description"></textarea>
+            <textarea id="story-ac" class="mb-2" rows="2" placeholder="Acceptance criteria"></textarea>
+            <button id="save-story-btn" class="btn btn-primary btn-sm">Save</button>
           </div>
           <div id="story-list" class="mt-4 space-y-2">
             ${stories.map(s => renderStoryCard(s)).join("")}
           </div>
         </div>
       </div>
-      <div id="file-mapping-section" class="card mb-4 ${stories.length === 0 ? 'hidden' : ''}">
-        <h2 class="font-semibold text-gray-900 mb-4">File Mapping</h2>
-        <p class="text-sm text-gray-500 mb-3">Select a story, then check files to associate.</p>
+      <div id="file-mapping-section" class="card mb-4 ${stories.length === 0 ? "hidden" : ""}">
+        <h2 class="font-semibold mb-4">File Mapping</h2>
+        <p class="text-sm text-secondary mb-3">Select a story, then check files to associate.</p>
         <div class="grid grid-cols-2 gap-4">
           <div>
             <div class="text-sm font-medium mb-2">Files</div>
@@ -211,7 +260,7 @@ export async function renderWizard(container, params) {
           </div>
           <div>
             <div class="text-sm font-medium mb-2">Selected Story</div>
-            <select id="story-select" class="w-full border rounded p-2 text-sm mb-2">
+            <select id="story-select" class="mb-2">
               <option value="">-- Select story --</option>
               ${stories.map((s, i) => `<option value="${i}">${escapeHtml(s.name || s.id)}</option>`).join("")}
             </select>
@@ -221,11 +270,10 @@ export async function renderWizard(container, params) {
         </div>
       </div>
       <div class="flex justify-between">
-        <button id="step3-back" class="btn">Back</button>
-        <button id="step3-next" class="btn btn-primary">Next</button>
+        <button id="step3-back" class="btn btn-ghost">${icon("arrowLeft", 14)} Back</button>
+        <button id="step3-next" class="btn btn-primary">Next ${icon("chevronRight", 14)}</button>
       </div>`;
 
-    // Story form toggle
     document.getElementById("add-story-btn").addEventListener("click", () => {
       document.getElementById("story-form").classList.toggle("hidden");
     });
@@ -261,19 +309,42 @@ export async function renderWizard(container, params) {
     const content = document.getElementById("wizard-content");
     content.innerHTML = `
       <div class="card mb-4">
-        <h2 class="font-semibold text-gray-900 mb-4">Ready to Start</h2>
-        <div class="space-y-2 text-sm">
-          <div><span class="text-gray-500">Review Type:</span> <span class="font-medium">${reviewType === 'code' ? 'Code Review Only' : 'Code + Story Alignment'}</span></div>
-          <div><span class="text-gray-500">Scope:</span> <span class="font-medium">${scopeMethod} ${scopeRef}</span></div>
-          ${reviewType === 'all' ? `<div><span class="text-gray-500">Stories:</span> <span class="font-medium">${stories.length} story(s)</span></div>` : ""}
+        <h2 class="font-semibold mb-4">Ready to Start</h2>
+        <div class="space-y-3">
+          <div class="flex items-center gap-3">
+            <span style="color:var(--text-muted)">${icon("eye", 18)}</span>
+            <div>
+              <div class="text-xs text-muted">Review Type</div>
+              <div class="text-sm font-medium">${reviewType === "code" ? "Code Review Only" : "Code + Story Alignment"}</div>
+            </div>
+          </div>
+          <div class="flex items-center gap-3">
+            <span style="color:var(--text-muted)">${icon("gitCommit", 18)}</span>
+            <div>
+              <div class="text-xs text-muted">Scope</div>
+              <div class="text-sm font-medium">${scopeMethod}${scopeRef ? " " + scopeRef : ""}</div>
+            </div>
+          </div>
+          ${reviewType === "all" ? `
+          <div class="flex items-center gap-3">
+            <span style="color:var(--text-muted)">${icon("clipboard", 18)}</span>
+            <div>
+              <div class="text-xs text-muted">Stories</div>
+              <div class="text-sm font-medium">${stories.length} story(s)</div>
+            </div>
+          </div>` : ""}
         </div>
-        <div class="mt-4 p-3 bg-blue-50 rounded text-sm text-blue-700">
-          AI review runs in the Claude Code terminal. Keep the terminal open.
+        <div class="mt-4 info-banner info-banner-amber">
+          ${icon("zap", 16)}
+          <span>AI review runs in the Claude Code terminal. Keep the terminal open.</span>
         </div>
       </div>
       <div class="flex justify-between">
-        <button id="step4-back" class="btn">Back</button>
-        <button id="start-review-btn" class="btn btn-primary">Start AI Review</button>
+        <button id="step4-back" class="btn btn-ghost">${icon("arrowLeft", 14)} Back</button>
+        <button id="start-review-btn" class="btn btn-primary">
+          ${icon("zap", 14)}
+          Start AI Review
+        </button>
       </div>`;
 
     document.getElementById("step4-back").addEventListener("click", () => {
@@ -285,29 +356,17 @@ export async function renderWizard(container, params) {
       try {
         const btn = document.getElementById("start-review-btn");
         btn.disabled = true;
-        btn.textContent = "Starting...";
+        btn.innerHTML = `<span class="spinner spinner-sm"></span> Starting...`;
         await api.updateSessionStatus(sessionId, "ready");
         localStorage.removeItem(savedKey);
         location.hash = `#/progress/${sessionId}`;
       } catch (e) {
         showToast("Failed to start review: " + e.message);
-        document.getElementById("start-review-btn").disabled = false;
-        document.getElementById("start-review-btn").textContent = "Start AI Review";
+        const btn = document.getElementById("start-review-btn");
+        if (btn) { btn.disabled = false; btn.innerHTML = `${icon("zap", 14)} Start AI Review`; }
       }
     });
   }
 
-  // Load providers on init
-  try {
-    const providers = await api.listProviders();
-    // Will populate story source dropdown on render
-  } catch (e) { /* no providers available */ }
-
   render();
-}
-
-function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
 }

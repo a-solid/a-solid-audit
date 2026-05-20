@@ -1,7 +1,7 @@
 // skills/audit/scripts/public/js/views/review.mjs
 import { api } from "../api.mjs";
 import { renderTaskDetail } from "../components/task-detail.mjs";
-import { showToast } from "../app.mjs";
+import { showToast, setBreadcrumb, icon, escapeHtml, onNavigateCleanup } from "../app.mjs";
 
 export async function renderReview(container, params) {
   const sessionId = params[0];
@@ -10,17 +10,24 @@ export async function renderReview(container, params) {
   let currentTab = "overview";
   let currentTaskIdx = 0;
 
+  setBreadcrumb([
+    { label: "Sessions", href: "#/home" },
+    { label: "Review Findings" },
+  ]);
+
   container.innerHTML = `
-    <h1 class="text-2xl font-bold text-gray-900 mb-6">Review Findings</h1>
-    <div class="tabs no-print">
-      <div class="tab ${currentTab === 'overview' ? 'active' : ''}" data-tab="overview">Overview</div>
+    <div class="flex items-center justify-between mb-4">
+      <h1 class="text-2xl">Review Findings</h1>
+      <div class="flex gap-2 no-print">
+        <button id="review-home-btn" class="btn btn-ghost">${icon("arrowLeft", 14)} Home</button>
+        <button id="review-summary-btn" class="btn btn-primary">Summary & Sign-off</button>
+      </div>
+    </div>
+    <div class="tabs no-print" id="review-tabs">
+      <div class="tab ${currentTab === "overview" ? "active" : ""}" data-tab="overview">Overview</div>
       <div class="tab" data-tab="tasks">Tasks</div>
     </div>
     <div id="review-content"></div>
-    <div class="flex justify-between mt-6 no-print">
-      <button id="review-home-btn" class="btn">Back to Home</button>
-      <button id="review-summary-btn" class="btn btn-primary">Summary & Sign-off</button>
-    </div>
   `;
 
   try {
@@ -34,6 +41,7 @@ export async function renderReview(container, params) {
 
   function renderContent() {
     const content = document.getElementById("review-content");
+    if (!content) return;
     if (currentTab === "overview") renderOverview(content);
     else renderTasksTab(content);
   }
@@ -50,50 +58,100 @@ export async function renderReview(container, params) {
       ? Math.round(tasks.reduce((s, t) => s + (t.review?.score || 0), 0) / tasks.length)
       : 0;
 
+    const maxSevCount = Math.max(...Object.values(bySeverity), 1);
+    const sevColors = {
+      critical: "var(--danger)", major: "var(--danger)", high: "var(--danger)",
+      medium: "var(--warning)", minor: "var(--warning)",
+      low: "var(--info)", info: "var(--info)",
+    };
+
     el.innerHTML = `
       <div class="grid grid-cols-3 gap-4 mb-6">
-        <div class="card text-center"><div class="text-3xl font-bold text-gray-900">${avgScore}/10</div><div class="text-sm text-gray-500">Avg Score</div></div>
-        <div class="card text-center"><div class="text-3xl font-bold text-gray-900">${totalFindings}</div><div class="text-sm text-gray-500">Findings</div></div>
-        <div class="card text-center"><div class="text-3xl font-bold text-gray-900">${tasks.length}</div><div class="text-sm text-gray-500">Tasks</div></div>
+        <div class="stat-card">
+          <div class="score-ring" style="margin:0 auto var(--space-2)">
+            <svg width="80" height="80" viewBox="0 0 80 80">
+              <circle class="score-ring-bg" cx="40" cy="40" r="34" fill="none" stroke-width="6"/>
+              <circle class="score-ring-fill" cx="40" cy="40" r="34" fill="none"
+                stroke="${avgScore >= 7 ? "var(--accent)" : avgScore >= 4 ? "var(--warning)" : "var(--danger)"}"
+                stroke-width="6"
+                stroke-dasharray="${2 * Math.PI * 34}"
+                stroke-dashoffset="${2 * Math.PI * 34 * (1 - avgScore / 10)}"
+                stroke-linecap="round"/>
+            </svg>
+            <div class="score-ring-text">${avgScore}</div>
+          </div>
+          <div class="stat-label">Avg Score</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${totalFindings}</div>
+          <div class="stat-label">Findings</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value">${tasks.length}</div>
+          <div class="stat-label">Tasks</div>
+        </div>
       </div>
+
       ${Object.keys(bySeverity).length > 0 ? `
         <div class="card mb-4">
-          <div class="font-medium text-gray-900 mb-3">Findings by Severity</div>
+          <div class="font-medium mb-4">Findings by Severity</div>
           ${Object.entries(bySeverity).map(([sev, count]) => `
-            <div class="flex items-center justify-between py-1">
-              <span class="badge severity-${sev}">${sev}</span>
-              <span class="font-medium">${count}</span>
-            </div>`).join("")}
+            <div class="severity-bar-row">
+              <span class="badge severity-${sev} severity-bar-label">${sev}</span>
+              <div class="severity-bar-track">
+                <div class="severity-bar-fill" style="width:${(count / maxSevCount) * 100}%;background:${sevColors[sev] || "var(--info)"}"></div>
+              </div>
+              <span class="severity-bar-count">${count}</span>
+            </div>
+          `).join("")}
         </div>
       ` : ""}
+
       <div class="card">
-        <div class="font-medium text-gray-900 mb-3">Needs Attention</div>
-        ${tasks.filter(t => (t.review?.findings || []).some(f => f.severity === "critical" || f.severity === "high" || f.severity === "major")).map(t => `
-          <div class="flex items-center justify-between py-2 border-b last:border-0">
-            <span class="text-sm font-mono">${t.name || t.file}</span>
-            <span class="text-sm text-red-600">${(t.review?.findings || []).filter(f => f.severity === "critical" || f.severity === "high" || f.severity === "major").length} high-severity</span>
-          </div>`).join("")}
-        ${tasks.filter(t => (t.review?.findings || []).some(f => f.severity === "critical" || f.severity === "high" || f.severity === "major")).length === 0 ? '<div class="text-sm text-gray-400">No high-severity findings.</div>' : ""}
+        <div class="font-medium mb-3">Needs Attention</div>
+        ${(() => {
+          const critical = tasks.filter(t =>
+            (t.review?.findings || []).some(f => f.severity === "critical" || f.severity === "high" || f.severity === "major")
+          );
+          if (critical.length === 0) {
+            return `<div class="flex items-center gap-2 text-sm text-muted">
+              ${icon("check", 16)}
+              <span>No high-severity findings.</span>
+            </div>`;
+          }
+          return critical.map(t => `
+            <div class="flex items-center justify-between py-2 border-b" style="border-color:var(--border)">
+              <span class="text-sm font-mono truncate">${escapeHtml(t.name || t.file)}</span>
+              <span class="text-sm text-danger font-medium">${(t.review?.findings || []).filter(f => f.severity === "critical" || f.severity === "high" || f.severity === "major").length} high-severity</span>
+            </div>
+          `).join("");
+        })()}
       </div>`;
   }
 
   function renderTasksTab(el) {
     el.innerHTML = `
-      <div class="grid grid-cols-3 gap-4">
-        <div class="col-span-1 border rounded max-h-screen overflow-y-auto" id="task-sidebar"></div>
-        <div class="col-span-2 card" id="task-detail-panel"></div>
+      <div class="sidebar-layout">
+        <div class="sidebar-panel" id="task-sidebar"></div>
+        <div class="detail-panel" id="task-detail-panel"></div>
       </div>`;
 
     const sidebar = document.getElementById("task-sidebar");
-    sidebar.innerHTML = tasks.map((t, i) => `
-      <div class="task-nav-item p-3 border-b cursor-pointer hover:bg-gray-50 ${i === currentTaskIdx ? 'bg-blue-50 border-l-2 border-l-blue-500' : ''}" data-idx="${i}">
-        <div class="text-sm font-mono truncate">${t.name || t.file}</div>
-        <div class="flex items-center gap-2 mt-1">
-          <span class="badge badge-${t.status}-task">${t.status}</span>
-          <span class="text-xs text-gray-500">${t.review?.score ?? "-"}/10</span>
-        </div>
-      </div>
-    `).join("");
+    sidebar.innerHTML = tasks.map((t, i) => {
+      const score = t.review?.score;
+      const dotClass = score >= 7 ? "score-dot-green" : score >= 4 ? "score-dot-amber" : "score-dot-red";
+      return `
+        <div class="task-nav-item ${i === currentTaskIdx ? "active" : ""}" data-idx="${i}">
+          <div class="score-dot ${score ? dotClass : ""}" style="${!score ? "background:var(--text-muted)" : ""}"></div>
+          <div style="min-width:0;flex:1">
+            <div class="text-sm font-mono truncate">${escapeHtml(t.name || t.file)}</div>
+            <div class="flex items-center gap-2 mt-1">
+              <span class="badge badge-${t.status === "reviewing" ? "reviewing-task" : t.status}">${t.status}</span>
+              <span class="text-xs text-muted">${score ?? "-"}/10</span>
+            </div>
+          </div>
+        </div>`;
+    }).join("");
 
     sidebar.querySelectorAll(".task-nav-item").forEach(item => {
       item.addEventListener("click", () => {
@@ -102,20 +160,40 @@ export async function renderReview(container, params) {
       });
     });
 
-    document.getElementById("task-detail-panel").innerHTML = renderTaskDetail(tasks[currentTaskIdx]);
+    const detailPanel = document.getElementById("task-detail-panel");
+    detailPanel.innerHTML = renderTaskDetail(tasks[currentTaskIdx]);
+
+    // Wire up confirm/dismiss buttons
+    detailPanel.querySelectorAll(".btn-confirm").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        try {
+          await api.updateTaskNote(sessionId, tasks[currentTaskIdx].file, { status: "confirmed" });
+          showToast("Finding confirmed", "success");
+        } catch (e) { showToast("Failed to update: " + e.message); }
+      });
+    });
+    detailPanel.querySelectorAll(".btn-dismiss").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        try {
+          await api.updateTaskNote(sessionId, tasks[currentTaskIdx].file, { status: "deferred" });
+          showToast("Finding dismissed", "success");
+        } catch (e) { showToast("Failed to update: " + e.message); }
+      });
+    });
   }
 
   // Tab switching
-  container.querySelectorAll(".tab").forEach(tab => {
+  const tabsEl = document.getElementById("review-tabs");
+  tabsEl.querySelectorAll(".tab").forEach(tab => {
     tab.addEventListener("click", () => {
       currentTab = tab.dataset.tab;
-      container.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+      tabsEl.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
       tab.classList.add("active");
       renderContent();
     });
   });
 
-  // Navigation
+  // Navigation buttons
   document.getElementById("review-home-btn").addEventListener("click", () => {
     location.hash = "#/home";
   });
@@ -123,8 +201,13 @@ export async function renderReview(container, params) {
     location.hash = `#/summary/${sessionId}`;
   });
 
-  // Keyboard shortcuts
-  document.addEventListener("keydown", function shortcutHandler(e) {
+  // Keyboard shortcuts — register with cleanup
+  function shortcutHandler(e) {
+    if (currentTab !== "tasks") {
+      if (e.key === "o") { currentTab = "overview"; renderContent(); updateTabUI(); }
+      else if (e.key === "s") { currentTab = "tasks"; renderContent(); updateTabUI(); }
+      return;
+    }
     if (e.key === "j" || e.key === "ArrowDown") {
       e.preventDefault();
       currentTaskIdx = Math.min(currentTaskIdx + 1, tasks.length - 1);
@@ -133,8 +216,21 @@ export async function renderReview(container, params) {
       e.preventDefault();
       currentTaskIdx = Math.max(currentTaskIdx - 1, 0);
       renderContent();
-    } else if (e.key === "o") { currentTab = "overview"; renderContent(); }
-    else if (e.key === "s") { currentTab = "tasks"; renderContent(); }
+    } else if (e.key === "o") { currentTab = "overview"; renderContent(); updateTabUI(); }
+    else if (e.key === "s") { currentTab = "tasks"; renderContent(); updateTabUI(); }
+  }
+
+  function updateTabUI() {
+    const tabsEl2 = document.getElementById("review-tabs");
+    if (!tabsEl2) return;
+    tabsEl2.querySelectorAll(".tab").forEach(t => {
+      t.classList.toggle("active", t.dataset.tab === currentTab);
+    });
+  }
+
+  document.addEventListener("keydown", shortcutHandler);
+  onNavigateCleanup(() => {
+    document.removeEventListener("keydown", shortcutHandler);
   });
 
   renderContent();

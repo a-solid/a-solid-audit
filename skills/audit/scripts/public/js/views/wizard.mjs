@@ -12,6 +12,7 @@ export async function renderWizard(container, params) {
   let scopeRef = "";
   let stories = [];
   let storyMappings = [];
+  let contextExpanded = false;
 
   const savedKey = `audit-wizard-${sessionId}`;
   const saved = localStorage.getItem(savedKey);
@@ -23,11 +24,12 @@ export async function renderWizard(container, params) {
     scopeRef = state.scopeRef || "";
     stories = state.stories || [];
     storyMappings = state.storyMappings || [];
+    contextExpanded = state.contextExpanded || false;
   }
 
   function save() {
     localStorage.setItem(savedKey, JSON.stringify({
-      step, reviewType, scopeMethod, scopeRef, stories, storyMappings,
+      step, reviewType, scopeMethod, scopeRef, stories, storyMappings, contextExpanded,
     }));
   }
 
@@ -274,6 +276,8 @@ export async function renderWizard(container, params) {
         <button id="step3-next" class="btn btn-primary">Next ${icon("chevronRight", 14)}</button>
       </div>`;
 
+    loadFileTree(sessionId);
+
     document.getElementById("add-story-btn").addEventListener("click", () => {
       document.getElementById("story-form").classList.toggle("hidden");
     });
@@ -290,19 +294,56 @@ export async function renderWizard(container, params) {
       } catch (e) { showToast("Failed to save story: " + e.message); }
     });
 
-    document.getElementById("save-mapping-btn").addEventListener("click", async () => {
-      try {
-        const mappings = stories.map(s => ({
-          storyName: s.name,
-          files: (storyMappings.find(m => m.storyName === s.name)?.files || []),
-        }));
-        await api.mapStories(sessionId, mappings);
-        showToast("Mappings saved", "success");
-      } catch (e) { showToast("Failed to save mappings: " + e.message); }
-    });
-
     document.getElementById("step3-back").addEventListener("click", () => { step = 2; save(); render(); });
     document.getElementById("step3-next").addEventListener("click", () => { step = 4; save(); render(); });
+  }
+
+  async function loadFileTree(sid) {
+    const container = document.getElementById("file-tree-container");
+    if (!container) return;
+    container.innerHTML = `<span class="text-sm text-muted">Loading files...</span>`;
+    try {
+      const tasks = await api.getTasks(sid);
+      const files = tasks.filter(t => t.type === "code").map(t => t.name);
+      if (files.length === 0) {
+        container.innerHTML = `<span class="text-sm text-muted">No files found. Confirm scope first.</span>`;
+        return;
+      }
+      const tree = renderFileTree(container, files);
+
+      const storySelect = document.getElementById("story-select");
+      storySelect.addEventListener("change", () => {
+        const idx = storySelect.value;
+        if (idx === "") { tree.clear(); return; }
+        const story = stories[parseInt(idx)];
+        const existing = storyMappings.find(m => m.storyName === story?.name);
+        tree.setSelected(existing?.files || []);
+      });
+
+      // Override save-mapping-btn to also capture current tree selection
+      const saveBtn = document.getElementById("save-mapping-btn");
+      const cloned = saveBtn.cloneNode(true);
+      saveBtn.parentNode.replaceChild(cloned, saveBtn);
+      cloned.addEventListener("click", () => {
+        const idx = storySelect.value;
+        if (!idx) { showToast("Select a story first"); return; }
+        const story = stories[parseInt(idx)];
+        const selected = tree.getSelected();
+        if (selected.length === 0) { showToast("Select at least one file"); return; }
+        const existing = storyMappings.findIndex(m => m.storyName === story.name);
+        if (existing >= 0) storyMappings[existing].files = selected;
+        else storyMappings.push({ storyName: story.name, files: selected });
+        save();
+        // Persist all mappings to server
+        api.mapStories(sid, stories.map(s => ({
+          storyName: s.name,
+          files: (storyMappings.find(m => m.storyName === s.name)?.files || []),
+        }))).then(() => showToast(`Mapped ${selected.length} file(s) to "${story.name}"`, "success"))
+          .catch(e => showToast("Failed to save: " + e.message));
+      });
+    } catch (e) {
+      container.innerHTML = `<span class="text-sm text-danger">Failed to load files: ${escapeHtml(e.message)}</span>`;
+    }
   }
 
   function renderStep4() {
@@ -334,6 +375,20 @@ export async function renderWizard(container, params) {
             </div>
           </div>` : ""}
         </div>
+
+        <div class="mt-4 border-t" style="border-color:var(--border)">
+          <div id="context-toggle" class="flex items-center gap-2 py-3 cursor-pointer" style="color:var(--text-secondary)">
+            ${icon("messageSquare", 16)}
+            <span class="text-sm font-medium">Review Context</span>
+            <span class="text-xs text-muted ml-1">(optional)</span>
+            <span id="context-chevron" class="ml-auto" style="transition:transform 200ms;transform:rotate(${contextExpanded ? "180" : "0"}deg)">${icon("chevronDown", 14)}</span>
+          </div>
+          <div id="context-panel" style="display:${contextExpanded ? "block" : "none"}">
+            <textarea id="review-context-input" class="w-full" rows="4" placeholder="项目背景、关键需求、关注领域、已知问题..."></textarea>
+            <div class="text-xs text-muted mt-1">This context is passed to AI reviewers as additional guidance.</div>
+          </div>
+        </div>
+
         <div class="mt-4 info-banner info-banner-amber">
           ${icon("zap", 16)}
           <span>AI review runs in the Claude Code terminal. Keep the terminal open.</span>
@@ -347,12 +402,47 @@ export async function renderWizard(container, params) {
         </button>
       </div>`;
 
+    // Load existing context
+    api.getReviewContext(sessionId).then(data => {
+      const input = document.getElementById("review-context-input");
+      if (input && data.context) input.value = data.context;
+    }).catch(() => {});
+
+    // Toggle collapsible
+    document.getElementById("context-toggle").addEventListener("click", () => {
+      contextExpanded = !contextExpanded;
+      const panel = document.getElementById("context-panel");
+      const chevron = document.getElementById("context-chevron");
+      panel.style.display = contextExpanded ? "block" : "none";
+      chevron.style.transform = `rotate(${contextExpanded ? 180 : 0}deg)`;
+      save();
+    });
+
+    // Save context on blur (debounced)
+    let contextSaveTimer = null;
+    const contextInput = document.getElementById("review-context-input");
+    if (contextInput) {
+      contextInput.addEventListener("blur", () => {
+        clearTimeout(contextSaveTimer);
+        contextSaveTimer = setTimeout(async () => {
+          try {
+            await api.setReviewContext(sessionId, contextInput.value);
+          } catch (e) { /* silent fail — context is optional */ }
+        }, 300);
+      });
+    }
+
+    // Also save context right before starting review
     document.getElementById("step4-back").addEventListener("click", () => {
       step = reviewType === "code" ? 2 : 3;
       save();
       render();
     });
     document.getElementById("start-review-btn").addEventListener("click", async () => {
+      // Save context before starting
+      if (contextInput) {
+        try { await api.setReviewContext(sessionId, contextInput.value); } catch (e) {}
+      }
       try {
         const btn = document.getElementById("start-review-btn");
         btn.disabled = true;

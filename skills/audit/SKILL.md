@@ -34,29 +34,28 @@ After telling the user to open the browser:
 
 ### 3. Begin Review
 
-1. When status is `ready`, run: `node scripts/cli.mjs update-session-status <session-id> reviewing`
-   (Or use `PUT /api/sessions/:id/status` with `{ status: "reviewing" }`)
-2. Read `GET /api/sessions/:id/tasks` to get the code task list.
-3. Confirm codeTasks is non-empty. If empty, tell user to check scope.
+1. When status is `ready`, update session status via API: `PUT /api/sessions/:id/status` with `{ status: "reviewing" }`
+2. Read `GET /api/sessions/:id/tasks` to get the task list. Filter for `type === "code"` to get code tasks.
+3. Confirm there are code tasks. If none, tell user to check scope.
 
 ### 4. Code Review Loop
 
-For each task in codeTasks with status `pending` (process sequentially, one at a time):
+For each task with `type === "code"` and status `pending` (process sequentially, one at a time):
 
 1. Update status: `node scripts/cli.mjs update-task <session-id> <task-file> reviewing`
 2. Read the task YAML file from `.audit/<session-id>/<task-file>`
-3. Read `prompts/code-review.md` (relative to this skill directory) and use its content as the prompt for a sub-agent (Agent tool), passing the task file path AND the `review-context.md` path (`.audit/<session-id>/review-context.md`) as context. If the file does not exist, only pass the task file path.
+3. Read `prompts/code-review.md` (relative to this skill directory) and use its content as the prompt for a sub-agent (Agent tool), passing the task file path and the session directory path (`.audit/<session-id>/`) as context. The session directory always contains `review-context.md`.
 4. The sub-agent writes results under `review:` in the task YAML
 5. Verify the task file was updated (read back to confirm `status: reviewed`)
 
-### 5. Story Review Loop (if storyTasks exist)
+### 5. Story Review Loop (if tasks with `type === "story"` exist)
 
-For each task in storyTasks with status `pending` (process sequentially, one at a time):
+For each story task with status `pending` (process sequentially, one at a time):
 
-1. Update status to `reviewing`
-2. Read the story task YAML file
+1. Update status: `node scripts/cli.mjs update-task <session-id> <task-file> reviewing`
+2. Read the story task YAML file from `.audit/<session-id>/<task-file>`
 3. For context, the task contains `taskFile` references — the agent reads code task YAMLs via these references to get diffs
-4. Read `prompts/story-review.md` (relative to this skill directory) and use its content as the prompt for a sub-agent (Agent tool), passing the task file path AND the `review-context.md` path as context. If the file does not exist, only pass the task file path.
+4. Read `prompts/story-review.md` (relative to this skill directory) and use its content as the prompt for a sub-agent (Agent tool), passing the task file path and the session directory path (`.audit/<session-id>/`) as context. The session directory always contains `review-context.md`.
 5. The sub-agent writes results under `review:` in the task YAML
 6. Verify the task file was updated
 

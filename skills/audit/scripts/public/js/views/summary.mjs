@@ -41,9 +41,30 @@ export async function renderSummary(container, params) {
   });
 
   const noteTasks = notes?.tasks || [];
-  const confirmed = noteTasks.filter(t => t.status === "confirmed").length;
-  const actionRequired = noteTasks.filter(t => t.status === "action-required").length;
-  const deferred = noteTasks.filter(t => t.status === "deferred").length;
+  // Count from per-finding statuses (what the UI actually writes)
+  let confirmed = 0;
+  let actionRequired = 0;
+  let deferred = 0;
+  noteTasks.forEach(t => {
+    (t.findings || []).forEach(f => {
+      if (f.status === "confirmed") confirmed++;
+      else if (f.status === "deferred") deferred++;
+    });
+  });
+  // Any confirmed critical/major finding = action required
+  tasks.forEach(t => {
+    const noteTask = noteTasks.find(nt => nt.file === t.file);
+    const taskFindings = t.review?.findings || [];
+    const noteFindings = noteTask?.findings || [];
+    taskFindings.forEach((f, i) => {
+      const noteF = noteFindings[i];
+      if (noteF?.status === "confirmed" && (f.severity === "critical" || f.severity === "major" || f.severity === "high")) {
+        actionRequired++;
+      }
+    });
+  });
+  const reviewed = confirmed + deferred + actionRequired;
+  const unreviewed = totalFindings - reviewed;
 
   const maxSevCount = Math.max(...Object.values(bySeverity), 1);
   const sevColors = {
@@ -54,7 +75,7 @@ export async function renderSummary(container, params) {
 
   const content = document.getElementById("summary-content");
   content.innerHTML = `
-    <div class="grid grid-cols-4 gap-4 mb-6">
+    <div class="grid grid-cols-5 gap-4 mb-6">
       <div class="stat-card">
         <div class="stat-value">${totalFindings}</div>
         <div class="stat-label">Total Findings</div>
@@ -70,6 +91,10 @@ export async function renderSummary(container, params) {
       <div class="stat-card">
         <div class="stat-value stat-value-warning">${deferred}</div>
         <div class="stat-label">Deferred</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--text-muted)">${unreviewed}</div>
+        <div class="stat-label">Unreviewed</div>
       </div>
     </div>
 

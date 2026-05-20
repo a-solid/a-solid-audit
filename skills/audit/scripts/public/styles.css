@@ -317,7 +317,7 @@ img, svg { display: block; }
 
 /* ─── Step Indicator ─── */
 .steps {
-  display: flex; align-items: center;
+  display: flex; flex-direction: column;
   margin-bottom: var(--space-8);
   position: relative;
 }

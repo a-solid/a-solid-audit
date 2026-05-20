@@ -39,6 +39,21 @@ export async function renderReview(container, params) {
     return;
   }
 
+  async function updateFindingStatus(sid, task, findingIdx, status, reason) {
+    const findingsCount = (task.review?.findings || []).length;
+    const noteFindings = Array.from({ length: findingsCount }, (_, i) => {
+      const existing = notes?.tasks?.find(t => t.file === task.file)?.findings?.[i];
+      return existing || { status: "confirmed", reason: "" };
+    });
+    noteFindings[findingIdx] = { status, reason };
+    try {
+      await api.updateTaskNote(sid, task.file, { findings: noteFindings });
+      showToast(status === "confirmed" ? "Finding confirmed" : "Finding dismissed", "success");
+    } catch (e) {
+      showToast("Failed to update: " + e.message);
+    }
+  }
+
   function renderContent() {
     const content = document.getElementById("review-content");
     if (!content) return;
@@ -166,18 +181,37 @@ export async function renderReview(container, params) {
     // Wire up confirm/dismiss buttons
     detailPanel.querySelectorAll(".btn-confirm").forEach(btn => {
       btn.addEventListener("click", async () => {
-        try {
-          await api.updateTaskNote(sessionId, tasks[currentTaskIdx].file, { status: "confirmed" });
-          showToast("Finding confirmed", "success");
-        } catch (e) { showToast("Failed to update: " + e.message); }
+        const idx = parseInt(btn.dataset.idx);
+        await updateFindingStatus(sessionId, tasks[currentTaskIdx], idx, "confirmed", "");
       });
     });
     detailPanel.querySelectorAll(".btn-dismiss").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const idx = btn.dataset.idx;
+        // Close any other open dismiss panels
+        detailPanel.querySelectorAll(".dismiss-panel").forEach(p => {
+          if (p.dataset.dismissPanel !== idx) p.classList.add("hidden");
+        });
+        const panel = detailPanel.querySelector(`[data-dismiss-panel="${idx}"]`);
+        panel.classList.toggle("hidden");
+      });
+    });
+    // Dismiss reason buttons
+    detailPanel.querySelectorAll(".dismiss-reason-btn").forEach(btn => {
       btn.addEventListener("click", async () => {
-        try {
-          await api.updateTaskNote(sessionId, tasks[currentTaskIdx].file, { status: "deferred" });
-          showToast("Finding dismissed", "success");
-        } catch (e) { showToast("Failed to update: " + e.message); }
+        const idx = parseInt(btn.closest("[data-dismiss-panel]").dataset.dismissPanel);
+        const reason = btn.dataset.reason;
+        await updateFindingStatus(sessionId, tasks[currentTaskIdx], idx, "deferred", reason);
+      });
+    });
+    // Dismiss custom submit
+    detailPanel.querySelectorAll(".dismiss-submit-btn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const idx = parseInt(btn.dataset.dismissSubmit);
+        const input = detailPanel.querySelector(`[data-dismiss-custom="${idx}"]`);
+        const reason = input?.value?.trim();
+        if (!reason) { showToast("Enter a reason"); return; }
+        await updateFindingStatus(sessionId, tasks[currentTaskIdx], idx, "deferred", reason);
       });
     });
   }

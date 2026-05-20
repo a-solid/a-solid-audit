@@ -615,7 +615,41 @@ code {
 .finding-card.severity-info,
 .finding-card.severity-low { border-left-color: var(--info); }
 
-/* ─── Notes Panel ─── */
+/* ─── Dismiss Panel ─── */
+.dismiss-panel {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  animation: dismissSlideIn 150ms var(--ease-spring);
+}
+@keyframes dismissSlideIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.dismiss-reasons {
+  display: flex; flex-wrap: wrap; gap: var(--space-2);
+}
+.dismiss-reason-btn {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs); font-weight: 500; font-family: var(--font-ui);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-spring);
+}
+.dismiss-reason-btn:hover {
+  background: var(--bg-elevated);
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+.dismiss-custom-input {
+  flex: 1;
+  min-width: 120px;
+}
 .notes-fab {
   position: fixed; bottom: 24px; right: 24px; z-index: 45;
   width: 44px; height: 44px; border-radius: 50%;

@@ -47,7 +47,7 @@ export function renderTaskDetail(task) {
           <div class="text-xs text-muted font-semibold mb-3">FINDINGS (${findings.length})</div>
           <div class="space-y-3">
             ${findings.map((f, i) => `
-              <div class="finding-card severity-${f.severity}">
+              <div class="finding-card severity-${f.severity}" data-finding="${i}">
                 <div class="flex items-center justify-between mb-2">
                   <span class="badge severity-${f.severity}">${f.severity}</span>
                   <div class="flex gap-2">
@@ -60,6 +60,17 @@ export function renderTaskDetail(task) {
                   </div>
                 </div>
                 <div class="text-sm">${escapeHtml(f.description || "")}</div>
+                <div class="dismiss-panel hidden" data-dismiss-panel="${i}">
+                  <div class="dismiss-reasons">
+                    ${["False positive", "Acceptable risk", "Out of scope", "Already addressed", "Intentional design"].map(r =>
+                      `<button class="dismiss-reason-btn" data-reason="${r}">${escapeHtml(r)}</button>`
+                    ).join("")}
+                  </div>
+                  <div class="flex gap-2 mt-2">
+                    <input class="dismiss-custom-input" placeholder="Other reason..." data-dismiss-custom="${i}">
+                    <button class="btn btn-sm btn-primary dismiss-submit-btn" data-dismiss-submit="${i}">Submit</button>
+                  </div>
+                </div>
                 ${f.code ? `
                   <pre class="mt-2 p-3" style="border-color:var(--border)"><code class="text-xs">${escapeHtml(f.code)}</code></pre>
                 ` : ""}

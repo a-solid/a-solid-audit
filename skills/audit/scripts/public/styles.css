@@ -317,16 +317,12 @@ img, svg { display: block; }
 
 /* ─── Step Indicator ─── */
 .steps {
-  display: flex; align-items: center; gap: 0;
+  display: flex; align-items: center;
   margin-bottom: var(--space-8);
   position: relative;
 }
-.step {
-  display: flex; align-items: center; gap: var(--space-2);
-  flex: 1; font-size: var(--text-sm); color: var(--text-muted);
-  position: relative;
-  padding: var(--space-3) 0;
-  transition: color var(--duration-base) var(--ease-spring);
+.step-dots {
+  display: flex; align-items: center; width: 100%;
 }
 .step-dot {
   width: 28px; height: 28px; border-radius: 50%;
@@ -337,23 +333,29 @@ img, svg { display: block; }
   flex-shrink: 0;
   transition: all var(--duration-base) var(--ease-spring);
 }
-.step.active .step-dot {
+.step-dot.active {
   background: var(--accent-dim); color: var(--accent);
   border-color: var(--accent);
   box-shadow: 0 0 0 4px var(--accent-dim);
 }
-.step.done .step-dot {
+.step-dot.done {
   background: var(--accent); color: #052E16; border-color: var(--accent);
 }
-.step.active { color: var(--text-primary); }
-.step.done { color: var(--accent); }
 .step-line {
   flex: 1; height: 2px; background: var(--border);
-  margin: 0 var(--space-2);
   transition: background var(--duration-base) var(--ease-spring);
 }
 .step-line.done { background: var(--accent); }
-.step-label { white-space: nowrap; }
+.step-labels {
+  display: flex; width: 100%; margin-top: var(--space-2);
+}
+.step-label {
+  font-size: var(--text-xs); color: var(--text-muted);
+  text-align: center; white-space: nowrap;
+  transition: color var(--duration-base) var(--ease-spring);
+}
+.step-label.active { color: var(--text-primary); }
+.step-label.done { color: var(--accent); }
 
 /* ─── Tabs ─── */
 .tabs {

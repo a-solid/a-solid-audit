@@ -33,41 +33,47 @@ export async function renderWizard(container, params) {
     }));
   }
 
-  const totalSteps = reviewType === "all" ? 4 : 3;
-  const stepLabels = reviewType === "all"
-    ? ["Review Type", "Scope", "Stories", "Ready"]
-    : ["Review Type", "Scope", "Ready"];
-
   function render() {
     setBreadcrumb([
       { label: "Sessions", href: "#/home" },
       { label: "New Audit" },
     ]);
 
+    const totalSteps = reviewType === "all" ? 4 : 3;
+    const stepLabels = reviewType === "all"
+      ? ["Review Type", "Scope", "Stories", "Ready"]
+      : ["Review Type", "Scope", "Ready"];
+
     container.innerHTML = `
       <h1 class="text-2xl mb-6">New Audit</h1>
       <div class="steps">
-        ${stepLabels.map((label, i) => {
-          const num = i + 1;
-          const isActive = step === num;
-          const isDone = step > num;
-          const isLast = i === stepLabels.length - 1;
-          return `
-            <div class="step ${isActive ? "active" : ""} ${isDone ? "done" : ""}">
-              <div class="step-dot">
+        <div class="step-dots">
+          ${stepLabels.map((label, i) => {
+            const num = i + 1;
+            const isActive = step === num;
+            const isDone = step > num;
+            const isLast = i === stepLabels.length - 1;
+            return `
+              <div class="step-dot ${isActive ? "active" : ""} ${isDone ? "done" : ""}">
                 ${isDone ? icon("check", 14) : num}
               </div>
-              <span class="step-label">${label}</span>
-            </div>
-            ${!isLast ? `<div class="step-line ${isDone ? "done" : ""}"></div>` : ""}
-          `;
-        }).join("")}
+              ${!isLast ? `<div class="step-line ${isDone ? "done" : ""}"></div>` : ""}
+            `;
+          }).join("")}
+        </div>
+        <div class="step-labels">
+          ${stepLabels.map((label, i) => {
+            const num = i + 1;
+            const isActive = step === num;
+            const isDone = step > num;
+            return `<span class="step-label ${isActive ? "active" : ""} ${isDone ? "done" : ""}" style="flex:1">${label}</span>`;
+          }).join("")}
+        </div>
       </div>
       <div id="wizard-content"></div>
     `;
 
     const actualStep = reviewType === "code" && step === 4 ? 3 : step;
-    // Map step numbers to renderers (code-only mode compresses steps)
     if (actualStep === 1) renderStep1();
     else if (actualStep === 2) renderStep2();
     else if (actualStep === 3 && reviewType === "all") renderStep3();

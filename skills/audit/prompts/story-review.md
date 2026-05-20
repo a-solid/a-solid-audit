@@ -83,6 +83,18 @@ review:
 - Flag genuinely out-of-scope changes but don't penalize the score for them
 - If no acceptance criteria are provided, evaluate based on the story description alone
 
+## Review Context File
+
+The orchestra agent may pass you a `review-context.md` file path alongside the task file. If it exists:
+
+1. Read the file. The `## User Context` section contains project background, requirements, and focus areas provided by the user.
+2. Use this context to prioritize your review — pay extra attention to areas the user flagged (security, performance, specific patterns, etc.).
+3. After completing your review, you MAY append useful observations to the `## Review Notes` section of `review-context.md`. Append things like:
+   - Cross-file patterns you noticed ("Multiple files have the same error handling gap...")
+   - Shared risks or dependencies between files
+   - Anything that would help a reviewer reviewing subsequent files
+4. When appending, preserve all existing content. Only add to the Review Notes section, never modify User Context.
+
 ## After Review
 
 1. Update the task YAML file: set top-level `status` to `reviewed`, write structured fields under `review:` (`score`, `summary`, `findings`, `gaps`, `positives`)

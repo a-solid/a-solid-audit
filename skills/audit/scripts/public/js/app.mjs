@@ -11,19 +11,6 @@ const container = document.getElementById("app");
 const breadcrumbEl = document.getElementById("breadcrumb");
 let currentCleanup = null;
 
-// ─── Notes Panel ───
-const notesPanelRoot = document.getElementById("notes-panel-root");
-const notesPanel = initNotesPanel(notesPanelRoot);
-
-function getSessionIdFromHash() {
-  const hash = location.hash.slice(1) || "";
-  const parts = hash.split("/").filter(Boolean);
-  if (parts.length >= 2 && ["wizard", "progress", "review", "summary"].includes(parts[0])) {
-    return parts[1];
-  }
-  return null;
-}
-
 // ─── Shared Utilities ───
 
 export function escapeHtml(str) {
@@ -60,6 +47,19 @@ const ICONS = {
 export function icon(name, size = 16) {
   const path = ICONS[name] || ICONS.shield;
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+}
+
+// ─── Notes Panel ───
+const notesPanelRoot = document.getElementById("notes-panel-root");
+const notesPanel = initNotesPanel(notesPanelRoot);
+
+function getSessionIdFromHash() {
+  const hash = location.hash.slice(1) || "";
+  const parts = hash.split("/").filter(Boolean);
+  if (parts.length >= 2 && ["wizard", "progress", "review", "summary"].includes(parts[0])) {
+    return parts[1];
+  }
+  return null;
 }
 
 // ─── Breadcrumb ───

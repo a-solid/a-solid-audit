@@ -5,10 +5,24 @@ import { renderWizard } from "./views/wizard.mjs";
 import { renderProgress } from "./views/progress.mjs";
 import { renderReview } from "./views/review.mjs";
 import { renderSummary } from "./views/summary.mjs";
+import { initNotesPanel } from "./components/notes-panel.mjs";
 
 const container = document.getElementById("app");
 const breadcrumbEl = document.getElementById("breadcrumb");
 let currentCleanup = null;
+
+// ─── Notes Panel ───
+const notesPanelRoot = document.getElementById("notes-panel-root");
+const notesPanel = initNotesPanel(notesPanelRoot);
+
+function getSessionIdFromHash() {
+  const hash = location.hash.slice(1) || "";
+  const parts = hash.split("/").filter(Boolean);
+  if (parts.length >= 2 && ["wizard", "progress", "review", "summary"].includes(parts[0])) {
+    return parts[1];
+  }
+  return null;
+}
 
 // ─── Shared Utilities ───
 
@@ -104,6 +118,7 @@ async function navigate() {
   }
 
   const { view, params } = parseHash();
+  notesPanel.updateSession(getSessionIdFromHash());
   const render = routes[view];
   if (!render) { location.hash = "#/home"; return; }
 

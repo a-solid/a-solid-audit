@@ -82,9 +82,3 @@ export function getBranches(projectDir) {
   return output.trim().split("\n").filter(Boolean);
 }
 
-// Full file list from diff (used by wizard step 3 for file mapping checkboxes)
-export function getDiffFileList(scopeType, scopeRef, projectDir) {
-  const diff = runGitDiff(scopeType, scopeRef, projectDir);
-  if (!diff.trim()) return [];
-  return Object.keys(parseDiffByFile(diff));
-}

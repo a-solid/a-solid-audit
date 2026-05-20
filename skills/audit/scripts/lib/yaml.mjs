@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-export function yamlValue(v, indent = 0) {
+function yamlValue(v, indent = 0) {
   if (v === null || v === undefined) return "null";
   if (typeof v === "boolean") return v ? "true" : "false";
   if (typeof v === "number") return String(v);
@@ -92,7 +92,7 @@ function serializeYaml(data, indent, lines) {
   }
 }
 
-export function parseYaml(content) {
+function parseYaml(content) {
   const lines = content.split("\n");
   return parseBlock(lines, 0, 0).value;
 }

@@ -60,4 +60,9 @@ export const api = {
     request("POST", `/api/sessions/${encodeURIComponent(id)}/notes`, { file, ...data }),
   updateSummary: (id, data) =>
     request("POST", `/api/sessions/${encodeURIComponent(id)}/summary`, data),
+
+  // Review Context
+  getReviewContext: (id) => request("GET", `/api/sessions/${encodeURIComponent(id)}/review-context`),
+  setReviewContext: (id, context) =>
+    request("PUT", `/api/sessions/${encodeURIComponent(id)}/review-context`, { context }),
 };

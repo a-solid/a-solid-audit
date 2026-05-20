@@ -111,6 +111,11 @@ export function initSession(reportsDir, sid) {
   const base = path.join(reportsDir, safeSid);
   fs.mkdirSync(path.join(base, "code-tasks"), { recursive: true });
   fs.mkdirSync(path.join(base, "story-tasks"), { recursive: true });
+  fs.writeFileSync(
+    path.join(base, "review-context.md"),
+    "## User Context\n\n\n## Review Notes\n<!-- AI agents append shared observations here -->\n",
+    "utf-8",
+  );
   return base;
 }
 

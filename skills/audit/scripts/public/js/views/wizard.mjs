@@ -474,7 +474,6 @@ export async function renderWizard(container, params) {
             </div>
           </div>`;
       } catch (e) {
-      } catch (e) {
         showToast("Failed to start review: " + e.message);
         const btn = document.getElementById("start-review-btn");
         if (btn) { btn.disabled = false; btn.innerHTML = `${icon("zap", 14)} Start AI Review`; }

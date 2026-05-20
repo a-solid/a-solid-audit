@@ -46,28 +46,21 @@ export async function renderWizard(container, params) {
     container.innerHTML = `
       <h1 class="text-2xl mb-6">New Audit</h1>
       <div class="steps">
-        <div class="step-dots">
-          ${stepLabels.map((label, i) => {
-            const num = i + 1;
-            const isActive = step === num;
-            const isDone = step > num;
-            const isLast = i === stepLabels.length - 1;
-            return `
-              <div class="step-dot ${isActive ? "active" : ""} ${isDone ? "done" : ""}">
+        ${stepLabels.map((label, i) => {
+          const num = i + 1;
+          const isActive = step === num;
+          const isDone = step > num;
+          const isLast = i === stepLabels.length - 1;
+          return `
+            <div class="step-node ${isActive ? "active" : ""} ${isDone ? "done" : ""}">
+              <div class="step-dot">
                 ${isDone ? icon("check", 14) : num}
               </div>
-              ${!isLast ? `<div class="step-line ${isDone ? "done" : ""}"></div>` : ""}
-            `;
-          }).join("")}
-        </div>
-        <div class="step-labels">
-          ${stepLabels.map((label, i) => {
-            const num = i + 1;
-            const isActive = step === num;
-            const isDone = step > num;
-            return `<span class="step-label ${isActive ? "active" : ""} ${isDone ? "done" : ""}" style="flex:1">${label}</span>`;
-          }).join("")}
-        </div>
+              <span class="step-label">${label}</span>
+            </div>
+            ${!isLast ? `<div class="step-line ${isDone ? "done" : ""}"></div>` : ""}
+          `;
+        }).join("")}
       </div>
       <div id="wizard-content"></div>
     `;

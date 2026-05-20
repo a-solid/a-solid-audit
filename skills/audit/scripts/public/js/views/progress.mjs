@@ -18,7 +18,11 @@ export async function renderProgress(container, params) {
         <h1 class="text-2xl">AI Review in Progress</h1>
         <p class="text-sm text-muted mt-1">Keep the Claude Code terminal open.</p>
       </div>
-      <div id="session-badge"></div>
+      <div class="flex items-center gap-2">
+        <div id="session-badge"></div>
+        <button id="view-findings-btn" class="btn btn-ghost btn-sm hidden">${icon("eye", 14)} Findings</button>
+        <button id="view-summary-btn" class="btn btn-ghost btn-sm hidden">${icon("barChart", 14)} Summary</button>
+      </div>
     </div>
 
     <div class="card mb-4">
@@ -57,6 +61,14 @@ export async function renderProgress(container, params) {
       document.getElementById("progress-text").textContent = `${reviewed} of ${total} tasks reviewed`;
       document.getElementById("progress-pct").textContent = pct + "%";
       document.getElementById("session-badge").innerHTML = `<span class="badge badge-${session.status}">${session.status}</span>`;
+
+      // Show findings/summary buttons once tasks are reviewed
+      const findingsBtn = document.getElementById("view-findings-btn");
+      const summaryBtn = document.getElementById("view-summary-btn");
+      if (reviewed > 0) {
+        findingsBtn.classList.remove("hidden");
+        summaryBtn.classList.remove("hidden");
+      }
 
       document.getElementById("task-list").innerHTML = tasks.map(t => {
         const isReviewing = t.status === "reviewing";
@@ -102,6 +114,15 @@ export async function renderProgress(container, params) {
     pollFailures = 0;
     poll();
     pollTimer = setInterval(poll, 3000);
+  });
+
+  document.getElementById("view-findings-btn").addEventListener("click", () => {
+    if (pollTimer) clearInterval(pollTimer);
+    location.hash = `#/review/${sessionId}`;
+  });
+  document.getElementById("view-summary-btn").addEventListener("click", () => {
+    if (pollTimer) clearInterval(pollTimer);
+    location.hash = `#/summary/${sessionId}`;
   });
 
   await poll();

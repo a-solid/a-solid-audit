@@ -1,7 +1,6 @@
 // skills/audit/scripts/public/js/views/wizard.mjs
 import { api } from "../api.mjs";
 import { showToast, setBreadcrumb, icon, escapeHtml } from "../app.mjs";
-import { renderStoryCard } from "../components/story-card.mjs";
 import { renderFileTree } from "../components/file-tree.mjs";
 
 export async function renderWizard(container, params) {
@@ -253,36 +252,17 @@ export async function renderWizard(container, params) {
             <textarea id="story-ac" class="mb-2" rows="2" placeholder="Acceptance criteria"></textarea>
             <button id="save-story-btn" class="btn btn-primary btn-sm">Save</button>
           </div>
-          <div id="story-list" class="mt-4 space-y-2">
-            ${stories.map(s => renderStoryCard(s)).join("")}
-          </div>
         </div>
       </div>
       <div id="file-mapping-section" class="card mb-4 ${stories.length === 0 ? "hidden" : ""}">
         <h2 class="font-semibold mb-4">File Mapping</h2>
-        <p class="text-sm text-secondary mb-3">Select a story, then check files to associate.</p>
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <div class="text-sm font-medium mb-2">Files</div>
-            <div id="file-tree-container" class="border rounded p-2 max-h-64 overflow-y-auto"></div>
-          </div>
-          <div>
-            <div class="text-sm font-medium mb-2">Selected Story</div>
-            <select id="story-select" class="mb-2">
-              <option value="">-- Select story --</option>
-              ${stories.map((s, i) => `<option value="${i}">${escapeHtml(s.name || s.id)}</option>`).join("")}
-            </select>
-            <div id="selected-story-preview"></div>
-            <button id="save-mapping-btn" class="btn btn-primary mt-3 w-full">Save Mappings</button>
-          </div>
-        </div>
+        <p class="text-sm text-secondary mb-3">Click a story to expand, then check files to associate. Changes save automatically.</p>
+        <div id="accordion-container" class="space-y-2"></div>
       </div>
       <div class="flex justify-between">
         <button id="step3-back" class="btn btn-ghost">${icon("arrowLeft", 14)} Back</button>
         <button id="step3-next" class="btn btn-primary">Next ${icon("chevronRight", 14)}</button>
       </div>`;
-
-    loadFileTree(sessionId);
 
     document.getElementById("add-story-btn").addEventListener("click", () => {
       document.getElementById("story-form").classList.toggle("hidden");
@@ -302,10 +282,12 @@ export async function renderWizard(container, params) {
 
     document.getElementById("step3-back").addEventListener("click", () => { step = 2; save(); render(); });
     document.getElementById("step3-next").addEventListener("click", () => { step = 4; save(); render(); });
+
+    if (stories.length > 0) loadAccordionFileTree(sessionId);
   }
 
-  async function loadFileTree(sid) {
-    const container = document.getElementById("file-tree-container");
+  async function loadAccordionFileTree(sid) {
+    const container = document.getElementById("accordion-container");
     if (!container) return;
     container.innerHTML = `<span class="text-sm text-muted">Loading files...</span>`;
     try {
@@ -315,37 +297,68 @@ export async function renderWizard(container, params) {
         container.innerHTML = `<span class="text-sm text-muted">No files found. Confirm scope first.</span>`;
         return;
       }
-      const tree = renderFileTree(container, files);
 
-      const storySelect = document.getElementById("story-select");
-      storySelect.addEventListener("change", () => {
-        const idx = storySelect.value;
-        if (idx === "") { tree.clear(); return; }
-        const story = stories[parseInt(idx)];
-        const existing = storyMappings.find(m => m.storyName === story?.name);
-        tree.setSelected(existing?.files || []);
-      });
+      const fileTreeInstances = {};
+      let expandedIndex = -1;
 
-      // Override save-mapping-btn to also capture current tree selection
-      const saveBtn = document.getElementById("save-mapping-btn");
-      const cloned = saveBtn.cloneNode(true);
-      saveBtn.parentNode.replaceChild(cloned, saveBtn);
-      cloned.addEventListener("click", () => {
-        const idx = storySelect.value;
-        if (!idx) { showToast("Select a story first"); return; }
-        const story = stories[parseInt(idx)];
-        const selected = tree.getSelected();
-        if (selected.length === 0) { showToast("Select at least one file"); return; }
-        const existing = storyMappings.findIndex(m => m.storyName === story.name);
-        if (existing >= 0) storyMappings[existing].files = selected;
-        else storyMappings.push({ storyName: story.name, files: selected });
-        save();
-        // Persist all mappings to server
-        api.mapStories(sid, stories.map(s => ({
-          storyName: s.name,
-          files: (storyMappings.find(m => m.storyName === s.name)?.files || []),
-        }))).then(() => showToast(`Mapped ${selected.length} file(s) to "${story.name}"`, "success"))
-          .catch(e => showToast("Failed to save: " + e.message));
+      container.innerHTML = stories.map((story, i) => {
+        const existing = storyMappings.find(m => m.storyName === story.name);
+        const count = existing?.files?.length || 0;
+        return `
+          <div class="accordion-item" data-story-index="${i}">
+            <div class="accordion-header" data-index="${i}">
+              ${icon("clipboard", 14)}
+              <span class="text-sm font-medium">${escapeHtml(story.name || story.id)}</span>
+              <span class="accordion-badge ${count > 0 ? "has-files" : ""}">${count}</span>
+              <span class="accordion-chevron">${icon("chevronDown", 14)}</span>
+            </div>
+            <div class="accordion-body" id="accordion-body-${i}"></div>
+          </div>`;
+      }).join("");
+
+      container.querySelectorAll(".accordion-header").forEach(header => {
+        header.addEventListener("click", () => {
+          const idx = parseInt(header.dataset.index);
+          if (expandedIndex === idx) {
+            const item = container.querySelector(`[data-story-index="${idx}"]`);
+            item.classList.remove("expanded");
+            expandedIndex = -1;
+            return;
+          }
+          if (expandedIndex >= 0) {
+            const prev = container.querySelector(`[data-story-index="${expandedIndex}"]`);
+            if (prev) prev.classList.remove("expanded");
+          }
+          expandedIndex = idx;
+          const item = container.querySelector(`[data-story-index="${idx}"]`);
+          item.classList.add("expanded");
+
+          if (!fileTreeInstances[idx]) {
+            const body = document.getElementById(`accordion-body-${idx}`);
+            const story = stories[idx];
+            const existing = storyMappings.find(m => m.storyName === story.name);
+            const tree = renderFileTree(body, files);
+            if (existing?.files?.length) tree.setSelected(existing.files);
+            fileTreeInstances[idx] = tree;
+
+            body.addEventListener("change", () => {
+              const selected = tree.getSelected();
+              const mappingIdx = storyMappings.findIndex(m => m.storyName === story.name);
+              if (mappingIdx >= 0) storyMappings[mappingIdx].files = selected;
+              else storyMappings.push({ storyName: story.name, files: selected });
+              save();
+
+              const badge = item.querySelector(".accordion-badge");
+              badge.textContent = selected.length;
+              badge.classList.toggle("has-files", selected.length > 0);
+
+              api.mapStories(sid, stories.map(s => ({
+                storyName: s.name,
+                files: (storyMappings.find(m => m.storyName === s.name)?.files || []),
+              }))).catch(e => showToast("Failed to save mapping: " + e.message));
+            });
+          }
+        });
       });
     } catch (e) {
       container.innerHTML = `<span class="text-sm text-danger">Failed to load files: ${escapeHtml(e.message)}</span>`;

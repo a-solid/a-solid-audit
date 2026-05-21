@@ -45,25 +45,27 @@ Keep `overflow: hidden` for border-radius clipping. The detail panel's own `over
 
 ---
 
-## 2. Findings Default to Confirmed
+## 2. Findings Default to Confirmed on Task View
 
 **Problem A:** Confirm/Dismiss buttons both appear as ghost-style in the default (unreviewed) state — no visual cue to click.
 
-**Problem B:** `updateFindingStatus` in `review.mjs` line 51 implicitly defaults all unreviewed findings to `{ status: "confirmed" }` when saving. This silently marks findings the user never acted on.
+**Problem B:** `updateFindingStatus` in `review.mjs` line 51 implicitly defaults all unreviewed findings to `{ status: "confirmed" }` when saving any single finding. This silently marks findings the user never acted on — correct intent but wrong timing.
 
-### Fix A: Confirm button active by default
+### New behavior
 
-In `task-detail.mjs`, change the default (unreviewed) state of the Confirm button to show as solid/active instead of ghost. The Dismiss button stays as ghost (it's the alternative action).
+When a user clicks a task in the left sidebar to view its findings, **all findings for that task are automatically marked as confirmed** and persisted to the API. This happens upfront on first view — not hidden inside a later save call. The Confirm buttons show as active (already confirmed). The user can then selectively change individual findings to Dismissed with a reason.
 
-Change the Confirm button classes for the unreviewed state:
-- Remove `btn-ghost` when not confirmed
-- Add active styling that matches the confirmed state (accent color border, accent-dim background)
+### Fix A: Auto-confirm on task select
 
-The button should look "pre-selected" — users can click to confirm (no change) or click Dismiss to override.
+In `review.mjs`, when the user clicks a task in the sidebar (the click handler that sets `currentTaskIdx` and calls `renderContent()`), add a step that checks if this task has any findings in notes. If not, auto-confirm all findings by writing `{ findings: [...] }` with all set to `{ status: "confirmed", reason: "" }` via `api.updateTaskNote()`. Update the in-memory notes object immediately so the UI renders confirmed state.
 
-### Fix B: Remove implicit default in updateFindingStatus
+### Fix B: Confirm button active by default
 
-In `review.mjs` line 51, change the fallback from `{ status: "confirmed", reason: "" }` to just `null` or skip writing it. Only include findings the user has explicitly acted on in the saved notes array. This prevents silent auto-confirmation of unreviewed findings.
+In `task-detail.mjs`, change the Confirm button in the unreviewed state to show as solid/active — same styling as the confirmed state (accent border, accent-dim background). This visual matches the auto-confirmed behavior: findings are confirmed unless the user dismisses them.
+
+### Fix C: Clean up updateFindingStatus
+
+In `review.mjs` line 51, remove the implicit `{ status: "confirmed", reason: "" }` fallback. Since all findings are now confirmed on task view, this fallback is no longer needed. The function should only read existing statuses from notes data.
 
 ---
 
@@ -119,8 +121,8 @@ The "Action Required" stat card still displays `actionRequired` correctly — it
 ## Files
 
 - **Modify:** `skills/audit/scripts/public/styles.css` — remove `max-height: 75vh` from `.sidebar-layout`
+- **Modify:** `skills/audit/scripts/public/js/views/review.mjs` — auto-confirm all findings on task select, clean up updateFindingStatus fallback
 - **Modify:** `skills/audit/scripts/public/js/components/task-detail.mjs` — Confirm button active by default
-- **Modify:** `skills/audit/scripts/public/js/views/review.mjs` — remove implicit confirmed default in `updateFindingStatus`
 - **Modify:** `skills/audit/scripts/public/js/views/summary.mjs` — fix unreviewed stat formula
 - **Modify:** `skills/audit/scripts/public/print.html` — fix same unreviewed stat formula
 - **Modify:** `skills/audit/scripts/public/js/components/notes-panel.mjs` — extract only User Context section, update label

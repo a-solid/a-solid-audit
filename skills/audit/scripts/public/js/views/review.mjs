@@ -163,16 +163,28 @@ export async function renderReview(container, params) {
                 <span>No high-severity findings.</span>
               </div>`;
             }
-            return critical.map(t => `
-              <div class="flex items-center justify-between py-2 border-b" style="border-color:var(--border)">
+            return critical.map(t => {
+              const taskIdx = tasks.indexOf(t);
+              return `
+              <div class="flex items-center justify-between py-2 border-b needs-attention-item" style="border-color:var(--border);cursor:pointer" data-task-idx="${taskIdx}">
                 <span class="text-sm font-mono truncate">${escapeHtml(t.name || t.file)}</span>
                 <span class="text-sm text-danger font-medium">${(t.review?.findings || []).filter(f => f.severity === "critical" || f.severity === "high" || f.severity === "major").length} high-severity</span>
-              </div>
-            `).join("");
+              </div>`;
+            }).join("");
           })()}
         </div>
       `}
     `;
+
+    // Wire up Needs Attention task clicks
+    el.querySelectorAll(".needs-attention-item").forEach(item => {
+      item.addEventListener("click", () => {
+        currentTaskIdx = parseInt(item.dataset.taskIdx);
+        currentTab = "tasks";
+        updateTabUI();
+        renderContent();
+      });
+    });
   }
 
   function renderTasksTab(el) {

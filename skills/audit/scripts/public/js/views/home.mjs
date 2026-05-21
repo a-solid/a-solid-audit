@@ -70,11 +70,12 @@ export async function renderHome(container) {
       return;
     }
 
-    listEl.innerHTML = sessions.map(s => {
+    listEl.innerHTML = `<div class="session-grid">
+      ${sessions.map(s => {
       const cfg = STATUS_CONFIG[s.status] || STATUS_CONFIG.created;
       const pct = s.progress?.percentage ?? 0;
       return `
-        <div class="card card-clickable ${cfg.accent} mb-3" data-id="${s.id}" data-status="${s.status}">
+        <div class="card card-clickable ${cfg.accent}" data-id="${s.id}" data-status="${s.status}">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-3" style="min-width:0">
               <div style="color:var(--text-muted);flex-shrink:0">${icon("file", 18)}</div>
@@ -98,7 +99,8 @@ export async function renderHome(container) {
             </div>
           </div>
         </div>`;
-    }).join("");
+    }).join("")}
+    </div>`;
 
     listEl.querySelectorAll(".card-clickable").forEach(card => {
       card.addEventListener("click", () => {

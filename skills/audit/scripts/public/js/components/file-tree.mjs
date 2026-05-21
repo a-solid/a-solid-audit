@@ -22,14 +22,15 @@ export function renderFileTree(container, files) {
         if (selected.has(file)) selected.delete(file);
         else selected.add(file);
         render();
+        container.dispatchEvent(new Event("change", { bubbles: true }));
       });
-      // Keep checkbox in sync
       const checkbox = item.querySelector("input[type=checkbox]");
       checkbox?.addEventListener("change", () => {
         const file = item.dataset.file;
         if (selected.has(file)) selected.delete(file);
         else selected.add(file);
         render();
+        container.dispatchEvent(new Event("change", { bubbles: true }));
       });
     });
   }

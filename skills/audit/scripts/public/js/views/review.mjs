@@ -256,7 +256,8 @@ export async function renderReview(container, params) {
     });
     // Dismiss reason buttons
     detailPanel.querySelectorAll(".dismiss-reason-btn").forEach(btn => {
-      btn.addEventListener("click", async () => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
         const idx = parseInt(btn.closest("[data-dismiss-panel]").dataset.dismissPanel);
         const reason = btn.dataset.reason;
         await updateFindingStatus(sessionId, tasks[currentTaskIdx], idx, "deferred", reason);
@@ -264,13 +265,22 @@ export async function renderReview(container, params) {
     });
     // Dismiss custom submit
     detailPanel.querySelectorAll(".dismiss-submit-btn").forEach(btn => {
-      btn.addEventListener("click", async () => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
         const idx = parseInt(btn.dataset.dismissSubmit);
         const input = detailPanel.querySelector(`[data-dismiss-custom="${idx}"]`);
         const reason = input?.value?.trim();
         if (!reason) { showToast("Enter a reason"); return; }
         await updateFindingStatus(sessionId, tasks[currentTaskIdx], idx, "deferred", reason);
       });
+    });
+    // Prevent dismiss custom input clicks from bubbling
+    detailPanel.querySelectorAll(".dismiss-custom-input").forEach(input => {
+      input.addEventListener("click", (e) => e.stopPropagation());
+    });
+    // Prevent clicks inside dismiss panels from closing them
+    detailPanel.querySelectorAll(".dismiss-panel").forEach(panel => {
+      panel.addEventListener("click", (e) => e.stopPropagation());
     });
   }
 

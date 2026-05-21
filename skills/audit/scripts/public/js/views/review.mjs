@@ -166,6 +166,9 @@ export async function renderReview(container, params) {
   }
 
   function renderTasksTab(el) {
+    // Preserve sidebar scroll position across re-renders
+    const savedScrollTop = document.getElementById("task-sidebar")?.scrollTop || 0;
+
     el.innerHTML = `
       <div class="sidebar-layout">
         <div class="sidebar-panel" id="task-sidebar"></div>
@@ -189,6 +192,9 @@ export async function renderReview(container, params) {
         </div>`;
     }).join("");
 
+    // Restore sidebar scroll position
+    sidebar.scrollTop = savedScrollTop;
+
     sidebar.querySelectorAll(".task-nav-item").forEach(item => {
       item.addEventListener("click", () => {
         currentTaskIdx = parseInt(item.dataset.idx);
@@ -198,6 +204,9 @@ export async function renderReview(container, params) {
 
     const detailPanel = document.getElementById("task-detail-panel");
     detailPanel.innerHTML = renderTaskDetail(tasks[currentTaskIdx], notes);
+
+    // Reset detail panel scroll to top on task switch
+    detailPanel.scrollTop = 0;
 
     // Wire up confirm/dismiss buttons
     detailPanel.querySelectorAll(".btn-confirm").forEach(btn => {

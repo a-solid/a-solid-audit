@@ -62,7 +62,7 @@ export async function renderWizard(container, params) {
           `;
         }).join("")}
       </div>
-      <div id="wizard-content"></div>
+      <div id="wizard-content" class="wizard-content-enter"></div>
     `;
 
     const actualStep = reviewType === "code" && step === 4 ? 3 : step;

@@ -754,6 +754,7 @@ code {
 .grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
 .grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
 .grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
+.grid-cols-5 { grid-template-columns: repeat(5, 1fr); }
 .col-span-1 { grid-column: span 1; }
 .col-span-2 { grid-column: span 2; }
 .w-full { width: 100%; }
@@ -870,7 +871,7 @@ code {
     max-height: 200px; border-right: none;
     border-bottom: 1px solid var(--border);
   }
-  .grid-cols-2, .grid-cols-3, .grid-cols-4 { grid-template-columns: 1fr; }
+  .grid-cols-2, .grid-cols-3, .grid-cols-4, .grid-cols-5 { grid-template-columns: 1fr; }
   .col-span-2 { grid-column: span 1; }
   .steps { flex-wrap: wrap; gap: var(--space-2); }
   .step-line { display: none; }

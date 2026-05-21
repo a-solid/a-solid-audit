@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { sanitizePath } from "../../lib/session.mjs";
 import { taskFileName } from "../../lib/git.mjs";
-import { readYaml, writeYaml, writeStoryTaskYaml } from "../../lib/yaml.mjs";
+import { readYaml, writeYaml, writeIndexYaml, writeStoryTaskYaml } from "../../lib/yaml.mjs";
 import { listProviders, fetchFromProvider } from "../../lib/providers.mjs";
 import { jsonResponse, readBody, errorResponse } from "../index.mjs";
 
@@ -76,6 +76,24 @@ export function registerStoryRoutes(router, reportsDir) {
         acceptance: body.acceptance || "",
         files: body.files || [],
       });
+
+      // Update index.yaml to include the new story task
+      const indexPath = path.join(sessionDir, "index.yaml");
+      if (fs.existsSync(indexPath)) {
+        const index = readYaml(indexPath);
+        const storyTasks = index.storyTasks || [];
+        if (!storyTasks.some(t => t.file === storyFile)) {
+          storyTasks.push({ file: storyFile, status: "pending" });
+          // Upgrade session type to "all" if it was "code"
+          if (index.session && index.session.type === "code") {
+            index.session.type = "all";
+          }
+          writeIndexYaml(indexPath, {
+            ...index,
+            storyTasks,
+          });
+        }
+      }
 
       jsonResponse(res, { file: storyFile, name: safeName }, 201);
     } catch (e) {

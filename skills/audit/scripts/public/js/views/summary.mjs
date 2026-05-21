@@ -131,27 +131,10 @@ export async function renderSummary(container, params) {
         <div class="border-t my-4" style="border-color:var(--border)"></div>
 
         ${signoff?.date ? `
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-          <div style="width:32px;height:32px;border-radius:50%;background:var(--success);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;flex-shrink:0">
-            ${icon("check", 16)}
-          </div>
-          <div>
-            <div style="font-weight:600">Signed off</div>
-            <div class="text-xs text-muted">${new Date(signoff.date).toLocaleDateString()} · ${escapeHtml(signoff.name || "unknown")}${signoff.role ? " · " + escapeHtml(signoff.role) : ""}</div>
-          </div>
-          <button id="signoff-undo-btn" class="btn btn-ghost btn-sm no-print" style="margin-left:auto;font-size:12px;color:var(--text-muted);text-decoration:underline">Undo</button>
-        </div>
-        <div class="screen-only" style="opacity:0.5;pointer-events:none">
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label>Name</label>
-              <input class="mt-1" value="${escapeHtml(signoff.name || "")}" readonly>
-            </div>
-            <div>
-              <label>Role</label>
-              <input class="mt-1" value="${escapeHtml(signoff.role || "")}" readonly>
-            </div>
-          </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:22px;height:22px;border-radius:50%;background:var(--success);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;flex-shrink:0;font-size:11px">${icon("check", 12)}</div>
+          <div class="text-sm text-muted">${escapeHtml(signoff.name || "unknown")}${signoff.role ? " · " + escapeHtml(signoff.role) : ""} · ${new Date(signoff.date).toLocaleDateString()}</div>
+          <button id="signoff-undo-btn" class="btn btn-ghost btn-sm no-print" style="margin-left:auto;font-size:12px;color:var(--text-muted);text-decoration:underline;padding:2px 6px">Undo</button>
         </div>` : `
         <div class="grid grid-cols-2 gap-4">
           <div>

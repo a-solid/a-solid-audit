@@ -132,6 +132,7 @@ export async function renderSummary(container, params) {
         <div>
           <label>Name</label>
           <input id="signoff-name" class="mt-1" value="${escapeHtml(notes?.summary?.signoff?.name || "")}">
+          <div id="signoff-name-error" class="text-danger text-xs mt-1 hidden">Name is required</div>
         </div>
         <div>
           <label>Role</label>
@@ -164,20 +165,29 @@ export async function renderSummary(container, params) {
 
   document.getElementById("signoff-btn")?.addEventListener("click", async () => {
     const name = document.getElementById("signoff-name").value.trim();
+    const nameError = document.getElementById("signoff-name-error");
+    if (!name) {
+      if (nameError) nameError.classList.remove("hidden");
+      document.getElementById("signoff-name").style.borderColor = "var(--danger)";
+      document.getElementById("signoff-name").focus();
+      return;
+    }
+    if (nameError) nameError.classList.add("hidden");
+    document.getElementById("signoff-name").style.borderColor = "";
     const role = document.getElementById("signoff-role").value.trim();
-    if (!name) { showToast("Name is required for sign-off"); return; }
     try {
       await api.updateSummary(sessionId, {
-        signoff: {
-          name,
-          role,
-          date: new Date().toISOString(),
-        },
+        signoff: { name, role, date: new Date().toISOString() },
       });
       showToast("Signed off successfully", "success");
-      // Re-render to show signed-off state
       location.hash = `#/summary/${sessionId}`;
     } catch (e) { showToast("Sign-off failed: " + e.message); }
+  });
+
+  document.getElementById("signoff-name")?.addEventListener("input", () => {
+    const nameError = document.getElementById("signoff-name-error");
+    if (nameError) nameError.classList.add("hidden");
+    document.getElementById("signoff-name").style.borderColor = "";
   });
 
   document.getElementById("summary-back-btn").addEventListener("click", () => {

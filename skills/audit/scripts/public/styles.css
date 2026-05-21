@@ -360,6 +360,19 @@ img, svg { display: block; }
 .print-only { display: none; }
 .screen-only { }
 
+/* ─── Sign-off Signed State ─── */
+.signoff-signed { display: flex; align-items: center; gap: 12px; }
+.signoff-signed-left { flex-shrink: 0; }
+.signoff-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--success); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700;
+}
+.signoff-signed-body { min-width: 0; }
+.signoff-signed-name { font-size: 15px; font-weight: 600; color: var(--text-primary); }
+.signoff-signed-meta { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+
 /* ─── Progress Bar ─── */
 .progress-bar {
   height: 4px; background: var(--bg-active); border-radius: 2px; overflow: hidden;

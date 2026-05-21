@@ -124,16 +124,21 @@ export async function renderSummary(container, params) {
     if (!wrapper) return;
     wrapper.innerHTML = `
       <div class="card mb-6" id="review-summary-card"${signoff?.date ? ' style="border-color:var(--success);border-left:3px solid var(--success)"' : ""}>
-        <div class="font-medium mb-3">Review Summary</div>
+        <div class="font-medium mb-3">Review Sign-off</div>
 
         <textarea id="summary-notes" class="w-full" rows="4" placeholder="Add your review notes...">${escapeHtml(currentNotes || "")}</textarea>
 
         <div class="border-t my-4" style="border-color:var(--border)"></div>
 
         ${signoff?.date ? `
-        <div style="display:flex;align-items:center;gap:8px">
-          <div style="width:22px;height:22px;border-radius:50%;background:var(--success);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;flex-shrink:0;font-size:11px">${icon("check", 12)}</div>
-          <div class="text-sm text-muted">${escapeHtml(signoff.name || "unknown")}${signoff.role ? " · " + escapeHtml(signoff.role) : ""} · ${new Date(signoff.date).toLocaleDateString()}</div>
+        <div class="signoff-signed">
+          <div class="signoff-signed-left">
+            <div class="signoff-avatar">${icon("check", 16)}</div>
+          </div>
+          <div class="signoff-signed-body">
+            <div class="signoff-signed-name">${escapeHtml(signoff.name || "unknown")}</div>
+            <div class="signoff-signed-meta">${signoff.role ? escapeHtml(signoff.role) + " &middot; " : ""}${new Date(signoff.date).toLocaleDateString()}</div>
+          </div>
           <button id="signoff-undo-btn" class="btn btn-ghost btn-sm no-print" style="margin-left:auto;font-size:12px;color:var(--text-muted);text-decoration:underline;padding:2px 6px">Undo</button>
         </div>` : `
         <div class="grid grid-cols-2 gap-4">
@@ -217,6 +222,6 @@ export async function renderSummary(container, params) {
   });
 
   document.getElementById("export-pdf-btn").addEventListener("click", () => {
-    window.print();
+    window.open(`print.html?session=${sessionId}`, "_blank");
   });
 }

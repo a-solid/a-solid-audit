@@ -1,6 +1,6 @@
 # A-Solid Audit
 
-AI-powered code review and story alignment audit for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
+AI-powered code review and story alignment audit tool.
 
 [中文文档](README.zh-CN.md)
 
@@ -19,12 +19,12 @@ AI-powered code review and story alignment audit for [Claude Code](https://docs.
 
 ### Prerequisites
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI installed
+- An AI coding assistant CLI installed
 - Node.js 18+
 
 ### Installation
 
-This project is a Claude Code plugin distributed through its marketplace.
+This project is an AI coding assistant plugin distributed through a marketplace.
 
 **Step 1 — Add the marketplace**
 
@@ -56,7 +56,7 @@ After installation, the `/audit` skill is available in all your projects.
 
 ### Usage
 
-1. Open your project in Claude Code:
+1. Open your project in your AI coding assistant:
 
 ```bash
 cd your-project

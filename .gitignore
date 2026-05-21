@@ -1,27 +1,23 @@
-# Dependencies
-node_modules/
 
-# OS files
-.DS_Store
-Thumbs.db
-
-# Editor / IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-
-# Claude Code local settings (contains user-specific paths/perms)
+.audit/.superpowers/
 .claude/settings.local.json
-
-# Logs
-*.log
-
-# Superpowers (local tooling, not part of the project)
+.DS_Store
+.idea/
 .superpowers/
-docs/superpowers/
-
-# Git worktrees
+.vscode/
 .worktrees/
+*.log
+*.swo
+*.swp
+*~
+# AI assistant local settings (contains user-specific paths/perms)
+# Dependencies
+# Editor / IDE
+# Git worktrees
+# Logs
+# OS files
+# Superpowers (local tooling, not part of the project)
+docs/superpowers/
+node_modules/
+Thumbs.db
 .audit/

@@ -1,6 +1,6 @@
 # A-Solid Audit
 
-AI 驱动的代码审查与 Story 对齐审查工具，适用于 [Claude Code](https://docs.anthropic.com/en/docs/claude-code)。
+AI 驱动的代码审查与 Story 对齐审查工具。
 
 [English](README.md)
 
@@ -19,12 +19,12 @@ AI 驱动的代码审查与 Story 对齐审查工具，适用于 [Claude Code](h
 
 ### 前置条件
 
-- 已安装 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI
+- 已安装 AI 编程助手 CLI
 - Node.js 18+
 
 ### 安装插件
 
-本项目是一个通过插件市场分发的 Claude Code 插件。
+本项目是一个通过插件市场分发的 AI 编程助手插件。
 
 **第一步 — 添加市场**
 
@@ -56,7 +56,7 @@ AI 驱动的代码审查与 Story 对齐审查工具，适用于 [Claude Code](h
 
 ### 使用方法
 
-1. 在 Claude Code 中打开你的项目：
+1. 在 AI 编程助手中打开你的项目：
 
 ```bash
 cd your-project

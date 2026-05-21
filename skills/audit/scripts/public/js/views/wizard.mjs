@@ -403,7 +403,7 @@ export async function renderWizard(container, params) {
 
         <div class="mt-4 info-banner info-banner-amber">
           ${icon("zap", 16)}
-          <span>Click "Start AI Review" below, then go back to the Claude Code terminal and type <strong>start review</strong> to begin.</span>
+          <span>Click "Start AI Review" below, then go back to the AI terminal and type <strong>start review</strong> to begin.</span>
         </div>
       </div>
       <div class="flex justify-between">
@@ -467,7 +467,7 @@ export async function renderWizard(container, params) {
           <div class="card" style="text-align:center;padding:var(--space-8) var(--space-6)">
             <div style="margin-bottom:var(--space-4);color:var(--accent)">${icon("check", 48)}</div>
             <h2 class="text-xl mb-3">Audit Ready</h2>
-            <p class="text-secondary mb-4">Session is prepared. Go back to the Claude Code terminal and type:</p>
+            <p class="text-secondary mb-4">Session is prepared. Go back to the AI terminal and type:</p>
             <code style="font-size:var(--text-lg);background:var(--bg-elevated);padding:var(--space-2) var(--space-4);border-radius:var(--radius-md);display:inline-block">start review</code>
             <div class="mt-4">
               <a href="#/progress/${sessionId}" class="btn btn-ghost">View Progress ${icon("chevronRight", 14)}</a>

@@ -16,7 +16,7 @@ export async function renderProgress(container, params) {
     <div class="flex items-center justify-between mb-6">
       <div>
         <h1 class="text-2xl">AI Review in Progress</h1>
-        <p class="text-sm text-muted mt-1">Keep the Claude Code terminal open.</p>
+        <p class="text-sm text-muted mt-1">Keep the AI terminal open.</p>
       </div>
       <div class="flex items-center gap-2">
         <div id="session-badge"></div>

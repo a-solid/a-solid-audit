@@ -1,7 +1,7 @@
 // skills/audit/scripts/public/js/components/task-detail.mjs
 import { icon, escapeHtml } from "../app.mjs";
 
-export function renderTaskDetail(task) {
+export function renderTaskDetail(task, notes) {
   if (!task) return `<div class="text-muted text-sm flex items-center gap-2">${icon("chevronRight", 16)} Select a task to view details.</div>`;
 
   const score = task.review?.score;
@@ -12,6 +12,11 @@ export function renderTaskDetail(task) {
   const scoreColor = score >= 7 ? "var(--accent)" : score >= 4 ? "var(--warning)" : "var(--danger)";
   const circumference = 2 * Math.PI * 42;
   const offset = circumference * (1 - (score || 0) / 10);
+
+  function getFindingStatus(task, idx) {
+    const noteTask = notes?.tasks?.find(t => t.file === task.file);
+    return noteTask?.findings?.[idx]?.status || null;
+  }
 
   return `
     <div class="space-y-4">
@@ -46,15 +51,30 @@ export function renderTaskDetail(task) {
         <div>
           <div class="text-xs text-muted font-semibold mb-3">FINDINGS (${findings.length})</div>
           <div class="space-y-3">
-            ${findings.map((f, i) => `
+            ${findings.map((f, i) => {
+              const status = getFindingStatus(task, i);
+              const isConfirmed = status === "confirmed";
+              const isDismissed = status === "deferred";
+              const noteTask = notes?.tasks?.find(t => t.file === task.file);
+              const reason = noteTask?.findings?.[i]?.reason || "";
+
+              return `
               <div class="finding-card severity-${f.severity}" data-finding="${i}">
                 <div class="flex items-center justify-between mb-2">
-                  <span class="badge severity-${f.severity}">${f.severity}</span>
+                  <div class="flex items-center gap-2">
+                    <span class="badge severity-${f.severity}">${f.severity}</span>
+                    ${isConfirmed ? `<span class="badge" style="background:var(--success-dim);color:var(--accent)">${icon("check", 10)} Confirmed</span>` : ""}
+                    ${isDismissed ? `<span class="badge" style="background:var(--warning-dim);color:var(--warning)">${icon("x", 10)} Dismissed${reason ? ": " + escapeHtml(reason.slice(0, 30)) : ""}</span>` : ""}
+                  </div>
                   <div class="flex gap-2">
-                    <button class="btn btn-sm btn-ghost btn-confirm" data-idx="${i}" style="color:var(--accent)">
+                    <button class="btn btn-sm ${isConfirmed ? "" : "btn-ghost"} btn-confirm" data-idx="${i}"
+                      aria-label="Confirm finding"
+                      style="${isConfirmed ? "color:var(--accent);border-color:var(--accent);background:var(--accent-dim)" : "color:var(--accent)"}">
                       ${icon("check", 12)} Confirm
                     </button>
-                    <button class="btn btn-sm btn-ghost btn-dismiss" data-idx="${i}" style="color:var(--text-muted)">
+                    <button class="btn btn-sm ${isDismissed ? "" : "btn-ghost"} btn-dismiss" data-idx="${i}"
+                      aria-label="Dismiss finding"
+                      style="${isDismissed ? "color:var(--warning);border-color:var(--warning);background:var(--warning-dim)" : "color:var(--text-muted)"}">
                       ${icon("x", 12)} Dismiss
                     </button>
                   </div>
@@ -86,8 +106,8 @@ export function renderTaskDetail(task) {
                     <span class="font-mono">${escapeHtml(f.file)}${f.line ? ":" + f.line : ""}</span>
                   </div>
                 ` : ""}
-              </div>
-            `).join("")}
+              </div>`;
+            }).join("")}
           </div>
         </div>
       ` : ""}

@@ -182,7 +182,7 @@ export async function renderReview(container, params) {
     });
 
     const detailPanel = document.getElementById("task-detail-panel");
-    detailPanel.innerHTML = renderTaskDetail(tasks[currentTaskIdx]);
+    detailPanel.innerHTML = renderTaskDetail(tasks[currentTaskIdx], notes);
 
     // Wire up confirm/dismiss buttons
     detailPanel.querySelectorAll(".btn-confirm").forEach(btn => {

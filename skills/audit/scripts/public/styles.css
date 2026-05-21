@@ -660,6 +660,11 @@ code {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.needs-attention-item:hover {
+  background: var(--bg-hover);
 }
 .notes-fab {
   position: fixed; bottom: 24px; right: 24px; z-index: 45;

@@ -60,7 +60,7 @@ export function renderTaskDetail(task, notes) {
                   <div class="flex items-center gap-2">
                     <span class="badge severity-${f.severity}">${f.severity}</span>
                     ${isConfirmed ? `<span class="badge" style="background:var(--success-dim);color:var(--accent)">${icon("check", 10)} Confirmed</span>` : ""}
-                    ${isDismissed ? `<span class="badge dismiss-reason-badge" title="${escapeHtml(reason)}" style="background:var(--warning-dim);color:var(--warning)">${icon("x", 10)} Dismissed${reason ? ": " + escapeHtml(reason.length > 20 ? reason.slice(0, 20) + "..." : reason) : ""}</span>` : ""}
+                    ${isDismissed ? `<span class="badge dismiss-reason-badge"${reason ? ` title="${escapeHtml(reason)}"` : ""} style="background:var(--warning-dim);color:var(--warning)">${icon("x", 10)} Dismissed${reason ? ": " + escapeHtml(reason.length > 20 ? reason.slice(0, 20) + "..." : reason) : ""}</span>` : ""}
                   </div>
                   <div class="flex gap-2">
                     <button class="btn btn-sm ${isConfirmed ? "" : "btn-ghost"} btn-confirm" data-idx="${i}"

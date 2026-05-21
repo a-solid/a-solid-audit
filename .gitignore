@@ -16,8 +16,7 @@
 # Git worktrees
 # Logs
 # OS files
-# Superpowers (local tooling, not part of the project)
-docs/superpowers/
+# Superpowers local tooling (design specs are tracked in docs/superpowers/specs/)
 node_modules/
 Thumbs.db
 .audit/

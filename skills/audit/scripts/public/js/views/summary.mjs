@@ -110,7 +110,7 @@ export async function renderSummary(container, params) {
     </div>` : ""}
 
     <div class="card mb-6">
-      <div class="font-medium mb-3">Overall Notes</div>
+      <div class="font-medium mb-3">Comments</div>
       <textarea id="summary-notes" class="w-full" rows="4" placeholder="Add your review notes...">${escapeHtml(notes?.summary?.notes || "")}</textarea>
       <div class="flex justify-end mt-2">
         <button id="save-notes-btn" class="btn btn-sm">Save Notes</button>

@@ -111,7 +111,13 @@ export function registerNoteRoutes(router, reportsDir) {
       const notes = readNotes(sessionDir);
       if (!notes.summary) notes.summary = { notes: "", signoff: { name: "", role: "", date: "" } };
       if (body.notes !== undefined) notes.summary.notes = body.notes;
-      if (body.signoff) Object.assign(notes.summary.signoff, body.signoff);
+      if (body.signoff !== undefined) {
+        if (body.signoff === null) {
+          notes.summary.signoff = { name: "", role: "", date: "" };
+        } else {
+          Object.assign(notes.summary.signoff, body.signoff);
+        }
+      }
 
       writeNotes(sessionDir, notes);
       jsonResponse(res, { ok: true });

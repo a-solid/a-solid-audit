@@ -1,7 +1,10 @@
 const STORAGE_KEY = "audit-theme";
 
+function getStoredTheme() {
+  try { return localStorage.getItem(STORAGE_KEY); } catch { return null; }
+}
 function getPreferredTheme() {
-  const stored = localStorage.getItem(STORAGE_KEY);
+  const stored = getStoredTheme();
   if (stored) return stored;
   return window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
 }
@@ -13,7 +16,11 @@ const moonSVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" str
 function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
   const btn = document.getElementById("theme-toggle");
-  if (btn) btn.innerHTML = theme === "dark" ? moonSVG : sunSVG;
+  if (btn) {
+    btn.innerHTML = theme === "dark" ? moonSVG : sunSVG;
+    btn.setAttribute("aria-pressed", theme === "dark" ? "true" : "false");
+    btn.setAttribute("aria-label", theme === "dark" ? "Switch to light theme" : "Switch to dark theme");
+  }
 }
 
 export function initTheme() {
@@ -23,11 +30,11 @@ export function initTheme() {
     if (e.target.closest("#theme-toggle")) {
       const current = document.documentElement.getAttribute("data-theme") || "dark";
       const next = current === "dark" ? "light" : "dark";
-      localStorage.setItem(STORAGE_KEY, next);
+      try { localStorage.setItem(STORAGE_KEY, next); } catch { /* noop */ }
       applyTheme(next);
     }
   });
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e) => {
-    if (!localStorage.getItem(STORAGE_KEY)) applyTheme(e.matches ? "dark" : "light");
+    if (!getStoredTheme()) applyTheme(e.matches ? "dark" : "light");
   });
 }

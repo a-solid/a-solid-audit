@@ -48,7 +48,7 @@ export async function renderReview(container, params) {
     const findingsCount = (task.review?.findings || []).length;
     const noteFindings = Array.from({ length: findingsCount }, (_, i) => {
       const existing = notes?.tasks?.find(t => t.file === task.file)?.findings?.[i];
-      return existing || { status: "confirmed", reason: "" };
+      return existing || null;
     });
     noteFindings[findingIdx] = { status, reason };
     try {
@@ -73,6 +73,32 @@ export async function renderReview(container, params) {
     } catch (e) {
       showToast("Failed to update: " + e.message);
     }
+  }
+
+  async function autoConfirmFindings(task) {
+    const taskFindings = task.review?.findings || [];
+    if (taskFindings.length === 0) return;
+    const noteTask = notes?.tasks?.find(t => t.file === task.file);
+    const existingFindings = noteTask?.findings || [];
+    // Only confirm findings that have no status yet
+    let changed = false;
+    const noteFindings = taskFindings.map((_, i) => {
+      const existing = existingFindings[i];
+      if (existing) return existing;
+      changed = true;
+      return { status: "confirmed", reason: "" };
+    });
+    if (!changed) return;
+    try {
+      await api.updateTaskNote(sessionId, task.file, { findings: noteFindings });
+      if (!noteTask) {
+        if (!notes) notes = { tasks: [] };
+        const nt = { file: task.file, findings: noteFindings };
+        notes.tasks.push(nt);
+      } else {
+        noteTask.findings = noteFindings;
+      }
+    } catch (e) { /* best effort */ }
   }
 
   function renderContent() {
@@ -219,8 +245,12 @@ export async function renderReview(container, params) {
     sidebar.scrollTop = savedScrollTop;
 
     sidebar.querySelectorAll(".task-nav-item").forEach(item => {
-      item.addEventListener("click", () => {
-        currentTaskIdx = parseInt(item.dataset.idx);
+      item.addEventListener("click", async () => {
+        const newIdx = parseInt(item.dataset.idx);
+        if (newIdx !== currentTaskIdx) {
+          currentTaskIdx = newIdx;
+          await autoConfirmFindings(tasks[currentTaskIdx]);
+        }
         renderContent();
       });
     });

@@ -15,7 +15,7 @@ export function initNotesPanel(root) {
       <div class="notes-panel-header">
         <div>
           <span class="font-medium text-sm">Review Context</span>
-          <div class="text-xs text-muted" style="margin-top:2px">Referenced during code review as context.</div>
+          <div class="text-xs text-muted" style="margin-top:2px">Project context for AI reviewers</div>
         </div>
         <button id="notes-close" class="btn btn-ghost btn-sm">${icon("x", 14)}</button>
       </div>
@@ -66,7 +66,8 @@ export function initNotesPanel(root) {
   async function loadContent() {
     try {
       const data = await api.getReviewContext(sessionId);
-      loadedContent = data.context || "";
+      const match = (data.context || "").match(/## User Context\n([\s\S]*?)(?=\n## Review Notes|$)/);
+      loadedContent = match ? match[1].trim() : (data.context || "").trim();
       textarea.value = loadedContent;
     } catch (e) {
       textarea.value = "";

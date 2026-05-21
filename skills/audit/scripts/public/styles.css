@@ -878,7 +878,6 @@ code {
   border-radius: var(--radius-lg);
   overflow: hidden;
   min-height: 480px;
-  max-height: 75vh;
   background: var(--bg-surface-solid);
 }
 .sidebar-panel {

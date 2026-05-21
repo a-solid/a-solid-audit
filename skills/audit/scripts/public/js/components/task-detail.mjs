@@ -51,6 +51,7 @@ export function renderTaskDetail(task, notes) {
               const status = noteTask?.findings?.[i]?.status || null;
               const isConfirmed = status === "confirmed";
               const isDismissed = status === "deferred";
+              const isUnreviewed = !status;
               const reason = noteTask?.findings?.[i]?.reason || "";
 
               return `
@@ -62,9 +63,9 @@ export function renderTaskDetail(task, notes) {
                     ${isDismissed ? `<span class="badge dismiss-reason-badge"${reason ? ` title="${escapeHtml(reason)}"` : ""} style="background:var(--warning-dim);color:var(--warning)">${icon("x", 10)} Dismissed${reason ? ": " + escapeHtml(reason.length > 20 ? reason.slice(0, 20) + "..." : reason) : ""}</span>` : ""}
                   </div>
                   <div class="flex gap-2">
-                    <button class="btn btn-sm ${isConfirmed ? "" : "btn-ghost"} btn-confirm" data-idx="${i}"
+                    <button class="btn btn-sm ${isConfirmed || isUnreviewed ? "" : "btn-ghost"} btn-confirm" data-idx="${i}"
                       aria-label="Confirm finding"
-                      style="${isConfirmed ? "color:var(--accent);border-color:var(--accent);background:var(--accent-dim)" : "color:var(--accent)"}">
+                      style="${isConfirmed || isUnreviewed ? "color:var(--accent);border-color:var(--accent);background:var(--accent-dim)" : "color:var(--accent)"}">
                       ${icon("check", 12)} Confirm
                     </button>
                     <button class="btn btn-sm ${isDismissed ? "" : "btn-ghost"} btn-dismiss" data-idx="${i}"

@@ -194,7 +194,7 @@ async function init() {
       }
     });
   });
-  const unreviewed = totalFindings - confirmed - deferred - actionRequired;
+  const unreviewed = totalFindings - confirmed - deferred;
 
   const maxSevCount = Math.max(...Object.values(bySeverity), 1);
   const signoff = notes?.summary?.signoff;

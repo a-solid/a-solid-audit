@@ -65,8 +65,7 @@ export async function renderSummary(container, params) {
       }
     });
   });
-  const reviewed = confirmed + deferred + actionRequired;
-  const unreviewed = totalFindings - reviewed;
+  const unreviewed = totalFindings - confirmed - deferred;
 
   const maxSevCount = Math.max(...Object.values(bySeverity), 1);
 

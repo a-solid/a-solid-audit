@@ -173,6 +173,9 @@ img, svg { display: block; }
   from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
+.wizard-content-enter {
+  animation: fadeIn 200ms var(--ease-spring) forwards;
+}
 
 /* ─── Cards ─── */
 .card {
@@ -495,6 +498,8 @@ img, svg { display: block; }
 .task-nav-item.active {
   background: var(--accent-dim);
   border-left: 2px solid var(--accent);
+  transition: background var(--duration-fast) var(--ease-spring),
+              border-color var(--duration-fast) var(--ease-spring);
 }
 .task-nav-item .score-dot {
   width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
@@ -846,6 +851,7 @@ code {
 }
 .detail-panel {
   padding: var(--space-6);
+  padding-bottom: 72px;
   overflow-y: auto;
   background: var(--bg-base);
 }

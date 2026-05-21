@@ -867,6 +867,38 @@ code {
   background: var(--bg-base);
 }
 
+/* ─── Print Task Detail ─── */
+.print-task-card {
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  page-break-inside: avoid;
+}
+.print-task-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+.print-finding-card {
+  padding: var(--space-3);
+  border-left: 3px solid var(--border);
+  background: var(--bg-surface);
+  border-radius: var(--radius-md);
+}
+.print-finding-card + .print-finding-card { margin-top: var(--space-2); }
+.print-badge-confirmed {
+  background: var(--success-dim); color: var(--accent);
+}
+.print-badge-dismissed {
+  background: var(--warning-dim); color: var(--warning);
+}
+.print-badge-unreviewed {
+  background: var(--bg-surface); color: var(--text-muted);
+}
+
 /* ─── Print ─── */
 @media print {
   .no-print { display: none !important; }
@@ -876,7 +908,28 @@ code {
   }
   .text-primary, .text-secondary { color: black; }
   pre { border-color: #e5e7eb; }
+
+  .print-task-card {
+    background: white; border-color: #d1d5db; color: black;
+    page-break-inside: avoid;
+  }
+  .print-task-header { border-bottom-color: #d1d5db; }
+  .print-finding-card {
+    background: #f9fafb; border-left-color: #9ca3af;
+  }
   .badge { border: 1px solid #d1d5db; }
+  .badge.severity-critical, .badge.severity-major, .badge.severity-high {
+    color: #991b1b; border-color: #fca5a5; background: #fef2f2;
+  }
+  .badge.severity-medium, .badge.severity-minor {
+    color: #92400e; border-color: #fcd34d; background: #fffbeb;
+  }
+  .badge.severity-low, .badge.severity-info {
+    color: #1e40af; border-color: #93c5fd; background: #eff6ff;
+  }
+  .print-badge-confirmed { color: #166534; border-color: #86efac; background: #f0fdf4; }
+  .print-badge-dismissed { color: #92400e; border-color: #fcd34d; background: #fffbeb; }
+  .print-badge-unreviewed { color: #6b7280; border-color: #d1d5db; background: #f9fafb; }
 }
 
 /* ─── Responsive ─── */

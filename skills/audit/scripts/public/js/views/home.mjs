@@ -105,7 +105,7 @@ export async function renderHome(container) {
         const id = card.dataset.id;
         const status = card.dataset.status;
         if (status === "completed") location.hash = `#/review/${id}`;
-        else if (status === "created") location.hash = `#/wizard/${id}`;
+        else if (status === "created" || status === "scoped") location.hash = `#/wizard/${id}`;
         else location.hash = `#/progress/${id}`;
       });
     });

@@ -26,6 +26,38 @@ export async function renderWizard(container, params) {
     contextExpanded = state.contextExpanded || false;
   }
 
+  // If no localStorage data, try to restore from server for scoped sessions
+  if (!saved) {
+    try {
+      const session = await api.getSession(sessionId);
+      if (session?.status === "scoped") {
+        reviewType = session.type || "code";
+        if (session.scope) {
+          scopeMethod = session.scope.method || "uncommitted";
+          scopeRef = session.scope.ref || "";
+        }
+        // Jump to the appropriate step (past scope selection)
+        step = reviewType === "all" ? 3 : 2;
+        // Load stories from server
+        try {
+          const serverStories = await api.getStories(sessionId);
+          stories = serverStories.map(s => ({
+            name: s.name,
+            description: s.description || "",
+            acceptance: s.acceptance || "",
+          }));
+          storyMappings = serverStories.map(s => ({
+            storyName: s.name,
+            files: (s.files || []).map(f => typeof f === "string" ? f : f.name),
+          }));
+        } catch (e) { /* no stories yet */ }
+        save();
+      }
+    } catch (e) {
+      // If server fetch fails, start fresh
+    }
+  }
+
   function save() {
     localStorage.setItem(savedKey, JSON.stringify({
       step, reviewType, scopeMethod, scopeRef, stories, storyMappings, contextExpanded,

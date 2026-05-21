@@ -480,10 +480,13 @@ export async function renderWizard(container, params) {
         </button>
       </div>`;
 
-    // Load existing context
+    // Load existing context (extract only User Context section)
     api.getReviewContext(sessionId).then(data => {
       const input = document.getElementById("review-context-input");
-      if (input && data.context) input.value = data.context;
+      if (input && data.context) {
+        const match = data.context.match(/## User Context\n([\s\S]*?)(?=\n## Review Notes|$)/);
+        input.value = match ? match[1].trim() : data.context.trim();
+      }
     }).catch(() => {});
 
     // Toggle collapsible

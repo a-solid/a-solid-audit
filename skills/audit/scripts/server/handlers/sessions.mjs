@@ -11,9 +11,7 @@ const CONTEXT_FILE = "review-context.md";
 function readContextFile(sessionDir) {
   const p = path.join(sessionDir, CONTEXT_FILE);
   if (!fs.existsSync(p)) return "";
-  const content = fs.readFileSync(p, "utf-8");
-  const match = content.match(/## User Context\n([\s\S]*?)(?=\n## Review Notes|$)/);
-  return match ? match[1].trim() : "";
+  return fs.readFileSync(p, "utf-8");
 }
 
 function writeContextFile(sessionDir, userContext) {

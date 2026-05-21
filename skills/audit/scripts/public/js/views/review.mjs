@@ -36,10 +36,12 @@ export async function renderReview(container, params) {
     <div id="review-content"></div>
   `;
 
+  let reviewContext = "";
   try {
     const session = await api.getSession(sessionId);
     tasks = await api.getTasks(sessionId);
     notes = await api.getNotes(sessionId);
+    try { const ctx = await api.getReviewContext(sessionId); reviewContext = ctx.context || ""; } catch (e) { /* no context file */ }
   } catch (e) {
     showToast("Failed to load review data: " + e.message);
     return;
@@ -174,6 +176,13 @@ export async function renderReview(container, params) {
           })()}
         </div>
       `}
+
+    ${reviewContext ? `
+      <div class="card mb-4">
+        <div class="font-medium mb-3">Review Context</div>
+        <div class="text-sm" style="white-space:pre-wrap;word-break:break-word">${escapeHtml(reviewContext)}</div>
+      </div>
+    ` : ""}
     `;
 
     // Wire up Needs Attention task clicks

@@ -1,6 +1,7 @@
 // skills/audit/scripts/public/js/views/summary.mjs
 import { api } from "../api.mjs";
 import { showToast, setBreadcrumb, icon, escapeHtml } from "../app.mjs";
+import { renderPrintTaskDetail } from "../components/print-task-detail.mjs";
 
 const SEVERITY_LABELS = {
   'partially-met': 'Partial',
@@ -123,6 +124,13 @@ export async function renderSummary(container, params) {
       <textarea id="summary-notes" class="w-full" rows="4" placeholder="Add your review notes...">${escapeHtml(notes?.summary?.notes || "")}</textarea>
       <div class="flex justify-end mt-2">
         <button id="save-notes-btn" class="btn btn-sm">Save Notes</button>
+      </div>
+    </div>
+
+    <div class="card mb-6">
+      <div class="font-medium mb-4">Task Details</div>
+      <div class="space-y-4">
+        ${tasks.map(t => renderPrintTaskDetail(t, notes)).join("")}
       </div>
     </div>
 

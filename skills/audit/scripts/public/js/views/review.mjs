@@ -54,6 +54,14 @@ export async function renderReview(container, params) {
     noteFindings[findingIdx] = { status, reason };
     try {
       await api.updateTaskNote(sid, task.file, { findings: noteFindings });
+      // Update in-memory notes so re-renders reflect the change
+      let noteTask = notes?.tasks?.find(t => t.file === task.file);
+      if (!noteTask) {
+        if (!notes) notes = { tasks: [] };
+        noteTask = { file: task.file, findings: [] };
+        notes.tasks.push(noteTask);
+      }
+      noteTask.findings = noteFindings;
       const desc = task.review?.findings?.[findingIdx]?.description || "";
       const snippet = desc.length > 40 ? desc.slice(0, 40) + "..." : desc;
       showToast(
@@ -62,6 +70,7 @@ export async function renderReview(container, params) {
           : `Dismissed: ${snippet}`,
         "success"
       );
+      renderContent();
     } catch (e) {
       showToast("Failed to update: " + e.message);
     }

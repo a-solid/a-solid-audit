@@ -13,10 +13,7 @@ export function renderTaskDetail(task, notes) {
   const circumference = 2 * Math.PI * 42;
   const offset = circumference * (1 - (score || 0) / 10);
 
-  function getFindingStatus(task, idx) {
-    const noteTask = notes?.tasks?.find(t => t.file === task.file);
-    return noteTask?.findings?.[idx]?.status || null;
-  }
+  const noteTask = notes?.tasks?.find(t => t.file === task.file);
 
   return `
     <div class="space-y-4">
@@ -52,10 +49,9 @@ export function renderTaskDetail(task, notes) {
           <div class="text-xs text-muted font-semibold mb-3">FINDINGS (${findings.length})</div>
           <div class="space-y-3">
             ${findings.map((f, i) => {
-              const status = getFindingStatus(task, i);
+              const status = noteTask?.findings?.[i]?.status || null;
               const isConfirmed = status === "confirmed";
               const isDismissed = status === "deferred";
-              const noteTask = notes?.tasks?.find(t => t.file === task.file);
               const reason = noteTask?.findings?.[i]?.reason || "";
 
               return `

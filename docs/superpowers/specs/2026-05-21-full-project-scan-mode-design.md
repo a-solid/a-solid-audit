@@ -145,7 +145,7 @@ review:
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/api/sessions/:id/scan-scope` | Set scan scope, traverse files, generate scan task YAMLs |
-| POST | `/api/sessions/:id/fetch-url` | Fetch and summarize a URL, return content for context |
+| PUT | `/api/sessions/:id/scan-urls` | Store user-provided URLs for context gathering |
 | GET | `/api/sessions/:id/business-context` | Read generated business context (if exists) |
 
 **POST /api/sessions/:id/scan-scope** request body:
@@ -160,13 +160,13 @@ review:
 
 Empty `paths` = full project scan. Returns: `{ scope: { method: "scan", paths: [...], ignore: [...] }, taskCount: 12, fileCount: 87 }`.
 
-**POST /api/sessions/:id/fetch-url** request body:
+**PUT /api/sessions/:id/scan-urls** request body:
 
 ```json
-{ "url": "https://docs.example.com/architecture" }
+{ "urls": ["https://docs.example.com/architecture", "https://wiki.example.com/api-design"] }
 ```
 
-Returns: `{ content: "summarized content..." }`. The AI agent handles fetching and summarization.
+Stores URLs in the session. The AI orchestrator (SKILL.md) fetches and summarizes these URLs during Phase 1, merging the results into the business context alongside user-provided text.
 
 ### Modified Files
 
@@ -174,7 +174,7 @@ Returns: `{ content: "summarized content..." }`. The AI agent handles fetching a
 - `lib/yaml.mjs` — add `writeScanTaskYaml` (with `files` array, no `diff`) and `writeCrossModuleTaskYaml`
 - `lib/mapping.mjs` — status string `"scoped"` → `"configured"`
 - `server/handlers/audit.mjs` — add scan scope route
-- `server/handlers/sessions.mjs` — add URL fetch route, business context route
+- `server/handlers/sessions.mjs` — add scan-urls store route, business context read route
 - `server/handlers/tasks.mjs` — handle `scan` and `cross-module` task types
 - `SKILL.md` — add scan session flow section
 
@@ -249,7 +249,8 @@ Add to SKILL.md after the existing Code Review and Story Review sections:
 1. **Fetch session** — type `scan`, status `ready`
 2. **Phase 1 — Business Context Discovery**
    - Read key project files: `README.md`, package manifest, entry points, directory listing
-   - Dispatch sub-agent with `prompts/scan-business-context.md`
+   - If scan-urls were provided, fetch and summarize each URL's content
+   - Dispatch sub-agent with `prompts/scan-business-context.md` — the prompt instructs the agent to read project files and any URL-provided content, then generate the business context
    - Sub-agent writes `business-context.md` in the session directory
 3. **Phase 2 — Per-Module Review**
    - For each task with `type === "scan"` and status `pending`:
@@ -283,7 +284,7 @@ Add to SKILL.md after the existing Code Review and Story Review sections:
 | `lib/mapping.mjs` | Status string update |
 | `lib/yaml.mjs` | Add `writeScanTaskYaml`, `writeCrossModuleTaskYaml` |
 | `server/handlers/audit.mjs` | Add scan scope route |
-| `server/handlers/sessions.mjs` | Add URL fetch + business context routes |
+| `server/handlers/sessions.mjs` | Add scan-urls + business context routes |
 | `server/handlers/tasks.mjs` | Handle `scan`/`cross-module` task types |
 | `SKILL.md` | Add scan session flow section |
 | `public/js/views/wizard.mjs` | Third review type card, scan scope step, context URLs |

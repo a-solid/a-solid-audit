@@ -354,6 +354,8 @@ img, svg { display: block; }
 .font-semibold { font-weight: 600; }
 .font-mono { font-family: var(--font-mono); }
 .border-b { border-bottom: 1px solid var(--border); }
+.hidden { display: none !important; }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ─── Progress Bar ─── */
 .progress-bar {

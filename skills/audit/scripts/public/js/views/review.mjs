@@ -25,8 +25,8 @@ export async function renderReview(container, params) {
     <div class="flex items-center justify-between mb-4">
       <h1 class="text-2xl">Review Findings</h1>
       <div class="flex gap-2 no-print">
-        <button id="review-home-btn" class="btn btn-ghost">${icon("arrowLeft", 14)} Home</button>
-        <button id="review-summary-btn" class="btn btn-primary">Summary & Sign-off</button>
+        <button id="review-home-btn" class="btn btn-ghost" aria-label="Go home">${icon("arrowLeft", 14)} Home</button>
+        <button id="review-summary-btn" class="btn btn-primary" aria-label="Go to summary">Summary & Sign-off</button>
       </div>
     </div>
     <div class="tabs no-print" id="review-tabs">

@@ -20,8 +20,8 @@ export async function renderProgress(container, params) {
       </div>
       <div class="flex items-center gap-2">
         <div id="session-badge"></div>
-        <button id="view-findings-btn" class="btn btn-ghost btn-sm hidden">${icon("eye", 14)} Findings</button>
-        <button id="view-summary-btn" class="btn btn-ghost btn-sm hidden">${icon("barChart", 14)} Summary</button>
+        <button id="view-findings-btn" class="btn btn-ghost btn-sm hidden" aria-label="View findings">${icon("eye", 14)} Findings</button>
+        <button id="view-summary-btn" class="btn btn-ghost btn-sm hidden" aria-label="View summary">${icon("barChart", 14)} Summary</button>
       </div>
     </div>
 
@@ -41,7 +41,7 @@ export async function renderProgress(container, params) {
       <div class="info-banner info-banner-amber">
         ${icon("alertTriangle", 16)}
         <span>Connection issues detected.</span>
-        <button id="manual-refresh-btn" class="btn btn-sm ml-3">Refresh</button>
+        <button id="manual-refresh-btn" class="btn btn-sm ml-3" aria-label="Refresh">Refresh</button>
       </div>
     </div>
   `;

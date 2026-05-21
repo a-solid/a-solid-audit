@@ -123,7 +123,7 @@ export async function renderWizard(container, params) {
         <div id="scope-content" class="mt-4"></div>
       </div>
       <div class="flex justify-between">
-        <button id="step2-back" class="btn btn-ghost">${icon("arrowLeft", 14)} Back</button>
+        <button id="step2-back" class="btn btn-ghost" aria-label="Go back">${icon("arrowLeft", 14)} Back</button>
         <button id="step2-confirm" class="btn btn-primary">Confirm Scope</button>
       </div>`;
 
@@ -253,7 +253,7 @@ export async function renderWizard(container, params) {
         <div id="accordion-container" class="space-y-2"></div>
       </div>
       <div class="flex justify-between">
-        <button id="step3-back" class="btn btn-ghost">${icon("arrowLeft", 14)} Back</button>
+        <button id="step3-back" class="btn btn-ghost" aria-label="Go back">${icon("arrowLeft", 14)} Back</button>
         <button id="step3-next" class="btn btn-primary">Next ${icon("chevronRight", 14)}</button>
       </div>`;
 
@@ -407,7 +407,7 @@ export async function renderWizard(container, params) {
         </div>
       </div>
       <div class="flex justify-between">
-        <button id="step4-back" class="btn btn-ghost">${icon("arrowLeft", 14)} Back</button>
+        <button id="step4-back" class="btn btn-ghost" aria-label="Go back">${icon("arrowLeft", 14)} Back</button>
         <button id="start-review-btn" class="btn btn-primary">
           ${icon("zap", 14)}
           Start AI Review

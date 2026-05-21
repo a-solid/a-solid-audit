@@ -23,8 +23,8 @@ export async function renderSummary(container, params) {
     <div class="flex items-center justify-between mb-6">
       <h1 class="text-2xl">Summary & Sign-off</h1>
       <div class="flex gap-2 no-print">
-        <button id="summary-back-btn" class="btn btn-ghost">${icon("arrowLeft", 14)} Review</button>
-        <button id="export-pdf-btn" class="btn btn-primary">${icon("download", 14)} Export PDF</button>
+        <button id="summary-back-btn" class="btn btn-ghost" aria-label="Go back to review">${icon("arrowLeft", 14)} Review</button>
+        <button id="export-pdf-btn" class="btn btn-primary" aria-label="Export PDF">${icon("download", 14)} Export PDF</button>
       </div>
     </div>
     <div id="summary-content"></div>

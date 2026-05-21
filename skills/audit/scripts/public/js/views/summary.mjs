@@ -109,57 +109,7 @@ export async function renderSummary(container, params) {
       `).join("")}
     </div>` : ""}
 
-    <div class="card mb-6" id="review-summary-card"${notes?.summary?.signoff?.date ? ' style="border-color:var(--success);border-left:3px solid var(--success)"' : ""}>
-      <div class="font-medium mb-3">Review Summary</div>
-
-      <textarea id="summary-notes" class="w-full" rows="4" placeholder="Add your review notes...">${escapeHtml(notes?.summary?.notes || "")}</textarea>
-
-      <div class="border-t my-4" style="border-color:var(--border)"></div>
-
-      ${notes?.summary?.signoff?.date ? `
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
-        <div style="width:32px;height:32px;border-radius:50%;background:var(--success);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;flex-shrink:0">
-          ${icon("check", 16)}
-        </div>
-        <div>
-          <div style="font-weight:600">Signed off</div>
-          <div class="text-xs text-muted">${new Date(notes.summary.signoff.date).toLocaleDateString()} · ${escapeHtml(notes.summary.signoff.name || "unknown")}${notes.summary.signoff.role ? " · " + escapeHtml(notes.summary.signoff.role) : ""}</div>
-        </div>
-        <button id="signoff-undo-btn" class="btn btn-ghost btn-sm no-print" style="margin-left:auto;font-size:12px;color:var(--text-muted);text-decoration:underline">Undo</button>
-      </div>
-      <div class="screen-only" style="opacity:0.5;pointer-events:none">
-        <div class="grid grid-cols-2 gap-4">
-          <div>
-            <label>Name</label>
-            <input class="mt-1" value="${escapeHtml(notes.summary.signoff.name || "")}" readonly>
-          </div>
-          <div>
-            <label>Role</label>
-            <input class="mt-1" value="${escapeHtml(notes.summary.signoff.role || "")}" readonly>
-          </div>
-        </div>
-      </div>` : `
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <label>Name</label>
-          <input id="signoff-name" class="mt-1" value="${escapeHtml(notes?.summary?.signoff?.name || "")}">
-          <div id="signoff-name-error" class="text-danger text-xs mt-1 hidden">Name is required</div>
-        </div>
-        <div>
-          <label>Role</label>
-          <input id="signoff-role" class="mt-1" value="${escapeHtml(notes?.summary?.signoff?.role || "")}">
-        </div>
-      </div>`}
-      ${!notes?.summary?.signoff?.date ? `
-      <div class="flex justify-end mt-3">
-        <div id="signoff-name-error-bar" class="text-danger text-xs mr-auto hidden" style="align-self:center">Name is required</div>
-        <button id="save-btn" class="btn btn-primary no-print">
-          ${icon("check", 14)}
-          Save
-        </button>
-      </div>` : ""}
-      <div class="print-only text-sm text-muted mt-2">${notes?.summary?.signoff?.date ? "" : "Not signed off"}</div>
-    </div>
+    <div id="review-summary-card-wrapper"></div>
 
     <div class="card mb-6">
       <div class="font-medium mb-4">Task Details</div>
@@ -169,54 +119,115 @@ export async function renderSummary(container, params) {
     </div>
   `;
 
-  document.getElementById("save-btn")?.addEventListener("click", async () => {
-    const nameInput = document.getElementById("signoff-name");
-    const name = nameInput?.value.trim() || "";
-    const nameError = document.getElementById("signoff-name-error");
-    const nameErrorBar = document.getElementById("signoff-name-error-bar");
+  function renderSummaryCard(signoff, currentNotes) {
+    const wrapper = document.getElementById("review-summary-card-wrapper");
+    if (!wrapper) return;
+    wrapper.innerHTML = `
+      <div class="card mb-6" id="review-summary-card"${signoff?.date ? ' style="border-color:var(--success);border-left:3px solid var(--success)"' : ""}>
+        <div class="font-medium mb-3">Review Summary</div>
 
-    if (nameInput && !name) {
-      if (nameError) nameError.classList.remove("hidden");
-      if (nameErrorBar) nameErrorBar.classList.remove("hidden");
-      nameInput.style.borderColor = "var(--danger)";
-      nameInput.focus();
-      return;
-    }
-    if (nameError) nameError.classList.add("hidden");
-    if (nameErrorBar) nameErrorBar.classList.add("hidden");
-    if (nameInput) nameInput.style.borderColor = "";
+        <textarea id="summary-notes" class="w-full" rows="4" placeholder="Add your review notes...">${escapeHtml(currentNotes || "")}</textarea>
 
-    const role = document.getElementById("signoff-role")?.value.trim() || "";
-    try {
-      const update = {
-        notes: document.getElementById("summary-notes").value,
-      };
-      if (nameInput) {
-        update.signoff = { name, role, date: new Date().toISOString() };
+        <div class="border-t my-4" style="border-color:var(--border)"></div>
+
+        ${signoff?.date ? `
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+          <div style="width:32px;height:32px;border-radius:50%;background:var(--success);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;flex-shrink:0">
+            ${icon("check", 16)}
+          </div>
+          <div>
+            <div style="font-weight:600">Signed off</div>
+            <div class="text-xs text-muted">${new Date(signoff.date).toLocaleDateString()} · ${escapeHtml(signoff.name || "unknown")}${signoff.role ? " · " + escapeHtml(signoff.role) : ""}</div>
+          </div>
+          <button id="signoff-undo-btn" class="btn btn-ghost btn-sm no-print" style="margin-left:auto;font-size:12px;color:var(--text-muted);text-decoration:underline">Undo</button>
+        </div>
+        <div class="screen-only" style="opacity:0.5;pointer-events:none">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label>Name</label>
+              <input class="mt-1" value="${escapeHtml(signoff.name || "")}" readonly>
+            </div>
+            <div>
+              <label>Role</label>
+              <input class="mt-1" value="${escapeHtml(signoff.role || "")}" readonly>
+            </div>
+          </div>
+        </div>` : `
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label>Name</label>
+            <input id="signoff-name" class="mt-1" value="${escapeHtml(signoff?.name || "")}">
+            <div id="signoff-name-error" class="text-danger text-xs mt-1 hidden">Name is required</div>
+          </div>
+          <div>
+            <label>Role</label>
+            <input id="signoff-role" class="mt-1" value="${escapeHtml(signoff?.role || "")}">
+          </div>
+        </div>
+        <div class="flex justify-end mt-3">
+          <div id="signoff-name-error-bar" class="text-danger text-xs mr-auto hidden" style="align-self:center">Name is required</div>
+          <button id="save-btn" class="btn btn-primary no-print">
+            ${icon("check", 14)}
+            Save
+          </button>
+        </div>`}
+        <div class="print-only text-sm text-muted mt-2">${signoff?.date ? "" : "Not signed off"}</div>
+      </div>
+    `;
+    wireSummaryCardHandlers(signoff, currentNotes);
+  }
+
+  function wireSummaryCardHandlers(signoff, currentNotes) {
+    document.getElementById("save-btn")?.addEventListener("click", async () => {
+      const nameInput = document.getElementById("signoff-name");
+      const name = nameInput?.value.trim() || "";
+      const nameError = document.getElementById("signoff-name-error");
+      const nameErrorBar = document.getElementById("signoff-name-error-bar");
+
+      if (nameInput && !name) {
+        if (nameError) nameError.classList.remove("hidden");
+        if (nameErrorBar) nameErrorBar.classList.remove("hidden");
+        nameInput.style.borderColor = "var(--danger)";
+        nameInput.focus();
+        return;
       }
-      await api.updateSummary(sessionId, update);
-      showToast(nameInput ? "Signed off successfully" : "Saved", "success");
-      location.hash = `#/review/${sessionId}`;
-      requestAnimationFrame(() => { location.hash = `#/summary/${sessionId}`; });
-    } catch (e) { showToast("Save failed: " + e.message); }
-  });
+      if (nameError) nameError.classList.add("hidden");
+      if (nameErrorBar) nameErrorBar.classList.add("hidden");
+      if (nameInput) nameInput.style.borderColor = "";
 
-  document.getElementById("signoff-undo-btn")?.addEventListener("click", async () => {
-    try {
-      await api.updateSummary(sessionId, { signoff: null });
-      showToast("Sign-off cleared", "success");
-      location.hash = `#/review/${sessionId}`;
-      requestAnimationFrame(() => { location.hash = `#/summary/${sessionId}`; });
-    } catch (e) { showToast("Failed to undo sign-off: " + e.message); }
-  });
+      const role = document.getElementById("signoff-role")?.value.trim() || "";
+      const notesText = document.getElementById("summary-notes").value;
+      try {
+        const update = { notes: notesText };
+        if (nameInput) {
+          update.signoff = { name, role, date: new Date().toISOString() };
+        }
+        await api.updateSummary(sessionId, update);
+        showToast(nameInput ? "Signed off successfully" : "Saved", "success");
+        renderSummaryCard(nameInput ? { name, role, date: new Date().toISOString() } : signoff, notesText);
+      } catch (e) { showToast("Save failed: " + e.message); }
+    });
 
-  document.getElementById("signoff-name")?.addEventListener("input", () => {
-    const nameError = document.getElementById("signoff-name-error");
-    const nameErrorBar = document.getElementById("signoff-name-error-bar");
-    if (nameError) nameError.classList.add("hidden");
-    if (nameErrorBar) nameErrorBar.classList.add("hidden");
-    document.getElementById("signoff-name").style.borderColor = "";
-  });
+    document.getElementById("signoff-undo-btn")?.addEventListener("click", async () => {
+      try {
+        await api.updateSummary(sessionId, { signoff: null });
+        const notesText = document.getElementById("summary-notes").value;
+        showToast("Sign-off cleared", "success");
+        renderSummaryCard({ name: "", role: "", date: "" }, notesText);
+      } catch (e) { showToast("Failed to undo sign-off: " + e.message); }
+    });
+
+    document.getElementById("signoff-name")?.addEventListener("input", () => {
+      const nameError = document.getElementById("signoff-name-error");
+      const nameErrorBar = document.getElementById("signoff-name-error-bar");
+      if (nameError) nameError.classList.add("hidden");
+      if (nameErrorBar) nameErrorBar.classList.add("hidden");
+      const nameInput = document.getElementById("signoff-name");
+      if (nameInput) nameInput.style.borderColor = "";
+    });
+  }
+
+  renderSummaryCard(notes?.summary?.signoff, notes?.summary?.notes);
 
   document.getElementById("summary-back-btn").addEventListener("click", () => {
     location.hash = `#/review/${sessionId}`;

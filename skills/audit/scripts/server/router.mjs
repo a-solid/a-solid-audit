@@ -12,6 +12,9 @@ export function createRouter() {
     put(path, handler) {
       routes.push({ method: "PUT", path, handler });
     },
+    delete(path, handler) {
+      routes.push({ method: "DELETE", path, handler });
+    },
     resolve(method, pathname) {
       for (const route of routes) {
         if (route.method !== method) continue;

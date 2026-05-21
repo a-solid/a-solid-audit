@@ -2,12 +2,7 @@
 import { api } from "../api.mjs";
 import { showToast, setBreadcrumb, icon, escapeHtml } from "../app.mjs";
 import { renderPrintTaskDetail } from "../components/print-task-detail.mjs";
-
-const SEVERITY_LABELS = {
-  'partially-met': 'Partial',
-  'not-met': 'Not Met',
-  'met': 'Met',
-};
+import { SEVERITY_LABELS, SEVERITY_COLORS } from "../constants.mjs";
 
 export async function renderSummary(container, params) {
   const sessionId = params[0];
@@ -74,11 +69,6 @@ export async function renderSummary(container, params) {
   const unreviewed = totalFindings - reviewed;
 
   const maxSevCount = Math.max(...Object.values(bySeverity), 1);
-  const sevColors = {
-    critical: "var(--danger)", major: "var(--danger)", high: "var(--danger)",
-    medium: "var(--warning)", minor: "var(--warning)",
-    low: "var(--info)", info: "var(--info)",
-  };
 
   const content = document.getElementById("summary-content");
   content.innerHTML = `
@@ -112,7 +102,7 @@ export async function renderSummary(container, params) {
         <div class="severity-bar-row">
           <span class="badge severity-${sev} severity-bar-label">${SEVERITY_LABELS[sev] || sev}</span>
           <div class="severity-bar-track">
-            <div class="severity-bar-fill" style="width:${(count / maxSevCount) * 100}%;background:${sevColors[sev] || "var(--info)"}"></div>
+            <div class="severity-bar-fill" style="width:${(count / maxSevCount) * 100}%;background:${SEVERITY_COLORS[sev] || "var(--info)"}"></div>
           </div>
           <span class="severity-bar-count">${count}</span>
         </div>

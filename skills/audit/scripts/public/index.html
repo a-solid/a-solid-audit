@@ -18,18 +18,18 @@
   <a href="#app" class="skip-link">Skip to content</a>
   <header class="app-header no-print">
     <a href="#/home" class="app-logo">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
       audit
     </a>
     <div class="app-logo-sep"></div>
-    <nav id="breadcrumb" class="breadcrumb"></nav>
+    <nav id="breadcrumb" class="breadcrumb" aria-label="Breadcrumb"></nav>
   </header>
 
   <main id="app" class="app-main">
     <!-- Views render here -->
   </main>
 
-  <div id="toast-container" class="toast-container"></div>
+  <div id="toast-container" class="toast-container" role="status" aria-live="polite"></div>
   <div id="notes-panel-root"></div>
 </body>
 </html>

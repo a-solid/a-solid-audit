@@ -1,5 +1,6 @@
 // skills/audit/scripts/public/js/components/print-task-detail.mjs
 import { escapeHtml } from "../app.mjs";
+import { scoreColor } from "../constants.mjs";
 
 const SEVERITY_ORDER = ["critical", "major", "high", "medium", "minor", "low", "info"];
 
@@ -8,12 +9,10 @@ export function renderPrintTaskDetail(task, notes) {
   const rawFindings = task.review?.findings || [];
   const findings = rawFindings
     .map((f, origIdx) => ({ ...f, _origIdx: origIdx }))
-    .sort((a, b) => SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity));
+    .sort((a, b) => (SEVERITY_ORDER.indexOf(a.severity) ?? SEVERITY_ORDER.length) - (SEVERITY_ORDER.indexOf(b.severity) ?? SEVERITY_ORDER.length));
   const positives = task.review?.positives || [];
   const gaps = task.review?.gaps || [];
   const noteTask = notes?.tasks?.find(t => t.file === task.file);
-
-  const scoreColor = score >= 7 ? "var(--accent)" : score >= 4 ? "var(--warning)" : "var(--danger)";
 
   return `
     <div class="print-task-card">
@@ -22,7 +21,7 @@ export function renderPrintTaskDetail(task, notes) {
           <span class="text-lg font-semibold">${escapeHtml(task.name || task.file)}</span>
           <span class="badge" style="background:var(--bg-surface);color:var(--text-secondary)">${escapeHtml(task.status)}</span>
         </div>
-        <span class="text-lg font-semibold" style="color:${scoreColor}">${score ?? "-"}/10</span>
+        <span class="text-lg font-semibold" style="color:${scoreColor(score)}">${score ?? "-"}/10</span>
       </div>
 
       ${task.review?.summary ? `

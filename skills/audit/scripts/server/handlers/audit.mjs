@@ -37,6 +37,9 @@ export function registerAuditRoutes(router, projectDir, reportsDir) {
       if (body.method !== "uncommitted" && !body.ref) {
         return errorResponse(res, "Missing required field: ref", "VALIDATION_ERROR", 400);
       }
+      if (body.ref && !/^[a-zA-Z0-9._\-\/\s]+$/.test(body.ref)) {
+        return errorResponse(res, "Invalid ref format", "VALIDATION_ERROR", 400);
+      }
       const result = setScope(reportsDir, params.id, body.method, body.ref || "");
       jsonResponse(res, result);
     } catch (e) {

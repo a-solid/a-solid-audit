@@ -1,5 +1,6 @@
 // skills/audit/scripts/public/js/components/task-detail.mjs
 import { icon, escapeHtml } from "../app.mjs";
+import { scoreColor } from "../constants.mjs";
 
 export function renderTaskDetail(task, notes) {
   if (!task) return `<div class="text-muted text-sm flex items-center gap-2">${icon("chevronRight", 16)} Select a task to view details.</div>`;
@@ -8,8 +9,6 @@ export function renderTaskDetail(task, notes) {
   const findings = task.review?.findings || [];
   const positives = task.review?.positives || [];
   const gaps = task.review?.gaps || [];
-
-  const scoreColor = score >= 7 ? "var(--accent)" : score >= 4 ? "var(--warning)" : "var(--danger)";
   const circumference = 2 * Math.PI * 42;
   const offset = circumference * (1 - (score || 0) / 10);
 
@@ -23,17 +22,17 @@ export function renderTaskDetail(task, notes) {
           <svg width="96" height="96" viewBox="0 0 96 96">
             <circle class="score-ring-bg" cx="48" cy="48" r="42" fill="none" stroke-width="5"/>
             <circle class="score-ring-fill" cx="48" cy="48" r="42" fill="none"
-              stroke="${scoreColor}"
+              stroke="${scoreColor(score)}"
               stroke-width="5"
               stroke-dasharray="${circumference}"
               stroke-dashoffset="${offset}"
               stroke-linecap="round"/>
           </svg>
-          <div class="score-ring-text" style="color:${scoreColor}">${score ?? "-"}</div>
+          <div class="score-ring-text" style="color:${scoreColor(score)}">${score ?? "-"}</div>
         </div>
         <div>
           <div class="text-xs text-muted">Score</div>
-          <div class="text-lg font-semibold" style="color:${scoreColor}">${score ?? "-"}/10</div>
+          <div class="text-lg font-semibold" style="color:${scoreColor(score)}">${score ?? "-"}/10</div>
         </div>
       </div>
 

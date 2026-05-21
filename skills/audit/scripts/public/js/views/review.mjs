@@ -2,12 +2,7 @@
 import { api } from "../api.mjs";
 import { renderTaskDetail } from "../components/task-detail.mjs";
 import { showToast, setBreadcrumb, icon, escapeHtml, onNavigateCleanup } from "../app.mjs";
-
-const SEVERITY_LABELS = {
-  'partially-met': 'Partial',
-  'not-met': 'Not Met',
-  'met': 'Met',
-};
+import { SEVERITY_LABELS, SEVERITY_COLORS } from "../constants.mjs";
 
 export async function renderReview(container, params) {
   const sessionId = params[0];
@@ -33,7 +28,9 @@ export async function renderReview(container, params) {
       <div class="tab ${currentTab === "overview" ? "active" : ""}" data-tab="overview">Overview</div>
       <div class="tab" data-tab="tasks">Tasks</div>
     </div>
-    <div id="review-content"></div>
+    <div id="review-content">
+      <div class="flex items-center justify-center" style="padding:var(--space-8)"><span class="spinner"></span></div>
+    </div>
   `;
 
   let reviewContext = "";
@@ -98,11 +95,6 @@ export async function renderReview(container, params) {
       : 0;
 
     const maxSevCount = Math.max(...Object.values(bySeverity), 1);
-    const sevColors = {
-      critical: "var(--danger)", major: "var(--danger)", high: "var(--danger)",
-      medium: "var(--warning)", minor: "var(--warning)",
-      low: "var(--info)", info: "var(--info)",
-    };
 
     el.innerHTML = `
       <div class="grid grid-cols-3 gap-4 mb-6">
@@ -145,7 +137,7 @@ export async function renderReview(container, params) {
               <div class="severity-bar-row">
                 <span class="badge severity-${sev} severity-bar-label">${SEVERITY_LABELS[sev] || sev}</span>
                 <div class="severity-bar-track">
-                  <div class="severity-bar-fill" style="width:${(count / maxSevCount) * 100}%;background:${sevColors[sev] || "var(--info)"}"></div>
+                  <div class="severity-bar-fill" style="width:${(count / maxSevCount) * 100}%;background:${SEVERITY_COLORS[sev] || "var(--info)"}"></div>
                 </div>
                 <span class="severity-bar-count">${count}</span>
               </div>
@@ -314,6 +306,7 @@ export async function renderReview(container, params) {
 
   // Keyboard shortcuts — register with cleanup
   function shortcutHandler(e) {
+    if (e.target.matches("input, textarea, [contenteditable]")) return;
     if (currentTab !== "tasks") {
       if (e.key === "o") { currentTab = "overview"; renderContent(); updateTabUI(); }
       else if (e.key === "s") { currentTab = "tasks"; renderContent(); updateTabUI(); }

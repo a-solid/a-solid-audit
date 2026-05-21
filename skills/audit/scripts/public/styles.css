@@ -933,6 +933,21 @@ code {
     --danger: #991b1b;
     --warning: #92400e;
     --info: #1e40af;
+    --bg-deep: #fff;
+    --bg-base: #fff;
+    --bg-surface: #f9fafb;
+    --bg-surface-solid: #fff;
+    --bg-elevated: #f3f4f6;
+    --bg-hover: #e5e7eb;
+    --bg-active: #d1d5db;
+    --bg-muted: #f3f4f6;
+    --bg-input: #fff;
+    --text-primary: #111827;
+    --text-secondary: #4b5563;
+    --text-muted: #9ca3af;
+    --border: #e5e7eb;
+    --border-hover: #d1d5db;
+    --border-accent: rgba(22, 101, 52, 0.3);
   }
   .card, .stat-card, .sidebar-panel, .detail-panel, .finding-card {
     background: white; border-color: #e5e7eb; color: black;

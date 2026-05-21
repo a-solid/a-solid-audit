@@ -8,7 +8,7 @@ export function initNotesPanel(root) {
   let loadedContent = "";
 
   root.innerHTML = `
-    <button id="notes-fab" class="notes-fab" title="Edit review notes">
+    <button id="notes-fab" class="notes-fab" title="Edit review notes" aria-label="Edit review notes">
       ${icon("messageSquare", 20)}
     </button>
     <div id="notes-panel" class="notes-panel">

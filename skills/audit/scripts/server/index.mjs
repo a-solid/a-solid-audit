@@ -14,7 +14,7 @@ export function jsonResponse(res, data, status = 200) {
   res.end(JSON.stringify(data));
 }
 
-export function errorResponse(res, message, code, status) {
+export function errorResponse(res, message, code, status = 400) {
   res.writeHead(status, { "Content-Type": "application/json" });
   res.end(JSON.stringify({ error: message, code }));
 }
@@ -42,7 +42,15 @@ export function startServer(projectDir, port = 3456) {
 
     const match = router.resolve(req.method, url.pathname);
     if (match) {
-      return match.handler(req, res, match.params);
+      try {
+        return match.handler(req, res, match.params);
+      } catch (e) {
+        if (e instanceof SyntaxError) {
+          return errorResponse(res, "Invalid JSON", "PARSE_ERROR", 400);
+        }
+        console.error(e);
+        errorResponse(res, "Internal server error", "INTERNAL_ERROR", 500);
+      }
     }
 
     serveStatic(req, res, url.pathname);

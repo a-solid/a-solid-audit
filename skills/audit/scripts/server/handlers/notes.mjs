@@ -1,7 +1,7 @@
 // skills/audit/scripts/server/handlers/notes.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { sanitizePath } from "../../lib/session.mjs";
+import { sanitizePath, sanitizeFilePath } from "../../lib/session.mjs";
 import { readYaml, writeYaml } from "../../lib/yaml.mjs";
 import { jsonResponse, readBody, errorResponse } from "../index.mjs";
 
@@ -72,14 +72,15 @@ export function registerNoteRoutes(router, reportsDir) {
         return errorResponse(res, "findings must be an array", "VALIDATION_ERROR", 400);
       }
 
+      const safeFile = sanitizeFilePath(body.file);
       const notes = readNotes(sessionDir);
-      let entry = notes.tasks.find(t => t.file === body.file);
+      let entry = notes.tasks.find(t => t.file === safeFile);
       if (!entry) {
-        const taskPath = path.join(sessionDir, body.file);
+        const taskPath = path.join(sessionDir, safeFile);
         const task = fs.existsSync(taskPath) ? readYaml(taskPath) : null;
         const findingCount = (task?.review?.findings || []).length;
         const findings = Array.from({ length: findingCount }, () => ({ status: "confirmed", reason: "" }));
-        entry = { file: body.file, status: "", notes: "", findings };
+        entry = { file: safeFile, status: "", notes: "", findings };
         notes.tasks.push(entry);
       }
 

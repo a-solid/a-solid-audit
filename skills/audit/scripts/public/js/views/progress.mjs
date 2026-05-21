@@ -60,7 +60,7 @@ export async function renderProgress(container, params) {
       document.getElementById("progress-fill").style.width = pct + "%";
       document.getElementById("progress-text").textContent = `${reviewed} of ${total} tasks reviewed`;
       document.getElementById("progress-pct").textContent = pct + "%";
-      document.getElementById("session-badge").innerHTML = `<span class="badge badge-${session.status}">${session.status}</span>`;
+      document.getElementById("session-badge").innerHTML = `<span class="badge badge-${escapeHtml(session.status)}">${escapeHtml(session.status)}</span>`;
 
       // Show findings/summary buttons once tasks are reviewed
       const findingsBtn = document.getElementById("view-findings-btn");
@@ -87,7 +87,7 @@ export async function renderProgress(container, params) {
             </div>
             <div class="flex items-center gap-3" style="flex-shrink:0">
               ${t.review?.score ? `<span class="text-sm font-mono ${scoreColor}">${t.review.score}/10</span>` : ""}
-              <span class="badge badge-${t.status === "reviewing" ? "reviewing-task" : t.status}">${t.status}</span>
+              <span class="badge badge-${t.status === "reviewing" ? "reviewing-task" : escapeHtml(t.status)}">${escapeHtml(t.status)}</span>
             </div>
           </div>`;
       }).join("");
@@ -112,6 +112,7 @@ export async function renderProgress(container, params) {
 
   document.getElementById("manual-refresh-btn").addEventListener("click", () => {
     pollFailures = 0;
+    if (pollTimer) clearInterval(pollTimer);
     poll();
     pollTimer = setInterval(poll, 3000);
   });

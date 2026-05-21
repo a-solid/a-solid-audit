@@ -176,7 +176,7 @@ export async function renderWizard(container, params) {
         btn.disabled = true;
         btn.innerHTML = `<span class="spinner spinner-sm"></span> Generating...`;
         await api.setScope(sessionId, scopeMethod, scopeRef);
-        step = reviewType === "code" ? 3 : 3;
+        step = 3;
         save();
         render();
       } catch (e) {

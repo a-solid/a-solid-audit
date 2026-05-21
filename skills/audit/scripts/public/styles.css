@@ -523,6 +523,8 @@ img, svg { display: block; }
 /* ─── Stat Card ─── */
 .stat-card {
   background: var(--bg-surface);
+  backdrop-filter: blur(var(--card-blur));
+  -webkit-backdrop-filter: blur(var(--card-blur));
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--space-4) var(--space-5);

@@ -54,7 +54,7 @@ export function renderTaskDetail(task, notes) {
               const reason = noteTask?.findings?.[i]?.reason || "";
 
               return `
-              <div class="finding-card severity-${f.severity}" data-finding="${i}">
+              <div class="finding-card severity-${f.severity}${isConfirmed ? " confirmed" : ""}${isDismissed ? " dismissed" : ""}" data-finding="${i}">
                 <div class="flex items-center justify-between mb-2">
                   <div class="flex items-center gap-2">
                     <span class="badge severity-${f.severity}">${f.severity}</span>

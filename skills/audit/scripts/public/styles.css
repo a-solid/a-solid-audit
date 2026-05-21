@@ -121,6 +121,23 @@
 [data-theme="light"] .app-header {
   background: rgba(240, 242, 245, 0.85);
 }
+/* ─── Light-mode component overrides ─── */
+[data-theme="light"] .toast-error { background: #fef2f2; color: #991b1b; border-color: rgba(239, 68, 68, 0.2); }
+[data-theme="light"] .toast-success { background: #f0fdf4; color: #166534; border-color: rgba(34, 197, 94, 0.2); }
+[data-theme="light"] .toast-warning { background: #fffbeb; color: #92400e; border-color: rgba(245, 158, 11, 0.2); }
+[data-theme="light"] pre { background: #f1f3f5; border-color: rgba(0, 0, 0, 0.08); }
+[data-theme="light"] :not(pre) > code { background: rgba(0, 0, 0, 0.06); color: var(--text-primary); }
+[data-theme="light"] .severity-critical { background: linear-gradient(135deg, rgba(239,68,68,0.12), rgba(239,68,68,0.06)); color: #991b1b; }
+[data-theme="light"] .severity-major, [data-theme="light"] .severity-high { background: linear-gradient(135deg, rgba(239,68,68,0.1), rgba(239,68,68,0.05)); color: #b91c1c; }
+[data-theme="light"] .severity-minor, [data-theme="light"] .severity-medium { background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(245,158,11,0.06)); color: #92400e; }
+[data-theme="light"] .severity-info, [data-theme="light"] .severity-low { background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(59,130,246,0.05)); color: #1e40af; }
+[data-theme="light"] .severity-met { color: #166534; }
+[data-theme="light"] .severity-partially-met { color: #92400e; }
+[data-theme="light"] .severity-not-met { color: #991b1b; }
+[data-theme="light"] .finding-card.confirmed { background: linear-gradient(135deg, rgba(22,163,74,0.08), var(--bg-surface)); }
+[data-theme="light"] * { scrollbar-color: rgba(0, 0, 0, 0.2) transparent; }
+[data-theme="light"] ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.2); }
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.35); }
 
 /* Reset */
 *, *::before, *::after { box-sizing: border-box; margin: 0; }
@@ -187,6 +204,7 @@ img, svg { display: block; }
   width: 1px; height: 20px; background: var(--border); margin: 0 var(--space-2);
   flex-shrink: 0;
 }
+.header-spacer { flex: 1; }
 .breadcrumb {
   display: flex; align-items: center; gap: var(--space-1);
   font-size: var(--text-sm); color: var(--text-muted);

@@ -120,41 +120,49 @@ export async function renderReview(container, params) {
         </div>
       </div>
 
-      ${Object.keys(bySeverity).length > 0 ? `
-        <div class="card mb-4">
-          <div class="font-medium mb-4">Findings by Severity</div>
-          ${Object.entries(bySeverity).map(([sev, count]) => `
-            <div class="severity-bar-row">
-              <span class="badge severity-${sev} severity-bar-label">${SEVERITY_LABELS[sev] || sev}</span>
-              <div class="severity-bar-track">
-                <div class="severity-bar-fill" style="width:${(count / maxSevCount) * 100}%;background:${sevColors[sev] || "var(--info)"}"></div>
-              </div>
-              <span class="severity-bar-count">${count}</span>
-            </div>
-          `).join("")}
+      ${totalFindings === 0 ? `
+        <div class="card" style="text-align:center;padding:var(--space-8) var(--space-6)">
+          <div style="margin-bottom:var(--space-4);color:var(--accent)">${icon("check", 48)}</div>
+          <h2 class="text-lg" style="color:var(--text-secondary)">All Clear</h2>
+          <p class="text-sm text-muted mt-2" style="max-width:320px;margin:0 auto">No findings were identified in this review.</p>
         </div>
-      ` : ""}
+      ` : `
+        ${Object.keys(bySeverity).length > 0 ? `
+          <div class="card mb-4">
+            <div class="font-medium mb-4">Findings by Severity</div>
+            ${Object.entries(bySeverity).map(([sev, count]) => `
+              <div class="severity-bar-row">
+                <span class="badge severity-${sev} severity-bar-label">${SEVERITY_LABELS[sev] || sev}</span>
+                <div class="severity-bar-track">
+                  <div class="severity-bar-fill" style="width:${(count / maxSevCount) * 100}%;background:${sevColors[sev] || "var(--info)"}"></div>
+                </div>
+                <span class="severity-bar-count">${count}</span>
+              </div>
+            `).join("")}
+          </div>
+        ` : ""}
 
-      <div class="card">
-        <div class="font-medium mb-3">Needs Attention</div>
-        ${(() => {
-          const critical = tasks.filter(t =>
-            (t.review?.findings || []).some(f => f.severity === "critical" || f.severity === "high" || f.severity === "major")
-          );
-          if (critical.length === 0) {
-            return `<div class="flex items-center gap-2 text-sm text-muted">
-              ${icon("check", 16)}
-              <span>No high-severity findings.</span>
-            </div>`;
-          }
-          return critical.map(t => `
-            <div class="flex items-center justify-between py-2 border-b" style="border-color:var(--border)">
-              <span class="text-sm font-mono truncate">${escapeHtml(t.name || t.file)}</span>
-              <span class="text-sm text-danger font-medium">${(t.review?.findings || []).filter(f => f.severity === "critical" || f.severity === "high" || f.severity === "major").length} high-severity</span>
-            </div>
-          `).join("");
-        })()}
-      </div>`;
+        <div class="card">
+          <div class="font-medium mb-3">Needs Attention</div>
+          ${(() => {
+            const critical = tasks.filter(t =>
+              (t.review?.findings || []).some(f => f.severity === "critical" || f.severity === "high" || f.severity === "major")
+            );
+            if (critical.length === 0) {
+              return `<div class="flex items-center gap-2 text-sm text-muted">
+                ${icon("check", 16)}
+                <span>No high-severity findings.</span>
+              </div>`;
+            }
+            return critical.map(t => `
+              <div class="flex items-center justify-between py-2 border-b" style="border-color:var(--border)">
+                <span class="text-sm font-mono truncate">${escapeHtml(t.name || t.file)}</span>
+                <span class="text-sm text-danger font-medium">${(t.review?.findings || []).filter(f => f.severity === "critical" || f.severity === "high" || f.severity === "major").length} high-severity</span>
+              </div>
+            `).join("");
+          })()}
+        </div>
+      `}
   }
 
   function renderTasksTab(el) {

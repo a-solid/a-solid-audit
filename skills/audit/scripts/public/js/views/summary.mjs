@@ -112,20 +112,10 @@ export async function renderSummary(container, params) {
     <div class="card mb-6" id="review-summary-card"${notes?.summary?.signoff?.date ? ' style="border-color:var(--success);border-left:3px solid var(--success)"' : ""}>
       <div class="font-medium mb-3">Review Summary</div>
 
-      <!-- Comments -->
-      <div class="mb-2">
-        <label>Comments</label>
-      </div>
       <textarea id="summary-notes" class="w-full" rows="4" placeholder="Add your review notes...">${escapeHtml(notes?.summary?.notes || "")}</textarea>
-      <div class="flex justify-end mt-2">
-        <button id="save-notes-btn" class="btn btn-sm no-print">Save</button>
-      </div>
 
-      <!-- Divider -->
       <div class="border-t my-4" style="border-color:var(--border)"></div>
 
-      <!-- Sign-off -->
-      <div class="font-medium mb-3">Sign-off</div>
       ${notes?.summary?.signoff?.date ? `
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
         <div style="width:32px;height:32px;border-radius:50%;background:var(--success);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;flex-shrink:0">
@@ -159,12 +149,16 @@ export async function renderSummary(container, params) {
           <label>Role</label>
           <input id="signoff-role" class="mt-1" value="${escapeHtml(notes?.summary?.signoff?.role || "")}">
         </div>
-      </div>
-      <button id="signoff-btn" class="btn btn-primary mt-3 no-print">
-        ${icon("check", 14)}
-        Sign Off
-      </button>
-      <div class="print-only text-sm text-muted mt-2">Not signed off</div>`}
+      </div>`}
+      ${!notes?.summary?.signoff?.date ? `
+      <div class="flex justify-end mt-3">
+        <div id="signoff-name-error-bar" class="text-danger text-xs mr-auto hidden" style="align-self:center">Name is required</div>
+        <button id="save-btn" class="btn btn-primary no-print">
+          ${icon("check", 14)}
+          Save
+        </button>
+      </div>` : ""}
+      <div class="print-only text-sm text-muted mt-2">${notes?.summary?.signoff?.date ? "" : "Not signed off"}</div>
     </div>
 
     <div class="card mb-6">
@@ -175,34 +169,35 @@ export async function renderSummary(container, params) {
     </div>
   `;
 
-  document.getElementById("save-notes-btn").addEventListener("click", async () => {
-    try {
-      await api.updateSummary(sessionId, {
-        notes: document.getElementById("summary-notes").value,
-      });
-      showToast("Notes saved", "success");
-    } catch (e) { showToast("Failed to save: " + e.message); }
-  });
-
-  document.getElementById("signoff-btn")?.addEventListener("click", async () => {
-    const name = document.getElementById("signoff-name").value.trim();
+  document.getElementById("save-btn")?.addEventListener("click", async () => {
+    const nameInput = document.getElementById("signoff-name");
+    const name = nameInput?.value.trim() || "";
     const nameError = document.getElementById("signoff-name-error");
-    if (!name) {
+    const nameErrorBar = document.getElementById("signoff-name-error-bar");
+
+    if (nameInput && !name) {
       if (nameError) nameError.classList.remove("hidden");
-      document.getElementById("signoff-name").style.borderColor = "var(--danger)";
-      document.getElementById("signoff-name").focus();
+      if (nameErrorBar) nameErrorBar.classList.remove("hidden");
+      nameInput.style.borderColor = "var(--danger)";
+      nameInput.focus();
       return;
     }
     if (nameError) nameError.classList.add("hidden");
-    document.getElementById("signoff-name").style.borderColor = "";
-    const role = document.getElementById("signoff-role").value.trim();
+    if (nameErrorBar) nameErrorBar.classList.add("hidden");
+    if (nameInput) nameInput.style.borderColor = "";
+
+    const role = document.getElementById("signoff-role")?.value.trim() || "";
     try {
-      await api.updateSummary(sessionId, {
-        signoff: { name, role, date: new Date().toISOString() },
-      });
-      showToast("Signed off successfully", "success");
+      const update = {
+        notes: document.getElementById("summary-notes").value,
+      };
+      if (nameInput) {
+        update.signoff = { name, role, date: new Date().toISOString() };
+      }
+      await api.updateSummary(sessionId, update);
+      showToast(nameInput ? "Signed off successfully" : "Saved", "success");
       location.hash = `#/summary/${sessionId}`;
-    } catch (e) { showToast("Sign-off failed: " + e.message); }
+    } catch (e) { showToast("Save failed: " + e.message); }
   });
 
   document.getElementById("signoff-undo-btn")?.addEventListener("click", async () => {
@@ -215,7 +210,9 @@ export async function renderSummary(container, params) {
 
   document.getElementById("signoff-name")?.addEventListener("input", () => {
     const nameError = document.getElementById("signoff-name-error");
+    const nameErrorBar = document.getElementById("signoff-name-error-bar");
     if (nameError) nameError.classList.add("hidden");
+    if (nameErrorBar) nameErrorBar.classList.add("hidden");
     document.getElementById("signoff-name").style.borderColor = "";
   });
 

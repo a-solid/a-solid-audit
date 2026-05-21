@@ -54,7 +54,14 @@ export async function renderReview(container, params) {
     noteFindings[findingIdx] = { status, reason };
     try {
       await api.updateTaskNote(sid, task.file, { findings: noteFindings });
-      showToast(status === "confirmed" ? "Finding confirmed" : "Finding dismissed", "success");
+      const desc = task.review?.findings?.[findingIdx]?.description || "";
+      const snippet = desc.length > 40 ? desc.slice(0, 40) + "..." : desc;
+      showToast(
+        status === "confirmed"
+          ? `Confirmed: ${snippet}`
+          : `Dismissed: ${snippet}`,
+        "success"
+      );
     } catch (e) {
       showToast("Failed to update: " + e.message);
     }
@@ -200,6 +207,12 @@ export async function renderReview(container, params) {
         });
         const panel = detailPanel.querySelector(`[data-dismiss-panel="${idx}"]`);
         panel.classList.toggle("hidden");
+        // Auto-scroll dismiss panel into view
+        if (!panel.classList.contains("hidden")) {
+          requestAnimationFrame(() => {
+            panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          });
+        }
       });
     });
     // Dismiss reason buttons

@@ -119,6 +119,7 @@ async function navigate() {
 
   const { view, params } = parseHash();
   notesPanel.updateSession(getSessionIdFromHash());
+  window.scrollTo({ top: 0 });
   const render = routes[view];
   if (!render) { location.hash = "#/home"; return; }
 

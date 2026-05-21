@@ -1,13 +1,14 @@
-# Review Page Fixes: Scrolling, Findings Default, Review Context
+# Review Page Fixes: Scrolling, Findings Default, Stats Bug, Review Context
 
 Date: 2026-05-21
 
 ## Summary
 
-Three bug fixes for the review page:
+Four bug fixes for the review/summary pages:
 1. Finding cards clipped at bottom — cannot scroll to see all content
 2. Findings should default to confirmed state with active buttons
-3. Review Context panel shows full file but silently drops edits to AI section
+3. Unreviewed stat goes negative — double-counting actionRequired in formula
+4. Review Context panel shows full file but silently drops edits to AI section
 
 ---
 
@@ -84,9 +85,42 @@ loadedContent = match ? match[1].trim() : data.context.trim();
 
 ---
 
+## 4. Unreviewed Stat Goes Negative
+
+**Problem:** In `summary.mjs` lines 46-69, the stats formula double-counts `actionRequired`:
+
+```
+confirmed = all findings with status "confirmed"
+deferred  = all findings with status "deferred"
+actionRequired = subset of confirmed that are critical/major/high
+
+unreviewed = totalFindings - confirmed - deferred - actionRequired
+```
+
+Since `actionRequired` is a subset of `confirmed`, high-severity findings get subtracted twice. For example, if there are 3 confirmed findings (2 high + 1 low): `unreviewed = total - 3 - 0 - 2 = total - 5`, but there are only 3 confirmed findings total — the stat goes negative.
+
+**Fix:** Remove `actionRequired` from the unreviewed formula. `actionRequired` is a display-only stat (shows how many of the confirmed findings are high severity) — it should not affect the unreviewed count.
+
+```js
+// Before (line 69)
+const reviewed = confirmed + deferred + actionRequired;
+const unreviewed = totalFindings - reviewed;
+
+// After
+const unreviewed = totalFindings - confirmed - deferred;
+```
+
+Also fix the same bug in `print.html` which has the identical formula.
+
+The "Action Required" stat card still displays `actionRequired` correctly — it just no longer contributes to the unreviewed calculation.
+
+---
+
 ## Files
 
 - **Modify:** `skills/audit/scripts/public/styles.css` — remove `max-height: 75vh` from `.sidebar-layout`
 - **Modify:** `skills/audit/scripts/public/js/components/task-detail.mjs` — Confirm button active by default
 - **Modify:** `skills/audit/scripts/public/js/views/review.mjs` — remove implicit confirmed default in `updateFindingStatus`
+- **Modify:** `skills/audit/scripts/public/js/views/summary.mjs` — fix unreviewed stat formula
+- **Modify:** `skills/audit/scripts/public/print.html` — fix same unreviewed stat formula
 - **Modify:** `skills/audit/scripts/public/js/components/notes-panel.mjs` — extract only User Context section, update label

@@ -319,6 +319,21 @@ img, svg { display: block; }
 .severity-partially-met { background: var(--warning-dim); color: #fcd34d; }
 .severity-not-met { background: var(--danger-dim); color: #fca5a5; }
 
+/* ─── Semantic Color Classes ─── */
+.text-muted { color: var(--text-muted); }
+.text-secondary { color: var(--text-secondary); }
+.text-primary { color: var(--text-primary); }
+.text-accent { color: var(--accent); }
+.text-success { color: var(--success); }
+.text-danger { color: var(--danger); }
+.text-warning { color: var(--warning); }
+.text-info { color: var(--info); }
+.text-center { text-align: center; }
+.font-medium { font-weight: 500; }
+.font-semibold { font-weight: 600; }
+.font-mono { font-family: var(--font-mono); }
+.border-b { border-bottom: 1px solid var(--border); }
+
 /* ─── Progress Bar ─── */
 .progress-bar {
   height: 4px; background: var(--bg-active); border-radius: 2px; overflow: hidden;

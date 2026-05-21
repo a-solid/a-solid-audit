@@ -46,6 +46,8 @@ export const api = {
   getStories: (id) => request("GET", `/api/sessions/${encodeURIComponent(id)}/stories`),
   createStory: (id, story) =>
     request("POST", `/api/sessions/${encodeURIComponent(id)}/stories`, story),
+  deleteStory: (id, name) =>
+    request("DELETE", `/api/sessions/${encodeURIComponent(id)}/stories/${encodeURIComponent(name)}`),
   mapStories: (id, mappings) =>
     request("PUT", `/api/sessions/${encodeURIComponent(id)}/stories/map`, { mappings }),
 

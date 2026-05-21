@@ -102,6 +102,33 @@ export function registerStoryRoutes(router, reportsDir) {
     }
   });
 
+  // DELETE /api/sessions/:id/stories/:name — delete a story
+  router.delete("/api/sessions/:id/stories/:name", (req, res, params) => {
+    try {
+      const safeSid = sanitizePath(params.id);
+      const sessionDir = path.join(reportsDir, safeSid);
+      const safeName = sanitizePath(params.name);
+      const storyFile = "story-tasks/" + safeName + ".yaml";
+      const storyPath = path.join(sessionDir, storyFile);
+
+      // Remove the YAML file
+      if (fs.existsSync(storyPath)) fs.unlinkSync(storyPath);
+
+      // Remove from index.yaml
+      const indexPath = path.join(sessionDir, "index.yaml");
+      if (fs.existsSync(indexPath)) {
+        const index = readYaml(indexPath);
+        index.storyTasks = (index.storyTasks || []).filter(t => t.file !== storyFile);
+        writeIndexYaml(indexPath, index);
+      }
+
+      jsonResponse(res, { ok: true });
+    } catch (e) {
+      if (e.message.includes("Invalid path")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
+      throw e;
+    }
+  });
+
   // PUT /api/sessions/:id/stories/map — replace file-story mappings
   router.put("/api/sessions/:id/stories/map", async (req, res, params) => {
     try {

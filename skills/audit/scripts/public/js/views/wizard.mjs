@@ -335,6 +335,7 @@ export async function renderWizard(container, params) {
               ${icon("clipboard", 14)}
               <span class="text-sm font-medium">${escapeHtml(story.name || story.id)}</span>
               <span class="accordion-badge ${count > 0 ? "has-files" : ""}">${count}</span>
+              <button class="btn btn-ghost btn-sm story-delete-btn" data-story-name="${escapeHtml(story.name)}" style="margin-left:auto;padding:2px 6px;color:var(--text-muted)" title="Delete story">${icon("x", 12)}</button>
               <span class="accordion-chevron">${icon("chevronDown", 14)}</span>
             </div>
             <div class="accordion-body" id="accordion-body-${i}"></div>
@@ -399,6 +400,23 @@ export async function renderWizard(container, params) {
               syncMappingsToServer();
             });
           }
+        });
+      });
+
+      // Wire up delete buttons
+      container.querySelectorAll(".story-delete-btn").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const name = btn.dataset.storyName;
+          if (!confirm(`Delete story "${name}"?`)) return;
+          try {
+            const safeName = name.replace(/[^a-zA-Z0-9\-_.]/g, "-");
+            await api.deleteStory(sid, safeName);
+            stories = stories.filter(s => s.name !== name);
+            storyMappings = storyMappings.filter(m => m.storyName !== name);
+            save();
+            loadAccordionFileTree(sid);
+          } catch (err) { showToast("Failed to delete story: " + err.message); }
         });
       });
     } catch (e) {

@@ -7,7 +7,7 @@ description: Orchestrates the A-Solid Audit process, coordinating code reviews a
 
 ## Available Commands
 
-All commands run via `node scripts/cli.mjs [--project-dir <path>] <command>`. The `.audit/` data directory is created under the project root.
+All commands run via `node scripts/cli.mjs [--project-dir <path>] <command>`. Scripts are located in this skill's directory (`skills/audit/scripts/`). The `.audit/` data directory is created under the project root.
 
 - `update-task <session-id> <task-file> <status> [score]` — Update task status/score
 - `reset-reviewing <session-id>` — Reset reviewing tasks to pending (for resume after interruption)

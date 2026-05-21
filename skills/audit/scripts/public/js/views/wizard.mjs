@@ -309,6 +309,22 @@ export async function renderWizard(container, params) {
           </div>`;
       }).join("");
 
+      let syncing = false;
+      function syncMappingsToServer() {
+        if (syncing) return;
+        syncing = true;
+        api.mapStories(sid, stories.map(s => ({
+          storyName: s.name,
+          files: (storyMappings.find(m => m.storyName === s.name)?.files || []),
+        }))).catch(e => showToast("Failed to save mapping: " + e.message))
+          .finally(() => { syncing = false; });
+      }
+
+      // Sync existing mappings to server after re-render
+      if (storyMappings.some(m => m.files?.length > 0)) {
+        syncMappingsToServer();
+      }
+
       container.querySelectorAll(".accordion-header").forEach(header => {
         header.addEventListener("click", () => {
           const idx = parseInt(header.dataset.index);
@@ -331,8 +347,11 @@ export async function renderWizard(container, params) {
             const story = stories[idx];
             const existing = storyMappings.find(m => m.storyName === story.name);
             const tree = renderFileTree(body, files);
-            if (existing?.files?.length) tree.setSelected(existing.files);
             fileTreeInstances[idx] = tree;
+            // Restore selection after a microtask to avoid triggering change events during init
+            if (existing?.files?.length) {
+              queueMicrotask(() => { tree.setSelected(existing.files); });
+            }
 
             body.addEventListener("change", () => {
               const selected = tree.getSelected();
@@ -345,10 +364,7 @@ export async function renderWizard(container, params) {
               badge.textContent = selected.length;
               badge.classList.toggle("has-files", selected.length > 0);
 
-              api.mapStories(sid, stories.map(s => ({
-                storyName: s.name,
-                files: (storyMappings.find(m => m.storyName === s.name)?.files || []),
-              }))).catch(e => showToast("Failed to save mapping: " + e.message));
+              syncMappingsToServer();
             });
           }
         });

@@ -356,6 +356,9 @@ img, svg { display: block; }
 .border-b { border-bottom: 1px solid var(--border); }
 .hidden { display: none !important; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Print/PDF utility classes */
+.print-only { display: none; }
+.screen-only { }
 
 /* ─── Progress Bar ─── */
 .progress-bar {
@@ -985,6 +988,28 @@ code {
   .print-badge-confirmed { color: #166534; border-color: #86efac; background: #f0fdf4; }
   .print-badge-dismissed { color: #92400e; border-color: #fcd34d; background: #fffbeb; }
   .print-badge-unreviewed { color: #6b7280; border-color: #d1d5db; background: #f9fafb; }
+
+  /* Print/PDF utility overrides */
+  .print-only { display: block; }
+  .screen-only { display: none; }
+
+  /* Clean up textarea in PDF */
+  #summary-notes {
+    border: none;
+    background: transparent;
+    resize: none;
+    overflow: visible;
+    -webkit-appearance: none;
+    appearance: none;
+    box-shadow: none;
+  }
+
+  /* Remove green border from signed sign-off in print */
+  #review-summary-card[style*="border-color:var(--success)"],
+  #review-summary-card[style*="border-color: var(--success)"] {
+    border-color: #e5e7eb !important;
+    border-left-color: #e5e7eb !important;
+  }
 }
 
 /* ─── Responsive ─── */

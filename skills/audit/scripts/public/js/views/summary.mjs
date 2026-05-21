@@ -109,17 +109,24 @@ export async function renderSummary(container, params) {
       `).join("")}
     </div>` : ""}
 
-    <div class="card mb-6">
-      <div class="font-medium mb-3">Comments</div>
+    <div class="card mb-6" id="review-summary-card"${notes?.summary?.signoff?.date ? ' style="border-color:var(--success);border-left:3px solid var(--success)"' : ""}>
+      <div class="font-medium mb-3">Review Summary</div>
+
+      <!-- Comments -->
+      <div class="mb-2">
+        <label>Comments</label>
+      </div>
       <textarea id="summary-notes" class="w-full" rows="4" placeholder="Add your review notes...">${escapeHtml(notes?.summary?.notes || "")}</textarea>
       <div class="flex justify-end mt-2">
-        <button id="save-notes-btn" class="btn btn-sm">Save Notes</button>
+        <button id="save-notes-btn" class="btn btn-sm no-print">Save</button>
       </div>
-    </div>
 
-    ${notes?.summary?.signoff?.date ? `
-    <div class="card mb-6" id="signoff-card" style="border-color:var(--success);border-left:3px solid var(--success)">
+      <!-- Divider -->
+      <div class="border-t my-4" style="border-color:var(--border)"></div>
+
+      <!-- Sign-off -->
       <div class="font-medium mb-3">Sign-off</div>
+      ${notes?.summary?.signoff?.date ? `
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
         <div style="width:32px;height:32px;border-radius:50%;background:var(--success);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;flex-shrink:0">
           ${icon("check", 16)}
@@ -128,9 +135,9 @@ export async function renderSummary(container, params) {
           <div style="font-weight:600">Signed off</div>
           <div class="text-xs text-muted">${new Date(notes.summary.signoff.date).toLocaleDateString()} · ${escapeHtml(notes.summary.signoff.name || "unknown")}${notes.summary.signoff.role ? " · " + escapeHtml(notes.summary.signoff.role) : ""}</div>
         </div>
-        <button id="signoff-undo-btn" class="btn btn-ghost btn-sm" style="margin-left:auto;font-size:12px;color:var(--text-muted);text-decoration:underline">Undo</button>
+        <button id="signoff-undo-btn" class="btn btn-ghost btn-sm no-print" style="margin-left:auto;font-size:12px;color:var(--text-muted);text-decoration:underline">Undo</button>
       </div>
-      <div style="opacity:0.5;pointer-events:none">
+      <div class="screen-only" style="opacity:0.5;pointer-events:none">
         <div class="grid grid-cols-2 gap-4">
           <div>
             <label>Name</label>
@@ -141,10 +148,7 @@ export async function renderSummary(container, params) {
             <input class="mt-1" value="${escapeHtml(notes.summary.signoff.role || "")}" readonly>
           </div>
         </div>
-      </div>
-    </div>` : `
-    <div class="card mb-6" id="signoff-card">
-      <div class="font-medium mb-3">Sign-off</div>
+      </div>` : `
       <div class="grid grid-cols-2 gap-4">
         <div>
           <label>Name</label>
@@ -156,11 +160,12 @@ export async function renderSummary(container, params) {
           <input id="signoff-role" class="mt-1" value="${escapeHtml(notes?.summary?.signoff?.role || "")}">
         </div>
       </div>
-      <button id="signoff-btn" class="btn btn-primary mt-3">
+      <button id="signoff-btn" class="btn btn-primary mt-3 no-print">
         ${icon("check", 14)}
         Sign Off
       </button>
-    </div>`}
+      <div class="print-only text-sm text-muted mt-2">Not signed off</div>`}
+    </div>
 
     <div class="card mb-6">
       <div class="font-medium mb-4">Task Details</div>

@@ -73,7 +73,7 @@ Move the Sign-off card to between Overall Notes and Task Details. New order:
 - Green "Sign Off" button. Inline validation: name required, red border + error message if empty.
 
 **After sign-off:**
-- Card transforms: green border + green left accent stripe.
+- Card transforms: green border (all sides) with 3px green left accent stripe.
 - Green circle checkmark avatar appears with "Signed off" text.
 - Subtitle line: date, name, role (e.g. "May 21, 2026 · Zhang San · Tech Lead").
 - Inputs become read-only and visually muted (reduced opacity, no pointer events).

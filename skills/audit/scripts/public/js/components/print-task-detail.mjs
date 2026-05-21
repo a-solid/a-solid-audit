@@ -1,13 +1,14 @@
 // skills/audit/scripts/public/js/components/print-task-detail.mjs
-import { icon, escapeHtml } from "../app.mjs";
+import { escapeHtml } from "../app.mjs";
 
 const SEVERITY_ORDER = ["critical", "major", "high", "medium", "minor", "low", "info"];
 
 export function renderPrintTaskDetail(task, notes) {
   const score = task.review?.score;
-  const findings = (task.review?.findings || []).slice().sort((a, b) => {
-    return SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity);
-  });
+  const rawFindings = task.review?.findings || [];
+  const findings = rawFindings
+    .map((f, origIdx) => ({ ...f, _origIdx: origIdx }))
+    .sort((a, b) => SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity));
   const positives = task.review?.positives || [];
   const gaps = task.review?.gaps || [];
   const noteTask = notes?.tasks?.find(t => t.file === task.file);
@@ -19,7 +20,7 @@ export function renderPrintTaskDetail(task, notes) {
       <div class="print-task-header">
         <div class="flex items-center gap-3">
           <span class="text-lg font-semibold">${escapeHtml(task.name || task.file)}</span>
-          <span class="badge" style="background:var(--bg-surface);color:var(--text-secondary)">${task.status}</span>
+          <span class="badge" style="background:var(--bg-surface);color:var(--text-secondary)">${escapeHtml(task.status)}</span>
         </div>
         <span class="text-lg font-semibold" style="color:${scoreColor}">${score ?? "-"}/10</span>
       </div>
@@ -31,15 +32,15 @@ export function renderPrintTaskDetail(task, notes) {
       ${findings.length > 0 ? `
         <div class="text-xs text-muted font-semibold mb-2">FINDINGS (${findings.length})</div>
         <div class="space-y-2 mb-4">
-          ${findings.map((f, i) => {
-            const origIdx = (task.review?.findings || []).indexOf(f);
+          ${findings.map(f => {
+            const origIdx = f._origIdx;
             const status = noteTask?.findings?.[origIdx]?.status || null;
             const isConfirmed = status === "confirmed";
             const isDismissed = status === "deferred";
             const reason = noteTask?.findings?.[origIdx]?.reason || "";
 
             return `
-            <div class="print-finding-card">
+            <div class="print-finding-card severity-border-${f.severity}">
               <div class="flex items-center gap-2 mb-1">
                 <span class="badge severity-${f.severity}">${f.severity}</span>
                 ${isConfirmed ? `<span class="badge print-badge-confirmed">Confirmed</span>` : ""}

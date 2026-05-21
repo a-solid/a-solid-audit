@@ -72,7 +72,7 @@ export async function renderSummary(container, params) {
 
   const content = document.getElementById("summary-content");
   content.innerHTML = `
-    <div class="grid grid-cols-5 gap-4 mb-6">
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
       <div class="stat-card">
         <div class="stat-value">${totalFindings}</div>
         <div class="stat-label">Total Findings</div>

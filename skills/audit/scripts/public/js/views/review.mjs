@@ -97,7 +97,7 @@ export async function renderReview(container, params) {
     const maxSevCount = Math.max(...Object.values(bySeverity), 1);
 
     el.innerHTML = `
-      <div class="grid grid-cols-3 gap-4 mb-6">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div class="stat-card">
           <div class="score-ring" style="margin:0 auto var(--space-2)">
             <svg width="80" height="80" viewBox="0 0 80 80">

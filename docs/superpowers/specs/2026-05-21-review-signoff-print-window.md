@@ -24,11 +24,16 @@ Change the card title from "Review Summary" to "Review Sign-off" in:
 
 Current signed state uses `text-sm text-muted` for the sign-off line — too subtle.
 
-Changes to the signed state rendering:
-- Checkmark avatar: increase from 22px to 28px, keep green background
-- Name/role/date text: change from `text-sm text-muted` to `text-sm font-medium` with `color:var(--text-primary)`
-- Add a small label prefix "Signed off" before the name, using `text-xs text-muted` so it reads: "Signed off · Zhang San · Tech Lead · 5/21/2026"
+Replace the current 22px avatar + muted text with a **status badge row**:
+- Large green "✓ Signed" badge (uses existing badge styling, slightly larger padding) as a visual anchor
+- Name, role, and date follow inline with `font-medium` and `color:var(--text-primary)`
+- Date on a second line below, in `text-sm text-muted`
 - Undo link stays as-is (right-aligned, muted, underline)
+
+This approach:
+- Uses existing badge patterns — no new UI components
+- The badge is the visual hook that immediately says "this is signed"
+- Name/date are clearly readable without being visually heavy
 
 ---
 

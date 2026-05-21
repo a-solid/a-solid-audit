@@ -196,7 +196,8 @@ export async function renderSummary(container, params) {
       }
       await api.updateSummary(sessionId, update);
       showToast(nameInput ? "Signed off successfully" : "Saved", "success");
-      location.hash = `#/summary/${sessionId}`;
+      location.hash = `#/review/${sessionId}`;
+      requestAnimationFrame(() => { location.hash = `#/summary/${sessionId}`; });
     } catch (e) { showToast("Save failed: " + e.message); }
   });
 
@@ -204,7 +205,8 @@ export async function renderSummary(container, params) {
     try {
       await api.updateSummary(sessionId, { signoff: null });
       showToast("Sign-off cleared", "success");
-      location.hash = `#/summary/${sessionId}`;
+      location.hash = `#/review/${sessionId}`;
+      requestAnimationFrame(() => { location.hash = `#/summary/${sessionId}`; });
     } catch (e) { showToast("Failed to undo sign-off: " + e.message); }
   });
 

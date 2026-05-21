@@ -11,7 +11,8 @@ export async function renderWizard(container, params) {
   let scopeRef = "";
   let stories = [];
   let storyMappings = [];
-  let contextExpanded = false;
+  let contextExpanded = true;
+  let pendingExpandIndex = -1;
 
   const savedKey = `audit-wizard-${sessionId}`;
   const saved = localStorage.getItem(savedKey);
@@ -256,7 +257,7 @@ export async function renderWizard(container, params) {
     }
   }
 
-  function renderStep3() {
+  async function renderStep3() {
     const content = document.getElementById("wizard-content");
     content.innerHTML = `
       <div class="card mb-4">
@@ -300,9 +301,67 @@ export async function renderWizard(container, params) {
       try {
         await api.createStory(sessionId, { name, description, acceptance });
         stories.push({ name, description, acceptance });
+        pendingExpandIndex = stories.length - 1;
         save();
         render();
       } catch (e) { showToast("Failed to save story: " + e.message); }
+    });
+
+
+    // Populate provider sources
+    let providers = [];
+    try { providers = await api.listProviders(); } catch (e) {}
+    const sourceSelect = document.getElementById("story-source");
+    providers.forEach(p => {
+      const opt = document.createElement("option");
+      opt.value = p;
+      opt.textContent = p.charAt(0).toUpperCase() + p.slice(1);
+      sourceSelect.appendChild(opt);
+    });
+
+    // Provider fetch UI
+    const providerFetchArea = document.createElement("div");
+    providerFetchArea.id = "provider-fetch-area";
+    providerFetchArea.classList.add("hidden", "mt-2");
+    providerFetchArea.innerHTML = `
+      <div class="flex gap-2">
+        <input id="provider-key-input" placeholder="e.g. PROJ-123">
+        <button id="provider-fetch-btn" class="btn btn-sm">${icon("download", 14)} Fetch</button>
+      </div>
+    `;
+    document.getElementById("story-collection").insertBefore(
+      providerFetchArea,
+      document.getElementById("story-form")
+    );
+
+    sourceSelect.addEventListener("change", () => {
+      const isProvider = sourceSelect.value !== "manual";
+      providerFetchArea.classList.toggle("hidden", !isProvider);
+      document.getElementById("story-form").classList.add("hidden");
+    });
+
+    document.getElementById("provider-fetch-btn").addEventListener("click", async () => {
+      const key = document.getElementById("provider-key-input").value.trim();
+      if (!key) { showToast("Enter an issue key"); return; }
+      const fetchBtn = document.getElementById("provider-fetch-btn");
+      fetchBtn.disabled = true;
+      fetchBtn.innerHTML = `<span class="spinner spinner-sm"></span> Fetching...`;
+      try {
+        const results = await api.fetchFromProvider(sourceSelect.value, [key]);
+        if (!results || results.length === 0) { showToast("No data returned"); return; }
+        const story = results[0];
+        document.getElementById("story-name").value = story.name || "";
+        document.getElementById("story-desc").value = story.description || "";
+        document.getElementById("story-ac").value = story.acceptance || "";
+        document.getElementById("story-form").classList.remove("hidden");
+        providerFetchArea.classList.add("hidden");
+        sourceSelect.value = "manual";
+      } catch (e) {
+        showToast("Fetch failed: " + e.message);
+      } finally {
+        fetchBtn.disabled = false;
+        fetchBtn.innerHTML = `${icon("download", 14)} Fetch`;
+      }
     });
 
     document.getElementById("step3-back").addEventListener("click", () => { step = 2; save(); render(); });
@@ -333,7 +392,7 @@ export async function renderWizard(container, params) {
           <div class="accordion-item" data-story-index="${i}">
             <div class="accordion-header" data-index="${i}">
               ${icon("clipboard", 14)}
-              <span class="text-sm font-medium">${escapeHtml(story.name || story.id)}</span>
+              <span class="text-sm font-medium" style="flex-grow:1">${escapeHtml(story.name || story.id)}</span>
               <span class="accordion-badge ${count > 0 ? "has-files" : ""}">${count}</span>
               <button class="btn btn-ghost btn-sm story-delete-btn" data-story-name="${escapeHtml(story.name)}" style="margin-left:auto;padding:2px 6px;color:var(--text-muted)" title="Delete story">${icon("x", 12)}</button>
               <span class="accordion-chevron">${icon("chevronDown", 14)}</span>
@@ -356,6 +415,39 @@ export async function renderWizard(container, params) {
       // Sync existing mappings to server after re-render
       if (storyMappings.some(m => m.files?.length > 0)) {
         syncMappingsToServer();
+      }
+
+      if (pendingExpandIndex >= 0 && pendingExpandIndex < stories.length) {
+        expandedIndex = pendingExpandIndex;
+        pendingExpandIndex = -1;
+        const item = container.querySelector(`[data-story-index="${expandedIndex}"]`);
+        if (item) item.classList.add("expanded");
+      }
+
+      // Load file tree for pre-expanded item
+      if (expandedIndex >= 0) {
+        const body = document.getElementById(`accordion-body-${expandedIndex}`);
+        const story = stories[expandedIndex];
+        const existing = storyMappings.find(m => m.storyName === story.name);
+        const tree = renderFileTree(body, files);
+        fileTreeInstances[expandedIndex] = tree;
+        if (existing?.files?.length) {
+          queueMicrotask(() => { tree.setSelected(existing.files); });
+        }
+        body.addEventListener("change", () => {
+          const selected = tree.getSelected();
+          const mappingIdx = storyMappings.findIndex(m => m.storyName === story.name);
+          if (mappingIdx >= 0) storyMappings[mappingIdx].files = selected;
+          else storyMappings.push({ storyName: story.name, files: selected });
+          save();
+          const item = container.querySelector(`[data-story-index="${expandedIndex}"]`);
+          const badge = item?.querySelector(".accordion-badge");
+          if (badge) {
+            badge.textContent = selected.length;
+            badge.classList.toggle("has-files", selected.length > 0);
+          }
+          syncMappingsToServer();
+        });
       }
 
       container.querySelectorAll(".accordion-header").forEach(header => {
@@ -462,7 +554,7 @@ export async function renderWizard(container, params) {
             <span id="context-chevron" class="ml-auto" style="transition:transform 200ms;transform:rotate(${contextExpanded ? "180" : "0"}deg)">${icon("chevronDown", 14)}</span>
           </div>
           <div id="context-panel" style="display:${contextExpanded ? "block" : "none"}">
-            <textarea id="review-context-input" class="w-full" rows="4" placeholder="项目背景、关键需求、关注领域、已知问题..."></textarea>
+            <textarea id="review-context-input" class="w-full" rows="4" placeholder="Project background, key requirements, areas of concern, known issues..."></textarea>
             <div class="text-xs text-muted mt-1">This context is passed to AI reviewers as additional guidance.</div>
           </div>
         </div>

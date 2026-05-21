@@ -8,12 +8,15 @@ export function initNotesPanel(root) {
   let loadedContent = "";
 
   root.innerHTML = `
-    <button id="notes-fab" class="notes-fab" title="Edit review notes" aria-label="Edit review notes">
+    <button id="notes-fab" class="notes-fab" title="Edit review context" aria-label="Edit review context">
       ${icon("messageSquare", 20)}
     </button>
     <div id="notes-panel" class="notes-panel">
       <div class="notes-panel-header">
-        <span class="font-medium text-sm">Review Notes</span>
+        <div>
+          <span class="font-medium text-sm">Review Context</span>
+          <div class="text-xs text-muted" style="margin-top:2px">Referenced during code review as context.</div>
+        </div>
         <button id="notes-close" class="btn btn-ghost btn-sm">${icon("x", 14)}</button>
       </div>
       <textarea id="notes-textarea" class="notes-textarea" placeholder="Add review context, key concerns, known issues..."></textarea>

@@ -117,14 +117,33 @@ export async function renderSummary(container, params) {
       </div>
     </div>
 
-    <div class="card mb-6">
-      <div class="font-medium mb-4">Task Details</div>
-      <div class="space-y-4">
-        ${tasks.map(t => renderPrintTaskDetail(t, notes)).join("")}
+    ${notes?.summary?.signoff?.date ? `
+    <div class="card mb-6" id="signoff-card" style="border-color:var(--success);border-left:3px solid var(--success)">
+      <div class="font-medium mb-3">Sign-off</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div style="width:32px;height:32px;border-radius:50%;background:var(--success);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;flex-shrink:0">
+          ${icon("check", 16)}
+        </div>
+        <div>
+          <div style="font-weight:600">Signed off</div>
+          <div class="text-xs text-muted">${new Date(notes.summary.signoff.date).toLocaleDateString()} · ${escapeHtml(notes.summary.signoff.name || "unknown")}${notes.summary.signoff.role ? " · " + escapeHtml(notes.summary.signoff.role) : ""}</div>
+        </div>
+        <button id="signoff-undo-btn" class="btn btn-ghost btn-sm" style="margin-left:auto;font-size:12px;color:var(--text-muted);text-decoration:underline">Undo</button>
       </div>
-    </div>
-
-    <div class="card mb-6">
+      <div style="opacity:0.5;pointer-events:none">
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label>Name</label>
+            <input class="mt-1" value="${escapeHtml(notes.summary.signoff.name || "")}" readonly>
+          </div>
+          <div>
+            <label>Role</label>
+            <input class="mt-1" value="${escapeHtml(notes.summary.signoff.role || "")}" readonly>
+          </div>
+        </div>
+      </div>
+    </div>` : `
+    <div class="card mb-6" id="signoff-card">
       <div class="font-medium mb-3">Sign-off</div>
       <div class="grid grid-cols-2 gap-4">
         <div>
@@ -137,18 +156,17 @@ export async function renderSummary(container, params) {
           <input id="signoff-role" class="mt-1" value="${escapeHtml(notes?.summary?.signoff?.role || "")}">
         </div>
       </div>
-      ${notes?.summary?.signoff?.date ? `
-        <div class="info-banner info-banner-green mt-3">
-          ${icon("check", 16)}
-          <span>Signed off on ${new Date(notes.summary.signoff.date).toLocaleDateString()} by ${escapeHtml(notes.summary.signoff.name || "unknown")}</span>
-        </div>
-      ` : ""}
-      ${!notes?.summary?.signoff?.date ? `
-        <button id="signoff-btn" class="btn btn-primary mt-3">
-          ${icon("check", 14)}
-          Sign Off
-        </button>
-      ` : ""}
+      <button id="signoff-btn" class="btn btn-primary mt-3">
+        ${icon("check", 14)}
+        Sign Off
+      </button>
+    </div>`}
+
+    <div class="card mb-6">
+      <div class="font-medium mb-4">Task Details</div>
+      <div class="space-y-4">
+        ${tasks.map(t => renderPrintTaskDetail(t, notes)).join("")}
+      </div>
     </div>
   `;
 
@@ -180,6 +198,14 @@ export async function renderSummary(container, params) {
       showToast("Signed off successfully", "success");
       location.hash = `#/summary/${sessionId}`;
     } catch (e) { showToast("Sign-off failed: " + e.message); }
+  });
+
+  document.getElementById("signoff-undo-btn")?.addEventListener("click", async () => {
+    try {
+      await api.updateSummary(sessionId, { signoff: null });
+      showToast("Sign-off cleared", "success");
+      location.hash = `#/summary/${sessionId}`;
+    } catch (e) { showToast("Failed to undo sign-off: " + e.message); }
   });
 
   document.getElementById("signoff-name")?.addEventListener("input", () => {

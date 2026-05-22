@@ -10,6 +10,7 @@ export async function renderReview(container, params) {
   let notes = null;
   let currentTab = "overview";
   let currentTaskIdx = 0;
+  let preserveDetailScroll = false;
 
   setBreadcrumb([
     { label: "Sessions", href: "#/home" },
@@ -24,11 +25,11 @@ export async function renderReview(container, params) {
         <button id="review-summary-btn" class="btn btn-primary" aria-label="Go to summary">Summary & Sign-off</button>
       </div>
     </div>
-    <div class="tabs no-print" id="review-tabs">
-      <div class="tab ${currentTab === "overview" ? "active" : ""}" data-tab="overview">Overview</div>
-      <div class="tab" data-tab="tasks">Tasks</div>
+    <div class="tabs no-print" id="review-tabs" role="tablist">
+      <div class="tab ${currentTab === "overview" ? "active" : ""}" data-tab="overview" role="tab" tabindex="0" aria-selected="${currentTab === "overview"}" aria-controls="review-content">Overview</div>
+      <div class="tab" data-tab="tasks" role="tab" tabindex="-1" aria-selected="${currentTab !== "overview"}" aria-controls="review-content">Tasks</div>
     </div>
-    <div id="review-content">
+    <div id="review-content" role="tabpanel">
       <div class="flex items-center justify-center" style="padding:var(--space-8)"><span class="spinner"></span></div>
     </div>
   `;
@@ -53,7 +54,6 @@ export async function renderReview(container, params) {
     noteFindings[findingIdx] = { status, reason };
     try {
       await api.updateTaskNote(sid, task.file, { findings: noteFindings });
-      // Update in-memory notes so re-renders reflect the change
       let noteTask = notes?.tasks?.find(t => t.file === task.file);
       if (!noteTask) {
         if (!notes) notes = { tasks: [] };
@@ -69,7 +69,18 @@ export async function renderReview(container, params) {
           : `Dismissed: ${snippet}`,
         "success"
       );
-      renderContent();
+      // Brief visual transition before re-render
+      const findingCard = document.querySelector(`[data-finding="${findingIdx}"]`);
+      if (findingCard) {
+        findingCard.style.transition = "opacity 150ms ease";
+        findingCard.style.opacity = status === "confirmed" ? "0.6" : "0.3";
+      }
+      preserveDetailScroll = true;
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          renderContent();
+        });
+      });
     } catch (e) {
       showToast("Failed to update: " + e.message);
     }
@@ -80,7 +91,6 @@ export async function renderReview(container, params) {
     if (taskFindings.length === 0) return;
     const noteTask = notes?.tasks?.find(t => t.file === task.file);
     const existingFindings = noteTask?.findings || [];
-    // Only confirm findings that have no status yet
     let changed = false;
     const noteFindings = taskFindings.map((_, i) => {
       const existing = existingFindings[i];
@@ -174,10 +184,11 @@ export async function renderReview(container, params) {
             }
             return critical.map(t => {
               const taskIdx = tasks.indexOf(t);
+              const highSevCount = (t.review?.findings || []).filter(f => f.severity === "critical" || f.severity === "high" || f.severity === "major").length;
               return `
-              <div class="flex items-center justify-between py-2 border-b needs-attention-item" style="border-color:var(--border);cursor:pointer" data-task-idx="${taskIdx}">
+              <div class="flex items-center justify-between py-2 border-b needs-attention-item" style="border-color:var(--border);cursor:pointer" data-task-idx="${taskIdx}" role="link" tabindex="0" aria-label="${escapeHtml(t.name || t.file)}, ${highSevCount} high-severity findings">
                 <span class="text-sm font-mono truncate">${escapeHtml(t.name || t.file)}</span>
-                <span class="text-sm text-danger font-medium">${(t.review?.findings || []).filter(f => f.severity === "critical" || f.severity === "high" || f.severity === "major").length} high-severity</span>
+                <span class="text-sm text-danger font-medium">${highSevCount} high-severity</span>
               </div>`;
             }).join("");
           })()}
@@ -192,13 +203,21 @@ export async function renderReview(container, params) {
     ` : ""}
     `;
 
-    // Wire up Needs Attention task clicks
+    // Wire up Needs Attention item clicks + keyboard
+    function handleAttentionClick(e) {
+      const item = e.currentTarget;
+      currentTaskIdx = parseInt(item.dataset.taskIdx);
+      currentTab = "tasks";
+      updateTabUI();
+      renderContent();
+    }
     el.querySelectorAll(".needs-attention-item").forEach(item => {
-      item.addEventListener("click", () => {
-        currentTaskIdx = parseInt(item.dataset.taskIdx);
-        currentTab = "tasks";
-        updateTabUI();
-        renderContent();
+      item.addEventListener("click", handleAttentionClick);
+      item.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleAttentionClick(e);
+        }
       });
     });
   }
@@ -206,6 +225,9 @@ export async function renderReview(container, params) {
   function renderTasksTab(el) {
     // Preserve sidebar scroll position across re-renders
     const savedScrollTop = document.getElementById("task-sidebar")?.scrollTop || 0;
+    const savedDetailScroll = preserveDetailScroll
+      ? (document.getElementById("task-detail-panel")?.scrollTop || 0)
+      : 0;
 
     el.innerHTML = `
       <div class="sidebar-layout">
@@ -218,7 +240,7 @@ export async function renderReview(container, params) {
       const score = t.review?.score;
       const dotClass = score >= 7 ? "score-dot-green" : score >= 4 ? "score-dot-amber" : "score-dot-red";
       return `
-        <div class="task-nav-item ${i === currentTaskIdx ? "active" : ""}" data-idx="${i}">
+        <div class="task-nav-item ${i === currentTaskIdx ? "active" : ""}" data-idx="${i}" tabindex="0" role="button" aria-label="${escapeHtml(t.name || t.file)}, score ${score ?? '-'}">
           <div class="score-dot ${score ? dotClass : ""}" style="${!score ? "background:var(--text-muted)" : ""}"></div>
           <div style="min-width:0;flex:1">
             <div class="text-sm font-mono truncate" title="${escapeHtml(t.name || t.file)}">${escapeHtml(t.name || t.file)}</div>
@@ -233,22 +255,32 @@ export async function renderReview(container, params) {
     // Restore sidebar scroll position
     sidebar.scrollTop = savedScrollTop;
 
+    async function handleTaskNav(e) {
+      const item = e.currentTarget;
+      const newIdx = parseInt(item.dataset.idx);
+      if (newIdx !== currentTaskIdx) {
+        currentTaskIdx = newIdx;
+        await autoConfirmFindings(tasks[currentTaskIdx]);
+      }
+      renderContent();
+    }
+
     sidebar.querySelectorAll(".task-nav-item").forEach(item => {
-      item.addEventListener("click", async () => {
-        const newIdx = parseInt(item.dataset.idx);
-        if (newIdx !== currentTaskIdx) {
-          currentTaskIdx = newIdx;
-          await autoConfirmFindings(tasks[currentTaskIdx]);
+      item.addEventListener("click", handleTaskNav);
+      item.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          handleTaskNav(e);
         }
-        renderContent();
       });
     });
 
     const detailPanel = document.getElementById("task-detail-panel");
     detailPanel.innerHTML = renderTaskDetail(tasks[currentTaskIdx], notes);
 
-    // Reset detail panel scroll to top on task switch
-    detailPanel.scrollTop = 0;
+    // Restore detail panel scroll (only if not task switch)
+    detailPanel.scrollTop = preserveDetailScroll ? savedDetailScroll : 0;
+    preserveDetailScroll = false;
 
     // Wire up confirm/dismiss buttons
     detailPanel.querySelectorAll(".btn-confirm").forEach(btn => {
@@ -304,14 +336,28 @@ export async function renderReview(container, params) {
     });
   }
 
-  // Tab switching
+  // Tab switching — click + keyboard
   const tabsEl = document.getElementById("review-tabs");
   tabsEl.querySelectorAll(".tab").forEach(tab => {
     tab.addEventListener("click", () => {
       currentTab = tab.dataset.tab;
-      tabsEl.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-      tab.classList.add("active");
+      updateTabUI();
       renderContent();
+    });
+    tab.addEventListener("keydown", (e) => {
+      const tabList = Array.from(tabsEl.querySelectorAll(".tab"));
+      const idx = tabList.indexOf(tab);
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        e.preventDefault();
+        const next = e.key === "ArrowRight"
+          ? tabList[(idx + 1) % tabList.length]
+          : tabList[(idx - 1 + tabList.length) % tabList.length];
+        next.focus();
+        next.click();
+      } else if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        tab.click();
+      }
     });
   });
 
@@ -347,7 +393,10 @@ export async function renderReview(container, params) {
     const tabsEl2 = document.getElementById("review-tabs");
     if (!tabsEl2) return;
     tabsEl2.querySelectorAll(".tab").forEach(t => {
-      t.classList.toggle("active", t.dataset.tab === currentTab);
+      const isActive = t.dataset.tab === currentTab;
+      t.classList.toggle("active", isActive);
+      t.setAttribute("aria-selected", isActive);
+      t.setAttribute("tabindex", isActive ? "0" : "-1");
     });
   }
 

@@ -45,6 +45,7 @@ const ICONS = {
   clipboard: '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>',
   messageSquare: '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
   chevronDown: '<polyline points="6 9 12 15 18 9"/>',
+  inbox: '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
 };
 
 export function icon(name, size = 16) {
@@ -88,13 +89,22 @@ export function showToast(message, type = "error") {
   const el = document.createElement("div");
   el.className = `toast toast-${type}`;
   el.textContent = message;
+  el.setAttribute("role", "alert");
+  el.style.cursor = "pointer";
   toastContainer.appendChild(el);
-  setTimeout(() => {
+
+  let dismissed = false;
+  function dismiss() {
+    if (dismissed) return;
+    dismissed = true;
     el.style.opacity = "0";
     el.style.transform = "translateX(16px)";
     el.style.transition = "all 200ms ease";
     setTimeout(() => el.remove(), 200);
-  }, 4000);
+  }
+
+  el.addEventListener("click", dismiss);
+  setTimeout(dismiss, 4000);
 }
 
 // ─── Router ───

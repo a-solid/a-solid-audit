@@ -139,12 +139,12 @@ export async function renderSummary(container, params) {
         </div>` : `
         <div class="grid grid-cols-2 gap-4">
           <div>
-            <label>Name</label>
+            <label for="signoff-name">Name</label>
             <input id="signoff-name" class="mt-1" value="${escapeHtml(signoff?.name || "")}">
             <div id="signoff-name-error" class="text-danger text-xs mt-1 hidden">Name is required</div>
           </div>
           <div>
-            <label>Role</label>
+            <label for="signoff-role">Role</label>
             <input id="signoff-role" class="mt-1" value="${escapeHtml(signoff?.role || "")}">
           </div>
         </div>
@@ -247,7 +247,7 @@ export async function renderSummary(container, params) {
           </tr>
         </thead>
         <tbody>
-          ${taskList.map(task => {
+          ${taskList.map((task, taskIdx) => {
             const findings = task.review?.findings || [];
             const totalFindings = findings.length;
             const bySev = {};
@@ -269,7 +269,7 @@ export async function renderSummary(container, params) {
             const score = task.review?.score;
             return `
             <tr>
-              <td><a class="task-name-link" href="#/review/${sessionId}">${escapeHtml(task.name || task.file)}</a></td>
+              <td><a class="task-name-link" href="#/review/${sessionId}?task=${taskIdx}">${escapeHtml(task.name || task.file)}</a></td>
               <td><span style="color:${scoreColor(score)};font-weight:600;font-family:var(--font-mono)">${score ?? "-"}/10</span></td>
               ${severities.map(s => {
                 const count = bySev[s];

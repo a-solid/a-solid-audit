@@ -4,6 +4,17 @@ import { showToast, setBreadcrumb, icon, escapeHtml } from "../app.mjs";
 import { renderFileTree } from "../components/file-tree.mjs";
 import { renderScopeFileTree } from "../components/scope-file-tree.mjs";
 
+function formatScopeDisplay(method, ref) {
+  if (method === "uncommitted") return "Uncommitted Changes";
+  if (method === "commits" && ref) {
+    const parts = ref.split(" ");
+    if (parts.length === 2) return `${parts[0].slice(0, 7)}..${parts[1].slice(0, 7)}`;
+    return ref.slice(0, 14);
+  }
+  if (method === "branch" && ref) return ref;
+  return `${method}${ref ? " " + ref : ""}`;
+}
+
 export async function renderWizard(container, params) {
   const sessionId = params[0];
   let step = 1;
@@ -153,10 +164,10 @@ export async function renderWizard(container, params) {
     content.innerHTML = `
       <div class="card mb-4">
         <h2 class="font-semibold mb-4">Select Scope</h2>
-        <div class="tabs" id="scope-tabs">
-          <div class="tab ${scopeMethod === "uncommitted" ? "active" : ""}" data-method="uncommitted">Uncommitted</div>
-          <div class="tab ${scopeMethod === "commits" ? "active" : ""}" data-method="commits">Commits</div>
-          <div class="tab ${scopeMethod === "branch" ? "active" : ""}" data-method="branch">Branch</div>
+        <div class="tabs" id="scope-tabs" role="tablist">
+          <div class="tab ${scopeMethod === "uncommitted" ? "active" : ""}" data-method="uncommitted" role="tab" tabindex="0" aria-selected="${scopeMethod === "uncommitted"}">Uncommitted</div>
+          <div class="tab ${scopeMethod === "commits" ? "active" : ""}" data-method="commits" role="tab" tabindex="-1" aria-selected="${scopeMethod === "commits"}">Commits</div>
+          <div class="tab ${scopeMethod === "branch" ? "active" : ""}" data-method="branch" role="tab" tabindex="-1" aria-selected="${scopeMethod === "branch"}">Branch</div>
         </div>
         <div id="scope-content" class="mt-4"></div>
         <div id="file-preview-section" class="mt-4"></div>
@@ -168,7 +179,9 @@ export async function renderWizard(container, params) {
 
     renderScopeContent();
 
-    document.getElementById("scope-tabs").querySelectorAll(".tab").forEach(tab => {
+    // Tab click + keyboard
+    const scopeTabs = document.getElementById("scope-tabs");
+    scopeTabs.querySelectorAll(".tab").forEach(tab => {
       tab.addEventListener("click", () => {
         scopeMethod = tab.dataset.method;
         scopeRef = "";
@@ -176,19 +189,36 @@ export async function renderWizard(container, params) {
         save();
         render();
       });
+      tab.addEventListener("keydown", (e) => {
+        const tabList = Array.from(scopeTabs.querySelectorAll(".tab"));
+        const idx = tabList.indexOf(tab);
+        if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+          e.preventDefault();
+          const next = e.key === "ArrowRight"
+            ? tabList[(idx + 1) % tabList.length]
+            : tabList[(idx - 1 + tabList.length) % tabList.length];
+          next.focus();
+          next.click();
+        } else if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          tab.click();
+        }
+      });
     });
+
     document.getElementById("step2-back").addEventListener("click", () => { step = 1; save(); render(); });
     document.getElementById("step2-confirm").addEventListener("click", async () => {
+      const btn = document.getElementById("step2-confirm");
+      const originalHTML = btn.innerHTML;
       try {
-        const btn = document.getElementById("step2-confirm");
         btn.disabled = true;
         btn.innerHTML = `<span class="spinner spinner-sm"></span> Generating...`;
         if (excludedFiles.length > 0 && scopeTreeInstance) {
           const { selected, total } = scopeTreeInstance.getSelectedCount();
           if (total > 0 && selected === 0) {
             showToast("No files selected for review");
-            const btn = document.getElementById("step2-confirm");
-            if (btn) { btn.disabled = false; btn.textContent = "Confirm Scope"; }
+            btn.disabled = false;
+            btn.innerHTML = originalHTML;
             return;
           }
         }
@@ -198,8 +228,8 @@ export async function renderWizard(container, params) {
         render();
       } catch (e) {
         showToast("Failed to set scope: " + e.message);
-        const btn = document.getElementById("step2-confirm");
-        if (btn) { btn.disabled = false; btn.textContent = "Confirm Scope"; }
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
       }
     });
   }
@@ -220,13 +250,13 @@ export async function renderWizard(container, params) {
         scopeContent.innerHTML = `
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label>From</label>
+              <label for="commit-from">From</label>
               <select id="commit-from" class="mt-1">
                 ${commits.map(c => `<option value="${c.hash}">${c.hash.slice(0, 7)} ${escapeHtml(c.message)} (${c.date?.slice(0, 10)})</option>`).join("")}
               </select>
             </div>
             <div>
-              <label>To</label>
+              <label for="commit-to">To</label>
               <select id="commit-to" class="mt-1">
                 ${commits.map((c, i) => `<option value="${c.hash}" ${i === 0 ? "selected" : ""}>${c.hash.slice(0, 7)} ${escapeHtml(c.message)} (${c.date?.slice(0, 10)})</option>`).join("")}
               </select>
@@ -249,13 +279,13 @@ export async function renderWizard(container, params) {
         scopeContent.innerHTML = `
           <div class="grid grid-cols-2 gap-4">
             <div>
-              <label>Base</label>
+              <label for="branch-base">Base</label>
               <select id="branch-base" class="mt-1">
                 ${branches.map(b => `<option value="${b}" ${b === "main" || b === "master" ? "selected" : ""}>${escapeHtml(b)}</option>`).join("")}
               </select>
             </div>
             <div>
-              <label>Compare</label>
+              <label for="branch-compare">Compare</label>
               <select id="branch-compare" class="mt-1">
                 ${branches.map(b => `<option value="${b}">${escapeHtml(b)}</option>`).join("")}
               </select>
@@ -318,7 +348,7 @@ export async function renderWizard(container, params) {
         <h2 class="font-semibold mb-4">Story Collection</h2>
         <div id="story-collection">
           <div class="mb-3">
-            <label>Add Story</label>
+            <label for="story-source">Add Story</label>
             <div class="flex gap-2 mt-1">
               <select id="story-source">
                 <option value="manual">Manual Input</option>
@@ -327,8 +357,11 @@ export async function renderWizard(container, params) {
             </div>
           </div>
           <div id="story-form" class="hidden mt-3 card">
+            <label for="story-name" class="sr-only">Story name</label>
             <input id="story-name" class="mb-2" placeholder="Story name">
+            <label for="story-desc" class="sr-only">Description</label>
             <textarea id="story-desc" class="mb-2" rows="2" placeholder="Description"></textarea>
+            <label for="story-ac" class="sr-only">Acceptance criteria</label>
             <textarea id="story-ac" class="mb-2" rows="2" placeholder="Acceptance criteria"></textarea>
             <button id="save-story-btn" class="btn btn-primary btn-sm">Save</button>
           </div>
@@ -549,20 +582,35 @@ export async function renderWizard(container, params) {
         });
       });
 
-      // Wire up delete buttons
+      // Wire up delete buttons — two-click confirmation pattern
       container.querySelectorAll(".story-delete-btn").forEach(btn => {
         btn.addEventListener("click", async (e) => {
           e.stopPropagation();
           const name = btn.dataset.storyName;
-          if (!confirm(`Delete story "${name}"?`)) return;
-          try {
-            const safeName = name.replace(/[^a-zA-Z0-9\-_.]/g, "-");
-            await api.deleteStory(sid, safeName);
-            stories = stories.filter(s => s.name !== name);
-            storyMappings = storyMappings.filter(m => m.storyName !== name);
-            save();
-            loadAccordionFileTree(sid);
-          } catch (err) { showToast("Failed to delete story: " + err.message); }
+          if (btn.dataset.confirmPending === "true") {
+            // Second click — perform delete
+            if (btn._confirmTimer) clearTimeout(btn._confirmTimer);
+            try {
+              const safeName = name.replace(/[^a-zA-Z0-9\-_.]/g, "-");
+              await api.deleteStory(sid, safeName);
+              stories = stories.filter(s => s.name !== name);
+              storyMappings = storyMappings.filter(m => m.storyName !== name);
+              save();
+              loadAccordionFileTree(sid);
+            } catch (err) { showToast("Failed to delete story: " + err.message); }
+          } else {
+            // First click — show confirmation
+            btn.dataset.confirmPending = "true";
+            btn.style.color = "var(--danger)";
+            btn.style.borderColor = "var(--danger)";
+            btn.innerHTML = `${icon("x", 12)} Sure?`;
+            btn._confirmTimer = setTimeout(() => {
+              btn.dataset.confirmPending = "";
+              btn.style.color = "";
+              btn.style.borderColor = "";
+              btn.innerHTML = `${icon("x", 12)}`;
+            }, 3000);
+          }
         });
       });
     } catch (e) {
@@ -587,7 +635,7 @@ export async function renderWizard(container, params) {
             <span style="color:var(--text-muted)">${icon("gitCommit", 18)}</span>
             <div>
               <div class="text-xs text-muted">Scope</div>
-              <div class="text-sm font-medium">${scopeMethod}${scopeRef ? " " + scopeRef : ""}</div>
+              <div class="text-sm font-medium">${formatScopeDisplay(scopeMethod, scopeRef)}</div>
             </div>
           </div>
           ${reviewType === "all" ? `
@@ -666,12 +714,13 @@ export async function renderWizard(container, params) {
       render();
     });
     document.getElementById("start-review-btn").addEventListener("click", async () => {
+      const btn = document.getElementById("start-review-btn");
+      const originalHTML = btn.innerHTML;
       // Save context before starting
       if (contextInput) {
         try { await api.setReviewContext(sessionId, contextInput.value); } catch (e) {}
       }
       try {
-        const btn = document.getElementById("start-review-btn");
         btn.disabled = true;
         btn.innerHTML = `<span class="spinner spinner-sm"></span> Preparing...`;
         await api.updateSessionStatus(sessionId, "ready");
@@ -690,8 +739,8 @@ export async function renderWizard(container, params) {
           </div>`;
       } catch (e) {
         showToast("Failed to start review: " + e.message);
-        const btn = document.getElementById("start-review-btn");
-        if (btn) { btn.disabled = false; btn.innerHTML = `${icon("zap", 14)} Start AI Review`; }
+        const btn2 = document.getElementById("start-review-btn");
+        if (btn2) { btn2.disabled = false; btn2.innerHTML = originalHTML; }
       }
     });
   }

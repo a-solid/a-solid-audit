@@ -48,9 +48,7 @@ export async function renderHome(container) {
       listEl.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-icon">
-            <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            </svg>
+            ${icon("inbox", 56)}
           </div>
           <h2>Start your first audit</h2>
           <p>Create a new audit session to review code changes for quality, security, and best practices.</p>

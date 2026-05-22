@@ -6,6 +6,9 @@ export async function renderProgress(container, params) {
   const sessionId = params[0];
   let pollFailures = 0;
   let pollTimer = null;
+  let pollInterval = 3000;
+  let lastReviewedCount = 0;
+  let stableCount = 0;
 
   setBreadcrumb([
     { label: "Sessions", href: "#/home" },
@@ -27,15 +30,15 @@ export async function renderProgress(container, params) {
 
     <div class="card mb-4">
       <div class="flex items-center justify-between mb-3">
-        <div id="progress-text" class="text-sm text-secondary"></div>
-        <div id="progress-pct" class="text-sm font-mono font-semibold"></div>
+        <div id="progress-text" class="text-sm text-secondary" aria-live="polite" aria-atomic="true"></div>
+        <div id="progress-pct" class="text-sm font-mono font-semibold" aria-live="polite" aria-atomic="true"></div>
       </div>
       <div class="progress-bar progress-bar-lg">
         <div id="progress-fill" class="progress-fill" style="width:0%"></div>
       </div>
     </div>
 
-    <div id="task-list" class="space-y-2"></div>
+    <div id="task-list" class="space-y-2" role="list" aria-label="Task progress"></div>
 
     <div id="poll-warning" class="hidden mt-4">
       <div class="info-banner info-banner-amber">
@@ -75,7 +78,7 @@ export async function renderProgress(container, params) {
         const isReviewed = t.status === "reviewed";
         const scoreColor = t.review?.score >= 7 ? "text-success" : t.review?.score >= 4 ? "text-warning" : "text-danger";
         return `
-          <div class="card flex items-center justify-between" style="padding:var(--space-3) var(--space-4)">
+          <div class="card flex items-center justify-between" role="listitem" style="padding:var(--space-3) var(--space-4)">
             <div class="flex items-center gap-3" style="min-width:0">
               ${isReviewing
                 ? `<span class="spinner spinner-sm" style="flex-shrink:0"></span>`
@@ -93,44 +96,59 @@ export async function renderProgress(container, params) {
       }).join("");
 
       if (reviewed === total && total > 0 && session.status === "completed") {
-        clearInterval(pollTimer);
         location.hash = `#/review/${sessionId}`;
-        return;
+        return; // Stop polling
       }
 
       if (session.status === "scoped") {
         document.getElementById("progress-text").textContent = "Waiting for AI review to begin...";
       }
+
+      // Adaptive backoff: increase interval when progress is stable
+      if (reviewed === lastReviewedCount) {
+        stableCount++;
+      } else {
+        stableCount = 0;
+        lastReviewedCount = reviewed;
+      }
+      if (stableCount > 3) {
+        pollInterval = Math.min(pollInterval + 1000, 8000);
+      } else {
+        pollInterval = 3000;
+      }
+
     } catch (e) {
       pollFailures++;
       if (pollFailures >= 3) {
         document.getElementById("poll-warning").classList.remove("hidden");
-        clearInterval(pollTimer);
+        return; // Stop polling
       }
     }
+
+    // Schedule next poll
+    pollTimer = setTimeout(poll, pollInterval);
   }
 
   document.getElementById("manual-refresh-btn").addEventListener("click", () => {
     pollFailures = 0;
-    if (pollTimer) clearInterval(pollTimer);
+    if (pollTimer) clearTimeout(pollTimer);
+    pollInterval = 3000;
     poll();
-    pollTimer = setInterval(poll, 3000);
   });
 
   document.getElementById("view-findings-btn").addEventListener("click", () => {
-    if (pollTimer) clearInterval(pollTimer);
+    if (pollTimer) clearTimeout(pollTimer);
     location.hash = `#/review/${sessionId}`;
   });
   document.getElementById("view-summary-btn").addEventListener("click", () => {
-    if (pollTimer) clearInterval(pollTimer);
+    if (pollTimer) clearTimeout(pollTimer);
     location.hash = `#/summary/${sessionId}`;
   });
 
   await poll();
-  pollTimer = setInterval(poll, 3000);
 
   // Cleanup on navigation
   onNavigateCleanup(() => {
-    if (pollTimer) clearInterval(pollTimer);
+    if (pollTimer) clearTimeout(pollTimer);
   });
 }

@@ -28,11 +28,51 @@ export function renderScopeFileTree(container, files) {
       } else {
         checkedFiles = new Set();
       }
-      render();
+      // Update all file checkboxes directly
+      container.querySelectorAll("[data-action='toggle-file']").forEach(cb => {
+        cb.checked = e.target.checked;
+      });
+      container.querySelectorAll("[data-action='toggle-folder']").forEach(cb => {
+        cb.checked = e.target.checked;
+        cb.indeterminate = false;
+      });
+      updateSelectAllState();
       container.dispatchEvent(new Event("change", { bubbles: true }));
     });
 
     wireEvents();
+  }
+
+  function renderCounts() {
+    const { selected, total } = getCounts();
+    const countEl = container.querySelector(".scope-tree-count");
+    if (countEl) countEl.textContent = `${selected}/${total} files`;
+    updateSelectAllState();
+  }
+
+  function updateSelectAllState() {
+    const { selected, total } = getCounts();
+    const selectAll = document.getElementById("scope-select-all");
+    if (selectAll) {
+      selectAll.checked = selected === total;
+      selectAll.indeterminate = selected > 0 && selected < total;
+    }
+  }
+
+  function updateFolderCheckboxes(changedPath) {
+    // Walk up from the changed file's parent folders
+    const parts = changedPath.split("/");
+    for (let i = parts.length - 1; i > 0; i--) {
+      const dirPath = parts.slice(0, i).join("/");
+      const node = findFolderNode(tree, dirPath);
+      if (!node) continue;
+      const cb = container.querySelector(`[data-action="toggle-folder"][data-path="${CSS.escape(dirPath)}"]`);
+      if (!cb) continue;
+      const isChecked = isFolderChecked(node);
+      const isPartial = isFolderPartial(node);
+      cb.checked = isChecked;
+      cb.indeterminate = !isChecked && isPartial;
+    }
   }
 
   function renderNodes(nodes, depth) {
@@ -81,12 +121,31 @@ export function renderScopeFileTree(container, files) {
         const node = findFolderNode(tree, dirPath);
         if (!node) return;
         const folderFiles = getFolderFiles(node);
-        if (isFolderChecked(node)) {
-          folderFiles.forEach(f => checkedFiles.delete(f));
-        } else {
+        const shouldCheck = !isFolderChecked(node);
+        if (shouldCheck) {
           folderFiles.forEach(f => checkedFiles.add(f));
+        } else {
+          folderFiles.forEach(f => checkedFiles.delete(f));
         }
-        render();
+        // Update descendant file checkboxes directly
+        folderFiles.forEach(f => {
+          const fileCb = container.querySelector(`[data-action="toggle-file"][data-path="${CSS.escape(f)}"]`);
+          if (fileCb) fileCb.checked = shouldCheck;
+        });
+        // Update descendant folder checkboxes
+        updateDescendantFolderCheckboxes(node, shouldCheck);
+        // Walk up and update parent folder checkboxes
+        const parts = dirPath.split("/");
+        for (let i = parts.length - 1; i > 0; i--) {
+          const parentPath = parts.slice(0, i).join("/");
+          const parentNode = findFolderNode(tree, parentPath);
+          if (!parentNode) continue;
+          const parentCb = container.querySelector(`[data-action="toggle-folder"][data-path="${CSS.escape(parentPath)}"]`);
+          if (!parentCb) continue;
+          parentCb.checked = isFolderChecked(parentNode);
+          parentCb.indeterminate = !isFolderChecked(parentNode) && isFolderPartial(parentNode);
+        }
+        renderCounts();
         container.dispatchEvent(new Event("change", { bubbles: true }));
       });
     });
@@ -97,7 +156,9 @@ export function renderScopeFileTree(container, files) {
         const filePath = el.dataset.path;
         if (checkedFiles.has(filePath)) checkedFiles.delete(filePath);
         else checkedFiles.add(filePath);
-        render();
+        // Update parent folder checkbox states (walk up)
+        updateFolderCheckboxes(filePath);
+        renderCounts();
         container.dispatchEvent(new Event("change", { bubbles: true }));
       });
     });
@@ -108,10 +169,19 @@ export function renderScopeFileTree(container, files) {
     });
 
     // Set indeterminate state on Select All checkbox
-    const { selected, total } = getCounts();
-    const selectAll = document.getElementById("scope-select-all");
-    if (selectAll && selected > 0 && selected < total) {
-      selectAll.indeterminate = true;
+    updateSelectAllState();
+  }
+
+  function updateDescendantFolderCheckboxes(node, checked) {
+    for (const child of node.children) {
+      if (child.type === "folder") {
+        const cb = container.querySelector(`[data-action="toggle-folder"][data-path="${CSS.escape(child.path)}"]`);
+        if (cb) {
+          cb.checked = checked;
+          cb.indeterminate = false;
+        }
+        updateDescendantFolderCheckboxes(child, checked);
+      }
     }
   }
 

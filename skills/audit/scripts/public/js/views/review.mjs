@@ -196,7 +196,7 @@ export async function renderReview(container, params) {
       `}
 
     ${reviewContext ? `
-      <div class="card mb-4">
+      <div class="card mb-4 mt-6">
         <div class="font-medium mb-3">Review Context</div>
         <div class="text-sm" style="white-space:pre-wrap;word-break:break-word">${escapeHtml(reviewContext)}</div>
       </div>

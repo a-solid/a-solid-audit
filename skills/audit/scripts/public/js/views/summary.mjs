@@ -209,6 +209,25 @@ export async function renderSummary(container, params) {
       const nameInput = document.getElementById("signoff-name");
       if (nameInput) nameInput.style.borderColor = "";
     });
+
+    // Auto-save notes: debounce + blur
+    let notesTimer = null;
+    const notesEl = document.getElementById("summary-notes");
+    if (notesEl) {
+      notesEl.addEventListener("input", () => {
+        clearTimeout(notesTimer);
+        notesTimer = setTimeout(async () => {
+          try {
+            await api.updateSummary(sessionId, { notes: notesEl.value });
+            showToast("Notes saved", "success");
+          } catch (e) { /* next save will retry */ }
+        }, 1500);
+      });
+      notesEl.addEventListener("blur", () => {
+        clearTimeout(notesTimer);
+        api.updateSummary(sessionId, { notes: notesEl.value }).catch(() => {});
+      });
+    }
   }
 
   function renderTaskTable(taskList, notesData) {

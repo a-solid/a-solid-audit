@@ -34,8 +34,11 @@ export const api = {
   getBranches: () => request("GET", "/api/git/branches"),
 
   // Scope
-  setScope: (id, method, ref) =>
-    request("POST", `/api/sessions/${encodeURIComponent(id)}/scope`, { method, ref }),
+  previewScope: (method, ref) =>
+    request("POST", "/api/git/preview", { method, ref }),
+
+  setScope: (id, method, ref, excludeFiles) =>
+    request("POST", `/api/sessions/${encodeURIComponent(id)}/scope`, { method, ref, excludeFiles }),
 
   // Providers
   listProviders: () => request("GET", "/api/providers"),

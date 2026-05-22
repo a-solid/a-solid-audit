@@ -1,11 +1,12 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { resolveProjectDir } from "./lib/paths.mjs";
 import { resetReviewing } from "./lib/session.mjs";
 import { updateTask } from "./lib/task.mjs";
 import { startServer } from "./server/index.mjs";
 
-let projectDir = process.cwd();
+let projectDir = resolveProjectDir();
 
 function getReportsDir() {
   return path.join(projectDir, ".audit");
@@ -16,7 +17,7 @@ if (process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url)) {
   const filteredArgs = [];
   for (let i = 0; i < rawArgs.length; i++) {
     if (rawArgs[i] === "--project-dir" && rawArgs[i + 1]) {
-      projectDir = rawArgs[i + 1];
+      projectDir = resolveProjectDir(rawArgs[i + 1]);
       i++;
     } else {
       filteredArgs.push(rawArgs[i]);

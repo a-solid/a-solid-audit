@@ -106,6 +106,13 @@ export function renderScopeFileTree(container, files) {
     container.querySelectorAll(".indeterminate").forEach(el => {
       el.indeterminate = true;
     });
+
+    // Set indeterminate state on Select All checkbox
+    const { selected, total } = getCounts();
+    const selectAll = document.getElementById("scope-select-all");
+    if (selectAll && selected > 0 && selected < total) {
+      selectAll.indeterminate = true;
+    }
   }
 
   function isFolderChecked(node) {

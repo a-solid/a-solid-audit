@@ -1,5 +1,5 @@
 // skills/audit/scripts/server/handlers/audit.mjs
-import { getCommits, getBranches } from "../../lib/git.mjs";
+import { getCommits, getBranches, runGitDiff, parseDiffByFile } from "../../lib/git.mjs";
 import { setScope } from "../../lib/mapping.mjs";
 import { jsonResponse, readBody, errorResponse } from "../index.mjs";
 
@@ -24,6 +24,41 @@ export function registerAuditRoutes(router, projectDir, reportsDir) {
     }
   });
 
+  // POST /api/git/preview — preview diff files with change stats
+  router.post("/api/git/preview", async (req, res, params) => {
+    try {
+      const body = JSON.parse(await readBody(req));
+      if (!body || !body.method) {
+        return errorResponse(res, "Missing required field: method", "VALIDATION_ERROR", 400);
+      }
+      if (!["uncommitted", "commits", "branch"].includes(body.method)) {
+        return errorResponse(res, "Invalid method. Allowed: uncommitted, commits, branch", "VALIDATION_ERROR", 400);
+      }
+      if (body.method !== "uncommitted" && !body.ref) {
+        return errorResponse(res, "Missing required field: ref", "VALIDATION_ERROR", 400);
+      }
+      if (body.ref && !/^[a-zA-Z0-9._\-\/\s]+$/.test(body.ref)) {
+        return errorResponse(res, "Invalid ref format", "VALIDATION_ERROR", 400);
+      }
+      const diff = runGitDiff(body.method, body.ref || "", projectDir);
+      if (!diff.trim()) {
+        return jsonResponse(res, { files: [] });
+      }
+      const filesMap = parseDiffByFile(diff);
+      const files = [];
+      for (const [filePath, fileData] of Object.entries(filesMap)) {
+        const hasChanges = fileData.diff.split("\n").some(
+          l => (l.startsWith("+") && !l.startsWith("+++")) || (l.startsWith("-") && !l.startsWith("---"))
+        );
+        if (!hasChanges) continue;
+        files.push({ path: filePath, additions: fileData.additions, deletions: fileData.deletions });
+      }
+      jsonResponse(res, { files });
+    } catch (e) {
+      errorResponse(res, "Preview failed: " + e.message, "INTERNAL_ERROR", 500);
+    }
+  });
+
   // POST /api/sessions/:id/scope — set scope, generate code task YAMLs
   router.post("/api/sessions/:id/scope", async (req, res, params) => {
     try {
@@ -40,7 +75,8 @@ export function registerAuditRoutes(router, projectDir, reportsDir) {
       if (body.ref && !/^[a-zA-Z0-9._\-\/\s]+$/.test(body.ref)) {
         return errorResponse(res, "Invalid ref format", "VALIDATION_ERROR", 400);
       }
-      const result = setScope(projectDir, reportsDir, params.id, body.method, body.ref || "");
+      const excludeFiles = Array.isArray(body.excludeFiles) ? body.excludeFiles : [];
+      const result = setScope(projectDir, reportsDir, params.id, body.method, body.ref || "", excludeFiles);
       jsonResponse(res, result);
     } catch (e) {
       if (e.message.includes("No diff found")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);

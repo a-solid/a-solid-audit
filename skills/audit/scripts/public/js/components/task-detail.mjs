@@ -16,10 +16,10 @@ export function renderTaskDetail(task, notes) {
 
   return `
     <div class="space-y-4">
-      <!-- Score ring -->
-      <div class="flex items-center gap-4 mb-4">
-        <div class="score-ring">
-          <svg width="96" height="96" viewBox="0 0 96 96">
+      <!-- Task header -->
+      <div class="flex items-center gap-3 mb-2">
+        <div class="score-ring" style="flex-shrink:0">
+          <svg width="64" height="64" viewBox="0 0 96 96">
             <circle class="score-ring-bg" cx="48" cy="48" r="42" fill="none" stroke-width="5"/>
             <circle class="score-ring-fill" cx="48" cy="48" r="42" fill="none"
               stroke="${scoreColor(score)}"
@@ -28,11 +28,11 @@ export function renderTaskDetail(task, notes) {
               stroke-dashoffset="${offset}"
               stroke-linecap="round"/>
           </svg>
-          <div class="score-ring-text" style="color:${scoreColor(score)}">${score ?? "-"}</div>
+          <div class="score-ring-text" style="font-size:18px;color:${scoreColor(score)}">${score ?? "-"}</div>
         </div>
-        <div>
-          <div class="text-xs text-muted">Score</div>
-          <div class="text-lg font-semibold" style="color:${scoreColor(score)}">${score ?? "-"}/10</div>
+        <div style="min-width:0;flex:1">
+          <div class="font-mono text-sm truncate" title="${escapeHtml(task.name || task.file)}">${escapeHtml(task.name || task.file)}</div>
+          <div class="text-xs text-muted mt-1">${score ?? "-"}/10 &middot; ${findings.length} findings</div>
         </div>
       </div>
 
@@ -97,9 +97,9 @@ export function renderTaskDetail(task, notes) {
                   </div>
                 ` : ""}
                 ${f.file ? `
-                  <div class="text-xs text-muted mt-2 flex items-center gap-1">
+                  <div class="text-xs text-muted mt-2 flex items-center gap-1" style="min-width:0">
                     ${icon("file", 12)}
-                    <span class="font-mono">${escapeHtml(f.file)}${f.line ? ":" + f.line : ""}</span>
+                    <span class="font-mono truncate" title="${escapeHtml(f.file)}${f.line ? ":" + f.line : ""}">${escapeHtml(f.file)}${f.line ? ":" + f.line : ""}</span>
                   </div>
                 ` : ""}
               </div>`;

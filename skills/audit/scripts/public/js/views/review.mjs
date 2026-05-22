@@ -125,18 +125,7 @@ export async function renderReview(container, params) {
     el.innerHTML = `
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div class="stat-card">
-          <div class="score-ring" style="margin:0 auto var(--space-2)">
-            <svg width="80" height="80" viewBox="0 0 80 80">
-              <circle class="score-ring-bg" cx="40" cy="40" r="34" fill="none" stroke-width="6"/>
-              <circle class="score-ring-fill" cx="40" cy="40" r="34" fill="none"
-                stroke="${avgScore >= 7 ? "var(--accent)" : avgScore >= 4 ? "var(--warning)" : "var(--danger)"}"
-                stroke-width="6"
-                stroke-dasharray="${2 * Math.PI * 34}"
-                stroke-dashoffset="${2 * Math.PI * 34 * (1 - avgScore / 10)}"
-                stroke-linecap="round"/>
-            </svg>
-            <div class="score-ring-text">${avgScore}</div>
-          </div>
+          <div class="stat-value" style="color:${avgScore >= 7 ? "var(--accent)" : avgScore >= 4 ? "var(--warning)" : "var(--danger)"}">${avgScore}/10</div>
           <div class="stat-label">Avg Score</div>
         </div>
         <div class="stat-card">
@@ -232,7 +221,7 @@ export async function renderReview(container, params) {
         <div class="task-nav-item ${i === currentTaskIdx ? "active" : ""}" data-idx="${i}">
           <div class="score-dot ${score ? dotClass : ""}" style="${!score ? "background:var(--text-muted)" : ""}"></div>
           <div style="min-width:0;flex:1">
-            <div class="text-sm font-mono truncate">${escapeHtml(t.name || t.file)}</div>
+            <div class="text-sm font-mono truncate" title="${escapeHtml(t.name || t.file)}">${escapeHtml(t.name || t.file)}</div>
             <div class="flex items-center gap-2 mt-1">
               <span class="badge badge-${t.status === "reviewing" ? "reviewing-task" : t.status}">${t.status}</span>
               <span class="text-xs text-muted">${score ?? "-"}/10</span>

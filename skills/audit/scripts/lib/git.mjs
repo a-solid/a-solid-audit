@@ -50,15 +50,31 @@ export function parseDiffByFile(diffOutput) {
   for (const line of lines) {
     const match = line.match(/^diff --git a\/(.+?) b\/(.+)$/);
     if (match) {
-      if (currentFile) files[currentFile] = currentChunks.join("\n");
+      if (currentFile) {
+        const diff = currentChunks.join("\n");
+        files[currentFile] = { diff, ...countChanges(diff) };
+      }
       currentFile = match[2].trim();
       currentChunks = [line];
     } else if (currentFile) {
       currentChunks.push(line);
     }
   }
-  if (currentFile) files[currentFile] = currentChunks.join("\n");
+  if (currentFile) {
+    const diff = currentChunks.join("\n");
+    files[currentFile] = { diff, ...countChanges(diff) };
+  }
   return files;
+}
+
+function countChanges(diffText) {
+  let additions = 0;
+  let deletions = 0;
+  for (const line of diffText.split("\n")) {
+    if (line.startsWith("+") && !line.startsWith("+++")) additions++;
+    else if (line.startsWith("-") && !line.startsWith("---")) deletions++;
+  }
+  return { additions, deletions };
 }
 
 export function taskFileName(filePath) {

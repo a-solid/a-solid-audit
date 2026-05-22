@@ -15,6 +15,7 @@ export async function renderWizard(container, params) {
   let contextExpanded = true;
   let excludedFiles = [];
   let scopeTreeInstance = null;
+  let previewGeneration = 0;
   let pendingExpandIndex = -1;
 
   const savedKey = `audit-wizard-${sessionId}`;
@@ -171,6 +172,7 @@ export async function renderWizard(container, params) {
       tab.addEventListener("click", () => {
         scopeMethod = tab.dataset.method;
         scopeRef = "";
+        excludedFiles = [];
         save();
         render();
       });
@@ -279,22 +281,32 @@ export async function renderWizard(container, params) {
     const previewSection = document.getElementById("file-preview-section");
     if (!previewSection) return;
 
+    const gen = ++previewGeneration;
     previewSection.innerHTML = `<div class="scope-tree-loading"><span class="spinner spinner-sm"></span> Loading files...</div>`;
     scopeTreeInstance = null;
 
+    // Single persistent change listener — only attached once
+    if (!previewSection.dataset.changeWired) {
+      previewSection.dataset.changeWired = "1";
+      previewSection.addEventListener("change", () => {
+        if (scopeTreeInstance) {
+          excludedFiles = scopeTreeInstance.getExcludedFiles();
+          save();
+        }
+      });
+    }
+
     try {
       const data = await api.previewScope(scopeMethod, scopeRef);
+      if (gen !== previewGeneration) return;
       if (!data.files || data.files.length === 0) {
         previewSection.innerHTML = `<div class="scope-tree-loading">No changed files found for this scope.</div>`;
         return;
       }
       const tree = renderScopeFileTree(previewSection, data.files);
       scopeTreeInstance = tree;
-      previewSection.addEventListener("change", () => {
-        excludedFiles = tree.getExcludedFiles();
-        save();
-      });
     } catch (e) {
+      if (gen !== previewGeneration) return;
       previewSection.innerHTML = `<div class="scope-tree-loading" style="color:var(--danger)">Failed to load files: ${escapeHtml(e.message)}</div>`;
     }
   }

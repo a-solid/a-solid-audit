@@ -35,7 +35,8 @@ review:
       description: "<evaluation of implementation>"
       criteria: "<original AC text>"
       file: "<file path>"
-      code: "<code snippet>"
+      code: |
+        <multi-line code snippet>
       suggestion: "<what should be added or changed>"
   gaps:
     - "<missing implementation>"

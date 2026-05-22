@@ -33,7 +33,8 @@ review:
       description: "<specific finding>"
       file: "<file path>"
       line: <line number>
-      code: "<code snippet>"
+      code: |
+        <multi-line code snippet>
       suggestion: "<fix recommendation>"
   positives:
     - "<what was done well>"

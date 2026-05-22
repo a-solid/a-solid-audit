@@ -6,7 +6,7 @@ import { taskFileName, runGitDiff, parseDiffByFile, detectLanguage } from "./git
 import { readYaml, writeIndexYaml, writeCodeTaskYaml, writeStoryTaskYaml } from "./yaml.mjs";
 
 // Generate code task YAMLs from git diff scope and update index
-export function setScope(projectDir, reportsDir, sid, scopeType, scopeRef) {
+export function setScope(projectDir, reportsDir, sid, scopeType, scopeRef, excludeFiles = []) {
   const safeSid = sanitizePath(sid);
   const sessionDir = path.join(reportsDir, safeSid);
   const indexPath = path.join(sessionDir, "index.yaml");
@@ -16,11 +16,14 @@ export function setScope(projectDir, reportsDir, sid, scopeType, scopeRef) {
   if (!diff.trim()) throw new Error("No diff found for the selected scope");
 
   const filesMap = parseDiffByFile(diff);
+  const exclude = new Set(excludeFiles || []);
   const tasksDir = path.join(sessionDir, "code-tasks");
   fs.mkdirSync(tasksDir, { recursive: true });
 
   const tasks = [];
-  for (const [filePath, diffText] of Object.entries(filesMap)) {
+  for (const [filePath, fileData] of Object.entries(filesMap)) {
+    if (exclude.has(filePath)) continue;
+    const diffText = fileData.diff;
     const hasChanges = diffText.split("\n").some(
       l => (l.startsWith("+") && !l.startsWith("+++")) || (l.startsWith("-") && !l.startsWith("---"))
     );

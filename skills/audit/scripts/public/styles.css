@@ -134,6 +134,10 @@
 [data-theme="light"] .severity-met { color: #166534; }
 [data-theme="light"] .severity-partially-met { color: #92400e; }
 [data-theme="light"] .severity-not-met { color: #991b1b; }
+[data-theme="light"] .sev-count-critical { color: #991b1b; background: rgba(239, 68, 68, 0.1); }
+[data-theme="light"] .sev-count-major { color: #b91c1c; background: rgba(239, 68, 68, 0.08); }
+[data-theme="light"] .sev-count-minor { color: #92400e; background: rgba(245, 158, 11, 0.1); }
+[data-theme="light"] .sev-count-info { color: #1e40af; background: rgba(59, 130, 246, 0.1); }
 [data-theme="light"] .finding-card.confirmed { background: linear-gradient(135deg, rgba(22,163,74,0.08), var(--bg-surface)); }
 [data-theme="light"] * { scrollbar-color: rgba(0, 0, 0, 0.2) transparent; }
 [data-theme="light"] ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.2); }
@@ -992,15 +996,15 @@ code {
   text-transform: uppercase;
   letter-spacing: 0.3px;
 }
-.human-review-reviewed {
+.summary-table .human-review-reviewed {
   background: var(--success-dim);
   color: var(--accent);
 }
-.human-review-partial {
+.summary-table .human-review-partial {
   background: var(--warning-dim);
   color: var(--warning);
 }
-.human-review-unreviewed {
+.summary-table .human-review-unreviewed {
   background: var(--bg-surface);
   color: var(--text-muted);
 }

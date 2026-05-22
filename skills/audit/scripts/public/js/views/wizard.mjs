@@ -2,6 +2,7 @@
 import { api } from "../api.mjs";
 import { showToast, setBreadcrumb, icon, escapeHtml } from "../app.mjs";
 import { renderFileTree } from "../components/file-tree.mjs";
+import { renderScopeFileTree } from "../components/scope-file-tree.mjs";
 
 export async function renderWizard(container, params) {
   const sessionId = params[0];
@@ -12,6 +13,8 @@ export async function renderWizard(container, params) {
   let stories = [];
   let storyMappings = [];
   let contextExpanded = true;
+  let excludedFiles = [];
+  let scopeTreeInstance = null;
   let pendingExpandIndex = -1;
 
   const savedKey = `audit-wizard-${sessionId}`;
@@ -25,6 +28,7 @@ export async function renderWizard(container, params) {
     stories = state.stories || [];
     storyMappings = state.storyMappings || [];
     contextExpanded = state.contextExpanded || false;
+    excludedFiles = state.excludedFiles || [];
   }
 
   // If no localStorage data, try to restore from server for scoped sessions
@@ -61,7 +65,7 @@ export async function renderWizard(container, params) {
 
   function save() {
     localStorage.setItem(savedKey, JSON.stringify({
-      step, reviewType, scopeMethod, scopeRef, stories, storyMappings, contextExpanded,
+      step, reviewType, scopeMethod, scopeRef, stories, storyMappings, contextExpanded, excludedFiles,
     }));
   }
 
@@ -154,6 +158,7 @@ export async function renderWizard(container, params) {
           <div class="tab ${scopeMethod === "branch" ? "active" : ""}" data-method="branch">Branch</div>
         </div>
         <div id="scope-content" class="mt-4"></div>
+        <div id="file-preview-section" class="mt-4"></div>
       </div>
       <div class="flex justify-between">
         <button id="step2-back" class="btn btn-ghost" aria-label="Go back">${icon("arrowLeft", 14)} Back</button>
@@ -176,7 +181,16 @@ export async function renderWizard(container, params) {
         const btn = document.getElementById("step2-confirm");
         btn.disabled = true;
         btn.innerHTML = `<span class="spinner spinner-sm"></span> Generating...`;
-        await api.setScope(sessionId, scopeMethod, scopeRef);
+        if (excludedFiles.length > 0 && scopeTreeInstance) {
+          const { selected, total } = scopeTreeInstance.getSelectedCount();
+          if (total > 0 && selected === 0) {
+            showToast("No files selected for review");
+            const btn = document.getElementById("step2-confirm");
+            if (btn) { btn.disabled = false; btn.textContent = "Confirm Scope"; }
+            return;
+          }
+        }
+        await api.setScope(sessionId, scopeMethod, scopeRef, excludedFiles);
         step = 3;
         save();
         render();
@@ -221,6 +235,7 @@ export async function renderWizard(container, params) {
         function updateCommitRef() {
           scopeRef = document.getElementById("commit-from").value + " " + document.getElementById("commit-to").value;
           save();
+          loadFilePreview();
         }
         updateCommitRef();
       } catch (e) {
@@ -249,11 +264,38 @@ export async function renderWizard(container, params) {
         function updateBranchRef() {
           scopeRef = document.getElementById("branch-base").value + "..." + document.getElementById("branch-compare").value;
           save();
+          loadFilePreview();
         }
         updateBranchRef();
       } catch (e) {
         scopeContent.innerHTML = `<p class="text-danger text-sm">${icon("alertTriangle", 14)} Failed to load branches: ${escapeHtml(e.message)}</p>`;
       }
+    }
+    // Auto-load file preview
+    loadFilePreview();
+  }
+
+  async function loadFilePreview() {
+    const previewSection = document.getElementById("file-preview-section");
+    if (!previewSection) return;
+
+    previewSection.innerHTML = `<div class="scope-tree-loading"><span class="spinner spinner-sm"></span> Loading files...</div>`;
+    scopeTreeInstance = null;
+
+    try {
+      const data = await api.previewScope(scopeMethod, scopeRef);
+      if (!data.files || data.files.length === 0) {
+        previewSection.innerHTML = `<div class="scope-tree-loading">No changed files found for this scope.</div>`;
+        return;
+      }
+      const tree = renderScopeFileTree(previewSection, data.files);
+      scopeTreeInstance = tree;
+      previewSection.addEventListener("change", () => {
+        excludedFiles = tree.getExcludedFiles();
+        save();
+      });
+    } catch (e) {
+      previewSection.innerHTML = `<div class="scope-tree-loading" style="color:var(--danger)">Failed to load files: ${escapeHtml(e.message)}</div>`;
     }
   }
 

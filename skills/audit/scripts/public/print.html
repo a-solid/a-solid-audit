@@ -73,7 +73,6 @@
   .task-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
   .task-name { font-size: 14px; font-weight: 600; color: #1a1a2e; }
   .task-score { font-size: 16px; font-weight: 700; color: #1a1a2e; }
-  .task-summary { color: #1a1a2e; font-size: 12px; margin-bottom: 10px; line-height: 1.5; }
 
   /* Findings */
   .findings-header { font-size: 10px; font-weight: 700; color: #1a1a2e; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -98,18 +97,8 @@
   .badge-unreviewed { color: #64748b; }
 
   .finding-desc { font-size: 12px; color: #1a1a2e; line-height: 1.45; }
-  .finding-code {
-    font-family: "SF Mono", "Fira Code", "Cascadia Code", monospace;
-    font-size: 11px; background: #f8fafc; padding: 4px 6px; border-radius: 3px;
-    border: 1px solid #e2e8f0;
-    margin-top: 4px; overflow-x: auto; white-space: pre; line-height: 1.4; color: #1a1a2e;
-  }
   .finding-suggestion { font-size: 11px; color: #1a1a2e; margin-top: 3px; }
   .finding-file { font-size: 10px; color: #64748b; margin-top: 3px; }
-
-  /* Positives / Gaps */
-  .section-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; margin-top: 8px; color: #1a1a2e; }
-  .section-item { font-size: 12px; color: #1a1a2e; }
 
   /* Loading */
   .loading { text-align: center; padding: 60px 0; color: #888; font-size: 14px; }
@@ -258,8 +247,6 @@ async function init() {
     const findings = rawFindings
       .map((f, origIdx) => ({ ...f, _origIdx: origIdx }))
       .sort((a, b) => (SEVERITY_ORDER.indexOf(a.severity) ?? 99) - (SEVERITY_ORDER.indexOf(b.severity) ?? 99));
-    const positives = t.review?.positives || [];
-    const gaps = t.review?.gaps || [];
     const noteTask = noteTasks.find(nt => nt.file === t.file);
 
     return `
@@ -268,8 +255,6 @@ async function init() {
         <span class="task-name">${esc(t.name || t.file)}</span>
         <span class="task-score">${score ?? "-"}/10</span>
       </div>
-      ${t.review?.summary ? `<div class="task-summary">${esc(t.review.summary)}</div>` : ""}
-
       ${findings.length > 0 ? `
         <div class="findings-header">Findings (${findings.length})</div>
         ${findings.map(f => {
@@ -287,22 +272,12 @@ async function init() {
               ${!isConfirmed && !isDismissed ? '<span class="badge badge-status badge-unreviewed">Unreviewed</span>' : ""}
             </div>
             <div class="finding-desc">${esc(f.description || "")}</div>
-            ${f.code ? `<pre class="finding-code">${esc(f.code)}</pre>` : ""}
             ${f.suggestion ? `<div class="finding-suggestion">Suggestion: ${esc(f.suggestion)}</div>` : ""}
             ${f.file ? `<div class="finding-file">${esc(f.file)}${f.line ? ":" + f.line : ""}</div>` : ""}
           </div>`;
         }).join("")}
       ` : ""}
 
-      ${positives.length > 0 ? `
-        <div class="section-label">Positives</div>
-        ${positives.map(p => `<div class="section-item">&bull; ${esc(p)}</div>`).join("")}
-      ` : ""}
-
-      ${gaps.length > 0 ? `
-        <div class="section-label">Gaps</div>
-        ${gaps.map(g => `<div class="section-item">&bull; ${esc(g)}</div>`).join("")}
-      ` : ""}
     </div>`;
   }).join("")}
 </div>`;

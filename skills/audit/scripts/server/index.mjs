@@ -66,7 +66,9 @@ export function startServer(projectDir, port = 3456) {
 
 // Allow direct execution for testing
 if (process.argv[1] && process.argv[1] === import.meta.filename) {
-  const projectDir = process.argv[2] || process.cwd();
-  const port = parseInt(process.argv[3], 10) || 3456;
-  startServer(projectDir, port);
+  import("../lib/paths.mjs").then(({ resolveProjectDir }) => {
+    const projectDir = resolveProjectDir(process.argv[2]);
+    const port = parseInt(process.argv[3], 10) || 3456;
+    startServer(projectDir, port);
+  });
 }

@@ -1,8 +1,7 @@
 // skills/audit/scripts/public/js/views/summary.mjs
 import { api } from "../api.mjs";
 import { showToast, setBreadcrumb, icon, escapeHtml } from "../app.mjs";
-import { renderPrintTaskDetail } from "../components/print-task-detail.mjs";
-import { SEVERITY_LABELS, SEVERITY_COLORS } from "../constants.mjs";
+import { SEVERITY_LABELS, SEVERITY_COLORS, scoreColor } from "../constants.mjs";
 
 export async function renderSummary(container, params) {
   const sessionId = params[0];
@@ -111,10 +110,8 @@ export async function renderSummary(container, params) {
     <div id="review-summary-card-wrapper"></div>
 
     <div class="card mb-6">
-      <div class="font-medium mb-4">Task Details</div>
-      <div class="space-y-4">
-        ${tasks.map(t => renderPrintTaskDetail(t, notes)).join("")}
-      </div>
+      <div class="font-medium mb-4">Task Overview</div>
+      ${renderTaskTable(tasks, notes)}
     </div>
   `;
 
@@ -215,6 +212,60 @@ export async function renderSummary(container, params) {
   }
 
   renderSummaryCard(notes?.summary?.signoff, notes?.summary?.notes);
+
+  function renderTaskTable(taskList, notesData) {
+    const noteTasks = notesData?.tasks || [];
+    const severities = ["critical", "major", "minor", "info"];
+
+    return `
+    <div style="overflow-x:auto">
+      <table class="summary-table">
+        <thead>
+          <tr>
+            <th>Task</th>
+            <th>Score</th>
+            ${severities.map(s => `<th>${s.charAt(0).toUpperCase() + s.slice(1)}</th>`).join("")}
+            <th>Total</th>
+            <th>Human Review</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${taskList.map(task => {
+            const findings = task.review?.findings || [];
+            const totalFindings = findings.length;
+            const bySev = {};
+            severities.forEach(s => { bySev[s] = 0; });
+            findings.forEach(f => {
+              const normalized = f.severity === "high" ? "major" : f.severity === "medium" ? "minor" : f.severity === "low" ? "info" : f.severity;
+              if (bySev[normalized] !== undefined) bySev[normalized]++;
+            });
+
+            const noteTask = noteTasks.find(t => t.file === task.file);
+            const reviewedCount = (noteTask?.findings || []).filter(f => f.status === "confirmed" || f.status === "deferred").length;
+            let reviewStatus = "none";
+            if (totalFindings > 0) {
+              if (reviewedCount === 0) reviewStatus = "unreviewed";
+              else if (reviewedCount >= totalFindings) reviewStatus = "reviewed";
+              else reviewStatus = "partial";
+            }
+
+            const score = task.review?.score;
+            return `
+            <tr>
+              <td><a class="task-name-link" href="#/review/${sessionId}">${escapeHtml(task.name || task.file)}</a></td>
+              <td><span style="color:${scoreColor(score)};font-weight:600;font-family:var(--font-mono)">${score ?? "-"}/10</span></td>
+              ${severities.map(s => {
+                const count = bySev[s];
+                return `<td><span class="sev-count ${count > 0 ? "sev-count-" + s : "sev-count-zero"}">${count}</span></td>`;
+              }).join("")}
+              <td><span class="total-count">${totalFindings}</span></td>
+              <td>${reviewStatus === "none" ? '<span style="color:var(--text-muted)">—</span>' : `<span class="human-review-badge human-review-${reviewStatus}">${reviewStatus === "reviewed" ? "Reviewed" : reviewStatus === "partial" ? "Partial" : "Unreviewed"}</span>`}</td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>`;
+  }
 
   document.getElementById("summary-back-btn").addEventListener("click", () => {
     location.hash = `#/review/${sessionId}`;

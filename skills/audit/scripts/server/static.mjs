@@ -1,8 +1,10 @@
 // skills/audit/scripts/server/static.mjs
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const PUBLIC_DIR = path.join(import.meta.dirname, "..", "public");
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PUBLIC_DIR = path.join(__dirname, "..", "public");
 
 const MIME_TYPES = {
   ".html": "text/html",

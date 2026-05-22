@@ -1,9 +1,11 @@
 // skills/audit/scripts/lib/providers.mjs
 import fs from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
-const PROVIDERS_DIR = path.join(import.meta.dirname, "providers");
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PROVIDERS_DIR = path.join(__dirname, "providers");
 
 export function listProviders() {
   if (!fs.existsSync(PROVIDERS_DIR)) return [];

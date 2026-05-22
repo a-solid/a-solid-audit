@@ -1,6 +1,7 @@
 // skills/audit/scripts/server/index.mjs
 import http from "node:http";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { createRouter } from "./router.mjs";
 import { serveStatic } from "./static.mjs";
 import { registerSessionRoutes } from "./handlers/sessions.mjs";
@@ -65,7 +66,7 @@ export function startServer(projectDir, port = 3456) {
 }
 
 // Allow direct execution for testing
-if (process.argv[1] && process.argv[1] === import.meta.filename) {
+if (process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url)) {
   import("../lib/paths.mjs").then(({ resolveProjectDir }) => {
     const projectDir = resolveProjectDir(process.argv[2]);
     const port = parseInt(process.argv[3], 10) || 3456;

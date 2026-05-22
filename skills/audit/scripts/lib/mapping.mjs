@@ -6,13 +6,13 @@ import { taskFileName, runGitDiff, parseDiffByFile, detectLanguage } from "./git
 import { readYaml, writeIndexYaml, writeCodeTaskYaml, writeStoryTaskYaml } from "./yaml.mjs";
 
 // Generate code task YAMLs from git diff scope and update index
-export function setScope(reportsDir, sid, scopeType, scopeRef) {
+export function setScope(projectDir, reportsDir, sid, scopeType, scopeRef) {
   const safeSid = sanitizePath(sid);
   const sessionDir = path.join(reportsDir, safeSid);
   const indexPath = path.join(sessionDir, "index.yaml");
   if (!fs.existsSync(indexPath)) throw new Error("Session not found: " + safeSid);
 
-  const diff = runGitDiff(scopeType, scopeRef, reportsDir.replace(/\/\.audit$/, ""));
+  const diff = runGitDiff(scopeType, scopeRef, projectDir);
   if (!diff.trim()) throw new Error("No diff found for the selected scope");
 
   const filesMap = parseDiffByFile(diff);

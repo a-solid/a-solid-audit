@@ -40,7 +40,7 @@ export function registerAuditRoutes(router, projectDir, reportsDir) {
       if (body.ref && !/^[a-zA-Z0-9._\-\/\s]+$/.test(body.ref)) {
         return errorResponse(res, "Invalid ref format", "VALIDATION_ERROR", 400);
       }
-      const result = setScope(reportsDir, params.id, body.method, body.ref || "");
+      const result = setScope(projectDir, reportsDir, params.id, body.method, body.ref || "");
       jsonResponse(res, result);
     } catch (e) {
       if (e.message.includes("No diff found")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);

@@ -232,7 +232,7 @@ function parseScalar(v) {
 }
 
 export function readYaml(filePath) {
-  const content = fs.readFileSync(filePath, "utf8");
+  const content = fs.readFileSync(filePath, "utf8").replace(/\r\n?/g, "\n");
   return parseYaml(content);
 }
 

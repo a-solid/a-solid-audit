@@ -211,8 +211,6 @@ export async function renderSummary(container, params) {
     });
   }
 
-  renderSummaryCard(notes?.summary?.signoff, notes?.summary?.notes);
-
   function renderTaskTable(taskList, notesData) {
     const noteTasks = notesData?.tasks || [];
     const severities = ["critical", "major", "minor", "info"];
@@ -266,6 +264,8 @@ export async function renderSummary(container, params) {
       </table>
     </div>`;
   }
+
+  renderSummaryCard(notes?.summary?.signoff, notes?.summary?.notes);
 
   document.getElementById("summary-back-btn").addEventListener("click", () => {
     location.hash = `#/review/${sessionId}`;

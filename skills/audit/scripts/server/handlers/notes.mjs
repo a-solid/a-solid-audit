@@ -7,29 +7,10 @@ import { jsonResponse, readBody, errorResponse } from "../index.mjs";
 
 const NOTES_FILE = "review-notes.yaml";
 
-const OLD_TASK_STATUS_MAP = {
-  accept: "confirmed", reviewed: "confirmed",
-  "needs-work": "action-required", skip: "deferred",
-};
-
-function migrateNoteEntry(entry) {
-  if (!entry) return entry;
-  if (OLD_TASK_STATUS_MAP[entry.status]) entry.status = OLD_TASK_STATUS_MAP[entry.status];
-  if (Array.isArray(entry.findings)) {
-    entry.findings = entry.findings.map(f => {
-      if (typeof f === "string") return { status: f, reason: "" };
-      return f;
-    });
-  }
-  return entry;
-}
-
 function readNotes(sessionDir) {
   const p = path.join(sessionDir, NOTES_FILE);
   if (!fs.existsSync(p)) return { tasks: [], summary: { notes: "", signoff: { name: "", role: "", date: "" } } };
-  const notes = readYaml(p);
-  if (notes && notes.tasks) notes.tasks = notes.tasks.map(migrateNoteEntry);
-  return notes;
+  return readYaml(p);
 }
 
 function writeNotes(sessionDir, data) {

@@ -3,7 +3,6 @@ import { fileURLToPath } from "node:url";
 
 import { resolveProjectDir } from "./lib/paths.mjs";
 import { resetReviewing } from "./lib/session.mjs";
-import { updateTask } from "./lib/task.mjs";
 import { startServer } from "./server/index.mjs";
 
 let projectDir = resolveProjectDir();
@@ -28,10 +27,6 @@ if (process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url)) {
   (async () => {
     try {
       switch (command) {
-        case "update-task":
-          updateTask(getReportsDir(), args[0], args[1], args[2], args[3]);
-          console.log("Updated task: " + args[1] + " -> " + args[2]);
-          break;
         case "reset-reviewing":
           resetReviewing(getReportsDir(), args[0]);
           console.log("Reset reviewing tasks for session: " + args[0]);
@@ -43,7 +38,6 @@ if (process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url)) {
           console.log("Usage: node scripts/cli.mjs [--project-dir <path>] <command> [args]");
           console.log("Commands:");
           console.log("  server [port]            Start the web server (default port: 3456)");
-          console.log("  update-task <sid> <file> <status> [score]  Update task status");
           console.log("  reset-reviewing <sid>    Reset reviewing tasks to pending");
           break;
       }

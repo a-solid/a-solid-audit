@@ -47,4 +47,4 @@ For each story task with status `pending` (sequentially):
 
 ### 5. Completion
 
-When all tasks are reviewed, `update-task` automatically sets session status to `completed`. Tell the user: "Review complete. Findings at http://localhost:3456."
+When all tasks are reviewed, the review API automatically sets session status to `completed`. Tell the user: "Review complete. Findings at http://localhost:3456."

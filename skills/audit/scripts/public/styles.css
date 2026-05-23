@@ -363,7 +363,6 @@ img, svg { display: block; }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* Print/PDF utility classes */
 .print-only { display: none; }
-.screen-only { }
 
 /* ─── Sign-off Signed State ─── */
 .signoff-signed { display: flex; align-items: center; gap: 12px; }
@@ -1231,7 +1230,6 @@ code {
 
   /* Print/PDF utility overrides */
   .print-only { display: block; }
-  .screen-only { display: none; }
 
   /* Clean up textarea in PDF */
   #summary-notes {

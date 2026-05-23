@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { sanitizePath } from "./session.mjs";
 import { taskFileName, runGitDiff, parseDiffByFile, detectLanguage } from "./git.mjs";
-import { readYaml, writeIndexYaml, writeCodeTaskYaml, writeStoryTaskYaml } from "./yaml.mjs";
+import { readYaml, writeIndexYaml, writeCodeTaskYaml } from "./yaml.mjs";
 
 // Generate code task YAMLs from git diff scope and update index
 export function setScope(projectDir, reportsDir, sid, scopeType, scopeRef, excludeFiles = []) {
@@ -52,51 +52,4 @@ export function setScope(projectDir, reportsDir, sid, scopeType, scopeRef, exclu
   });
 
   return { scope: { method: scopeType, ref: scopeRef }, taskCount: tasks.length };
-}
-
-// Map stories to files
-export function mapStories(reportsDir, sid, mapping) {
-  const safeSid = sanitizePath(sid);
-  const sessionDir = path.join(reportsDir, safeSid);
-  const tasksDir = path.join(sessionDir, "story-tasks");
-  const indexPath = path.join(sessionDir, "index.yaml");
-
-  if (!fs.existsSync(indexPath)) throw new Error("Session not found: " + safeSid);
-  fs.mkdirSync(tasksDir, { recursive: true });
-
-  if (!Array.isArray(mapping)) throw new Error("Invalid mapping: expected array");
-
-  const index = readYaml(indexPath);
-  const existingStoryFiles = new Set((index.storyTasks || []).map(t => t.file));
-  const newStoryTasks = [];
-
-  for (const entry of mapping) {
-    if (!entry.storyName) continue;
-    const safeName = entry.storyName.replace(/[^a-zA-Z0-9\-_.]/g, "-");
-    const storyFile = "story-tasks/" + safeName + ".yaml";
-    if (existingStoryFiles.has(storyFile)) continue;
-
-    const files = (entry.files || []).map(f => {
-      const filePath = typeof f === "string" ? f : f.name;
-      return { name: filePath, taskFile: "code-tasks/" + taskFileName(filePath) };
-    });
-
-    writeStoryTaskYaml(path.join(sessionDir, storyFile), {
-      name: safeName,
-      status: "pending",
-      description: entry.description || "",
-      acceptance: entry.acceptance || "",
-      files,
-    });
-
-    newStoryTasks.push({ file: storyFile, status: "pending" });
-  }
-
-  index.storyTasks = [...(index.storyTasks || []), ...newStoryTasks];
-  if (newStoryTasks.length > 0 && index.session.type === "code") {
-    index.session.type = "all";
-  }
-  writeIndexYaml(indexPath, index);
-
-  return { created: newStoryTasks.length };
 }

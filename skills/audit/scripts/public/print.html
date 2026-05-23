@@ -58,11 +58,19 @@
   .sev-label {
     font-size: 10px; font-weight: 700; min-width: 60px; text-align: center;
     padding: 2px 6px; border-radius: 3px; letter-spacing: 0.3px;
-    border: 1px solid #94a3b8;
     background: #f1f5f9; color: #1a1a2e;
+    border-left: 3px solid #94a3b8;
   }
-  .sev-track { flex: 1; height: 8px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 2px; overflow: hidden; }
+  .sev-label.sev-critical { border-left-color: #b91c1c; color: #991b1b; }
+  .sev-label.sev-major, .sev-label.sev-high { border-left-color: #dc2626; color: #991b1b; }
+  .sev-label.sev-medium, .sev-label.sev-minor { border-left-color: #a16207; color: #92400e; }
+  .sev-label.sev-low, .sev-label.sev-info { border-left-color: #1d4ed8; color: #1e40af; }
+  .sev-track { flex: 1; height: 8px; background: #f1f5f9; border-radius: 2px; overflow: hidden; }
   .sev-fill { height: 100%; border-radius: 2px; background: #94a3b8; }
+  .sev-fill.sev-critical { background: #b91c1c; }
+  .sev-fill.sev-major, .sev-fill.sev-high { background: #dc2626; }
+  .sev-fill.sev-medium, .sev-fill.sev-minor { background: #a16207; }
+  .sev-fill.sev-low, .sev-fill.sev-info { background: #1d4ed8; }
   .sev-count { font-size: 12px; font-weight: 600; min-width: 16px; text-align: right; color: #1a1a2e; }
 
   /* ─── Task Cards ─── */
@@ -89,10 +97,9 @@
   .badge {
     display: inline-block; font-size: 10px; font-weight: 700;
     padding: 1px 6px; border-radius: 3px; line-height: 1.5;
-    border: 1px solid #94a3b8;
     background: #f1f5f9; color: #1a1a2e;
   }
-  .badge-sev { background: #f1f5f9; color: #1a1a2e; border: 1px solid #94a3b8; }
+  .badge-sev { background: #f1f5f9; color: #1a1a2e; }
   .badge-status { font-size: 10px; background: none; padding: 0; }
   .badge-confirmed { color: #166534; }
   .badge-dismissed { color: #92400e; }
@@ -239,8 +246,8 @@ async function init() {
     <h2>Findings by Severity</h2>
     ${Object.entries(bySeverity).map(([sev, count]) => `
       <div class="sev-row">
-        <span class="sev-label">${sev}</span>
-        <div class="sev-track"><div class="sev-fill" style="width:${(count / maxSevCount) * 100}%"></div></div>
+        <span class="sev-label sev-${sev}">${sev}</span>
+        <div class="sev-track"><div class="sev-fill sev-${sev}" style="width:${(count / maxSevCount) * 100}%"></div></div>
         <span class="sev-count">${count}</span>
       </div>
     `).join("")}

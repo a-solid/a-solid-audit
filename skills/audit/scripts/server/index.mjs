@@ -9,6 +9,7 @@ import { registerAuditRoutes } from "./handlers/audit.mjs";
 import { registerStoryRoutes } from "./handlers/stories.mjs";
 import { registerTaskRoutes } from "./handlers/tasks.mjs";
 import { registerNoteRoutes } from "./handlers/notes.mjs";
+import { registerReviewRoutes } from "./handlers/reviews.mjs";
 
 export function jsonResponse(res, data, status = 200) {
   res.writeHead(status, { "Content-Type": "application/json" });
@@ -37,6 +38,7 @@ export function startServer(projectDir, port = 3456) {
   registerStoryRoutes(router, reportsDir);
   registerTaskRoutes(router, reportsDir);
   registerNoteRoutes(router, reportsDir);
+  registerReviewRoutes(router, reportsDir);
 
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, `http://localhost:${port}`);

@@ -6,7 +6,7 @@ import { readYaml, writeYaml, writeIndexYaml } from "./yaml.mjs";
 
 const ALLOWED_STATUSES = ["pending", "reviewing", "reviewed"];
 
-export function updateTask(reportsDir, sid, taskFile, status, score) {
+export function updateTask(reportsDir, sid, taskFile, status, score, reviewData) {
   if (!ALLOWED_STATUSES.includes(status)) {
     throw new Error("Invalid status: " + status + ". Allowed: " + ALLOWED_STATUSES.join(", "));
   }
@@ -23,6 +23,9 @@ export function updateTask(reportsDir, sid, taskFile, status, score) {
   const task = readYaml(taskPath);
   task.status = status;
   if (score !== undefined && score !== null) task.review.score = parseInt(score, 10);
+  if (reviewData) {
+    task.review = { ...task.review, ...reviewData };
+  }
   writeYaml(taskPath, task);
 
   const index = readYaml(indexPath);

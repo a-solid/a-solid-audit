@@ -116,15 +116,47 @@ The report server auto-starts and provides a split-panel interface:
 - **Summary** — task status table (AI Review + Human Confirm), findings stats, sign-off form
 - **Task Detail** — findings grouped by severity, dismiss with reason selection, code snippets, suggestions, positives
 
+### Finding Status Lifecycle
+
+Each finding goes through a review workflow:
+
+```
+Unreviewed → Confirmed    (click Confirm, or auto-confirmed on task open)
+Unreviewed → Deferred     (click Dismiss + select reason)
+```
+
+- **Auto-confirm:** navigating to a task automatically confirms all unreviewed findings
+- **Terminology:** the UI button says "Dismiss", the backend stores `"deferred"`, the summary page shows "Deferred" — these all refer to the same action
+
 ### Dismiss Reasons
 
-| Code | Story |
+| Reason | When to use |
 |---|---|
-| AI false positive | Out of scope |
-| Known issue | Known limitation |
-| Business exception | Business decision |
-| Will fix elsewhere | Will fix elsewhere |
-| Acceptable risk | Acceptable risk |
+| False positive | AI flagged an issue that doesn't exist in the code |
+| Acceptable risk | The risk is known and acceptable for now |
+| Out of scope | Issue is outside the scope of this review |
+| Already addressed | Fix has already been applied elsewhere |
+| Intentional design | The flagged pattern is a deliberate design choice |
+
+### Summary Page Metrics
+
+| Metric | Meaning |
+|---|---|
+| Total Findings | Sum of all findings across all tasks |
+| Confirmed | Findings with status `confirmed` |
+| Action Required | Confirmed findings with severity critical, major, or high |
+| Deferred | Findings with status `deferred` (dismissed) |
+| Unreviewed | Findings with no status set |
+
+### Human Review Status
+
+The task table shows a Human Review column with three states:
+
+| Status | Condition |
+|---|---|
+| Reviewed | All findings in the task have a status |
+| Partial | Some findings have a status |
+| Unreviewed | No findings have a status |
 
 ### Keyboard Shortcuts
 

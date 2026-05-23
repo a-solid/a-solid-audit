@@ -20,24 +20,31 @@ For each file, evaluate:
 4. **Error handling** — Exception handling, meaningful errors, resource cleanup
 5. **Best practices** — Language-specific conventions and design patterns
 
-## Output Format
+## Submitting Results
 
-Write these fields under `review:` in the task YAML file. Set top-level `status` to `reviewed`.
+Submit your review via the audit server API. You will receive `session-id` and `task-file` as context.
 
-```yaml
-review:
-  score: <0-10>
-  summary: "<2-3 sentence summary>"
-  findings:
-    - severity: <critical|major|minor|info>
-      description: "<specific finding>"
-      file: "<file path>"
-      line: <line number>
-      code: |
-        <multi-line code snippet>
-      suggestion: "<fix recommendation>"
-  positives:
-    - "<what was done well>"
+POST to `http://localhost:3456/api/sessions/<session-id>/tasks/<task-file>/review` with JSON:
+
+```json
+{
+  "status": "reviewed",
+  "score": <0-10>,
+  "review": {
+    "summary": "<2-3 sentence summary>",
+    "findings": [
+      {
+        "severity": "<critical|major|minor|info>",
+        "description": "<specific finding>",
+        "file": "<file path>",
+        "line": <line number>,
+        "code": "<multi-line code snippet>",
+        "suggestion": "<fix recommendation>"
+      }
+    ],
+    "positives": ["<what was done well>"]
+  }
+}
 ```
 
 ### Score Guide
@@ -59,10 +66,7 @@ review:
 - `description` is required for each finding
 - `file`, `line`, `code`, `suggestion` are optional — include when helpful
 - Provide `suggestion` for critical and major findings
-- `findings` and `positives` are optional — omit if none
-- Multiline text uses `|` (literal block scalar), single-line uses plain scalar
-- Do NOT create an `output` field — write directly under `review:`
-- Do NOT write `status` under `review:` — it belongs at top level
+- `findings` and `positives` arrays may be empty — omit or send `[]`
 
 ## Review Context File
 

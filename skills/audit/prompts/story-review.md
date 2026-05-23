@@ -22,26 +22,32 @@ Read the code task YAMLs via the `taskFile` paths to get diffs. Read the full ch
 4. **Out-of-scope** — Changes unrelated to the story
 5. **Test coverage** — Do test changes align with the story requirements?
 
-## Output Format
+## Submitting Results
 
-Write these fields under `review:` in the task YAML file. Set top-level `status` to `reviewed`.
+Submit your review via the audit server API. You will receive `session-id` and `task-file` as context.
 
-```yaml
-review:
-  score: <0-10>
-  summary: "<2-3 sentence summary>"
-  findings:
-    - severity: <met|partially-met|not-met>
-      description: "<evaluation of implementation>"
-      criteria: "<original AC text>"
-      file: "<file path>"
-      code: |
-        <multi-line code snippet>
-      suggestion: "<what should be added or changed>"
-  gaps:
-    - "<missing implementation>"
-  positives:
-    - "<what was done well>"
+POST to `http://localhost:3456/api/sessions/<session-id>/tasks/<task-file>/review` with JSON:
+
+```json
+{
+  "status": "reviewed",
+  "score": <0-10>,
+  "review": {
+    "summary": "<2-3 sentence summary>",
+    "findings": [
+      {
+        "severity": "<met|partially-met|not-met>",
+        "description": "<evaluation of implementation>",
+        "criteria": "<original AC text>",
+        "file": "<file path>",
+        "code": "<multi-line code snippet>",
+        "suggestion": "<what should be added or changed>"
+      }
+    ],
+    "gaps": ["<missing implementation>"],
+    "positives": ["<what was done well>"]
+  }
+}
 ```
 
 ### Score Guide
@@ -56,10 +62,7 @@ review:
 - `description` is required for each finding
 - `suggestion` is required for `not-met` and `partially-met`, optional for `met`
 - `criteria`, `file`, `code` are optional — include when helpful
-- `findings`, `gaps`, `positives` are optional — omit if none
-- Multiline text uses `|` (literal block scalar), single-line uses plain scalar
-- Do NOT create an `output` field — write directly under `review:`
-- Do NOT write `status` under `review:` — it belongs at top level
+- `findings`, `gaps`, `positives` arrays may be empty — omit or send `[]`
 
 ## Review Context File
 

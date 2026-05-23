@@ -56,22 +56,22 @@ export function renderTaskDetail(task, notes) {
 
               return `
               <div class="finding-card severity-${f.severity}${isConfirmed ? " confirmed" : ""}${isDismissed ? " dismissed" : ""}" data-finding="${i}">
-                <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center justify-between">
                   <div class="flex items-center gap-2">
                     <span class="badge severity-${f.severity}">${f.severity}</span>
                     ${isConfirmed ? `<span class="badge" style="background:var(--success-dim);color:var(--accent)">${icon("check", 10)} Confirmed</span>` : ""}
                     ${isDismissed ? `<span class="badge dismiss-reason-badge"${reason ? ` title="${escapeHtml(reason)}"` : ""} style="background:var(--warning-dim);color:var(--warning)">${icon("x", 10)} Dismissed${reason ? ": " + escapeHtml(reason.length > 20 ? reason.slice(0, 20) + "..." : reason) : ""}</span>` : ""}
                   </div>
-                  <div class="flex gap-2">
-                    <button class="btn btn-sm ${isConfirmed || isUnreviewed ? "" : "btn-ghost"} btn-confirm" data-idx="${i}"
-                      aria-label="Confirm finding"
+                  <div class="flex gap-1">
+                    <button class="btn btn-sm btn-icon ${isConfirmed || isUnreviewed ? "" : "btn-ghost"} btn-confirm" data-idx="${i}"
+                      title="Confirm" aria-label="Confirm finding"
                       style="${isConfirmed || isUnreviewed ? "color:var(--accent);border-color:var(--accent);background:var(--accent-dim)" : "color:var(--accent)"}">
-                      ${icon("check", 12)} Confirm
+                      ${icon("check", 14)}
                     </button>
-                    <button class="btn btn-sm ${isDismissed ? "" : "btn-ghost"} btn-dismiss" data-idx="${i}"
-                      aria-label="Dismiss finding"
+                    <button class="btn btn-sm btn-icon ${isDismissed ? "" : "btn-ghost"} btn-dismiss" data-idx="${i}"
+                      title="Dismiss" aria-label="Dismiss finding"
                       style="${isDismissed ? "color:var(--warning);border-color:var(--warning);background:var(--warning-dim)" : "color:var(--text-muted)"}">
-                      ${icon("x", 12)} Dismiss
+                      ${icon("x", 14)}
                     </button>
                   </div>
                 </div>
@@ -87,13 +87,21 @@ export function renderTaskDetail(task, notes) {
                     <button class="btn btn-sm btn-primary dismiss-submit-btn" data-dismiss-submit="${i}">Submit</button>
                   </div>
                 </div>
-                ${f.code ? `
-                  <pre class="mt-2 p-3" style="border-color:var(--border)"><code class="text-xs">${escapeHtml(f.code)}</code></pre>
-                ` : ""}
-                ${f.suggestion ? `
-                  <div class="text-sm mt-2 flex items-start gap-2" style="color:var(--info)">
-                    ${icon("zap", 14)}
-                    <span>${escapeHtml(f.suggestion)}</span>
+                ${(f.code || f.suggestion) ? `
+                  <button class="finding-collapse-toggle mt-2" data-collapse-toggle="${i}">
+                    <span class="toggle-icon">${icon("chevronRight", 12)}</span>
+                    ${f.code && f.suggestion ? "Show details" : f.code ? "Show code" : "Show suggestion"}
+                  </button>
+                  <div class="finding-collapsible" data-collapsible="${i}">
+                    ${f.code ? `
+                      <pre class="mt-2 p-3" style="border-color:var(--border)"><code class="text-xs">${escapeHtml(f.code)}</code></pre>
+                    ` : ""}
+                    ${f.suggestion ? `
+                      <div class="text-sm mt-2 flex items-start gap-2" style="color:var(--info)">
+                        ${icon("zap", 14)}
+                        <span>${escapeHtml(f.suggestion)}</span>
+                      </div>
+                    ` : ""}
                   </div>
                 ` : ""}
                 ${f.file ? `

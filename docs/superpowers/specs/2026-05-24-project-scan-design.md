@@ -113,7 +113,7 @@ review:
 |------|------|
 | 1. 选择类型 | 选择 `project-scan` |
 | 2. 选择项目 | 当前仓库 或 输入外部目录路径 |
-| 3. 提供背景 | 文本输入 + URL/文件上传（可选） |
+| 3. 提供背景 | 文本输入 + URL 输入（AI 抓取内容，可选） |
 | 4. 确认范围 | 展示识别出的入口列表 + 未覆盖文件，用户可排除 |
 | 5. 启动扫描 | 进入 reviewing 状态 |
 
@@ -168,6 +168,15 @@ review:
 连接信息通过 wizard 中的配置步骤或环境变量提供：
 - `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_TYPE`
 
+### 实现方式
+
+遵循项目零依赖原则，通过 AI agent 调用系统已安装的数据库 CLI 工具：
+- MySQL: `mysql` CLI
+- PostgreSQL: `psql` CLI
+- SQL Server: `sqlcmd` CLI
+
+Skill 提供标准化的查询接口，agent 通过 Bash 工具执行 CLI 命令获取结果。无需安装 npm 依赖。
+
 ### 输出
 
 数据库相关发现归入 `category: performance` 或 `category: security`，写入对应 project-task 的 findings。
@@ -178,7 +187,7 @@ review:
 
 新增 `project-scan` 类型的 wizard 流程（4 步），复用现有 wizard 组件模式：
 - 步骤 2：目录选择器（当前仓库 / 外部路径输入）
-- 步骤 3：背景输入区（文本框 + URL 输入 + 文件上传按钮）
+- 步骤 3：背景输入区（文本框 + URL 输入框，AI 抓取 URL 内容后精简整合到 review-context）
 - 步骤 4：入口列表展示（checkbox tree，可排除）
 
 ### Progress

@@ -9,7 +9,6 @@ description: Orchestrates the A-Solid Audit process, coordinating code reviews a
 
 All commands run via `node scripts/cli.mjs <command>`. Scripts are located in this skill's directory (`skills/audit/scripts/`). The project root is auto-detected via git — **do not pass `--project-dir`**; the script finds the git root automatically. The `.audit/` data directory is created under the project root.
 
-- `update-task <session-id> <task-file> <status> [score]` — Update task status/score
 - `reset-reviewing <session-id>` — Reset reviewing tasks to pending (for resume after interruption)
 - `server [port]` — Start the web server (default: 3456)
 
@@ -32,21 +31,19 @@ All commands run via `node scripts/cli.mjs <command>`. Scripts are located in th
 
 For each task with `type === "code"` and status `pending` (sequentially):
 
-1. `node scripts/cli.mjs update-task <session-id> <task-file> reviewing`
-2. Read the task YAML from `.audit/<session-id>/<task-file>`
-3. Dispatch a sub-agent with `prompts/code-review.md` as its prompt, passing the task file path and session directory `.audit/<session-id>/` as context. The session directory contains `review-context.md`.
-4. Sub-agent writes results under `review:` in the task YAML, sets top-level `status: reviewed`
-5. Verify the file was updated
+1. `POST /api/sessions/:id/tasks/:file/review` with `{"status":"reviewing"}` — sets task to reviewing
+2. Dispatch a sub-agent with `prompts/code-review.md` as its prompt, passing `session-id` and `task-file` as context. The session directory is `.audit/<session-id>/` (contains `review-context.md`).
+3. Sub-agent reads the task YAML, performs the review, and POSTs results via the review endpoint
+4. Sub-agent appends cross-file observations to `review-context.md`
 
 ### 4. Story Review Loop (if `type === "all"` session)
 
 For each story task with status `pending` (sequentially):
 
-1. `node scripts/cli.mjs update-task <session-id> <task-file> reviewing`
-2. Read the story task YAML — it contains `files[].taskFile` references to code task YAMLs for diffs
-3. Dispatch a sub-agent with `prompts/story-review.md`, passing the task file path and session directory as context.
-4. Sub-agent writes results and sets status
-5. Verify the file was updated
+1. `POST /api/sessions/:id/tasks/:file/review` with `{"status":"reviewing"}` — sets task to reviewing
+2. Dispatch a sub-agent with `prompts/story-review.md`, passing `session-id` and `task-file` as context.
+3. Sub-agent reads the story task YAML, reads referenced code task YAMLs for diffs, performs the review, and POSTs results via the review endpoint
+4. Sub-agent appends cross-file observations to `review-context.md`
 
 ### 5. Completion
 

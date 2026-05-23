@@ -334,6 +334,23 @@ export async function renderReview(container, params) {
     detailPanel.querySelectorAll(".dismiss-panel").forEach(panel => {
       panel.addEventListener("click", (e) => e.stopPropagation());
     });
+    // Collapse toggles
+    detailPanel.querySelectorAll(".finding-collapse-toggle").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const idx = btn.dataset.collapseToggle;
+        const collapsible = detailPanel.querySelector(`[data-collapsible="${idx}"]`);
+        const isOpen = collapsible.classList.toggle("open");
+        btn.classList.toggle("open", isOpen);
+        const label = btn.querySelector(".toggle-icon").nextSibling;
+        if (label) {
+          const finding = tasks[currentTaskIdx].review?.findings?.[parseInt(idx)];
+          const hasBoth = finding?.code && finding?.suggestion;
+          label.textContent = isOpen
+            ? (hasBoth ? "Hide details" : finding?.code ? "Hide code" : "Hide suggestion")
+            : (hasBoth ? "Show details" : finding?.code ? "Show code" : "Show suggestion");
+        }
+      });
+    });
   }
 
   // Tab switching — click + keyboard

@@ -295,11 +295,19 @@ export function generateTasksFromGroups(reportsDir, sid) {
     });
   }
 
+  // Read graph-data for metadata
+  const graphDataPath = path.join(sessionDir, "graph-data.json");
+  let graphMeta = { projectDir: null, totalFiles: 0 };
+  if (fs.existsSync(graphDataPath)) {
+    const gd = JSON.parse(fs.readFileSync(graphDataPath, "utf-8"));
+    graphMeta = { projectDir: gd.projectDir || null, totalFiles: gd.totalFiles || 0 };
+  }
+
   // Write project-map.yaml
   writeYaml(path.join(sessionDir, "project-map.yaml"), {
-    projectDir: groups.projectDir || null,
-    totalFiles: groups.totalFiles || tasks.reduce((sum, t) => sum, 0),
-    scannedFiles: groups.totalFiles || 0,
+    projectDir: graphMeta.projectDir,
+    totalFiles: graphMeta.totalFiles,
+    scannedFiles: graphMeta.totalFiles,
     excludedDirs: [],
     groups: groups.map((g, i) => ({
       id: `group-${String(i + 1).padStart(3, "0")}`,

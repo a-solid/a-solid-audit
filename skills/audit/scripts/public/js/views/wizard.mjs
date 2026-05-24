@@ -1,6 +1,6 @@
 // skills/audit/scripts/public/js/views/wizard.mjs
 import { api } from "../api.mjs";
-import { showToast, setBreadcrumb, icon, escapeHtml, initTabKeyboard } from "../app.mjs";
+import { showToast, setBreadcrumb, icon, escapeHtml, initTabKeyboard, onNavigateCleanup } from "../app.mjs";
 import { renderFileTree } from "../components/file-tree.mjs";
 import { renderScopeFileTree } from "../components/scope-file-tree.mjs";
 
@@ -446,7 +446,7 @@ export async function renderWizard(container, params) {
         <button id="group-confirm-btn" class="btn btn-primary" disabled>Confirm Groups ${icon("check", 14)}</button>
       </div>`;
 
-    document.getElementById("group-back").addEventListener("click", () => { step = 2; save(); render(); });
+    document.getElementById("group-back").addEventListener("click", () => { if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; } step = 2; save(); render(); });
 
     let groups = null;
     let pollTimer = null;
@@ -578,6 +578,9 @@ export async function renderWizard(container, params) {
 
     // Start by polling
     pollForGroups();
+
+    // Cleanup poll timer on navigation
+    onNavigateCleanup(() => { if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; } });
   }
 
   function renderProjectReady() {

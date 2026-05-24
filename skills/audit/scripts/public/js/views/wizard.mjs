@@ -1,6 +1,6 @@
 // skills/audit/scripts/public/js/views/wizard.mjs
 import { api } from "../api.mjs";
-import { showToast, setBreadcrumb, icon, escapeHtml } from "../app.mjs";
+import { showToast, setBreadcrumb, icon, escapeHtml, initTabKeyboard } from "../app.mjs";
 import { renderFileTree } from "../components/file-tree.mjs";
 import { renderScopeFileTree } from "../components/scope-file-tree.mjs";
 
@@ -13,6 +13,116 @@ function formatScopeDisplay(method, ref) {
   }
   if (method === "branch" && ref) return ref;
   return `${method}${ref ? " " + ref : ""}`;
+}
+
+function renderCodegraphStatus(containerId, projectDir) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+
+  const dir = projectDir || "";
+  if (!dir) {
+    el.innerHTML = `
+      <div class="codegraph-status-card codegraph-unavail">
+        <div class="codegraph-info">
+          <div class="codegraph-title">${icon("info", 16)} CodeGraph</div>
+          <div class="codegraph-detail">Enter a project directory to check CodeGraph status.</div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="codegraph-status-card codegraph-loading">
+      <div class="codegraph-info">
+        <div class="codegraph-title"><span class="spinner spinner-sm"></span> Checking CodeGraph...</div>
+      </div>
+    </div>`;
+
+  api.getCodegraphStatus(dir).then(status => {
+    if (status.available && status.indexed) {
+      el.innerHTML = `
+        <div class="codegraph-status-card codegraph-ready">
+          <div class="codegraph-info">
+            <div class="codegraph-title">${icon("check", 16)} CodeGraph — Ready</div>
+            <div class="codegraph-detail">${status.fileCount || 0} files, ${status.symbolCount || 0} symbols indexed</div>
+          </div>
+          <button id="codegraph-reindex-btn" class="btn btn-sm">Re-index</button>
+        </div>`;
+      document.getElementById("codegraph-reindex-btn")?.addEventListener("click", async () => {
+        const btn = document.getElementById("codegraph-reindex-btn");
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner spinner-sm"></span> Indexing...';
+        try {
+          await api.initCodegraph(dir);
+          renderCodegraphStatus(containerId, dir);
+        } catch (e) {
+          showToast("Re-index failed: " + e.message);
+          btn.disabled = false;
+          btn.textContent = "Re-index";
+        }
+      });
+    } else if (status.available && !status.initialized) {
+      el.innerHTML = `
+        <div class="codegraph-status-card codegraph-uninit">
+          <div class="codegraph-info">
+            <div class="codegraph-title">${icon("alertTriangle", 16)} CodeGraph — Not Initialized</div>
+            <div class="codegraph-detail">CLI detected but no index found.</div>
+          </div>
+          <button id="codegraph-init-btn" class="btn btn-primary btn-sm">Initialize & Index</button>
+        </div>`;
+      document.getElementById("codegraph-init-btn")?.addEventListener("click", async () => {
+        const btn = document.getElementById("codegraph-init-btn");
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner spinner-sm"></span> Indexing...';
+        try {
+          await api.initCodegraph(dir);
+          renderCodegraphStatus(containerId, dir);
+        } catch (e) {
+          showToast("Init failed: " + e.message);
+          btn.disabled = false;
+          btn.textContent = "Initialize & Index";
+        }
+      });
+    } else if (status.available && status.initialized && !status.indexed) {
+      el.innerHTML = `
+        <div class="codegraph-status-card codegraph-uninit">
+          <div class="codegraph-info">
+            <div class="codegraph-title">${icon("alertTriangle", 16)} CodeGraph — Needs Indexing</div>
+            <div class="codegraph-detail">Initialized but not yet indexed.</div>
+          </div>
+          <button id="codegraph-index-btn" class="btn btn-primary btn-sm">Run Index</button>
+        </div>`;
+      document.getElementById("codegraph-index-btn")?.addEventListener("click", async () => {
+        const btn = document.getElementById("codegraph-index-btn");
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner spinner-sm"></span> Indexing...';
+        try {
+          await api.initCodegraph(dir);
+          renderCodegraphStatus(containerId, dir);
+        } catch (e) {
+          showToast("Index failed: " + e.message);
+          btn.disabled = false;
+          btn.textContent = "Run Index";
+        }
+      });
+    } else {
+      el.innerHTML = `
+        <div class="codegraph-status-card codegraph-unavail">
+          <div class="codegraph-info">
+            <div class="codegraph-title">${icon("x", 16)} CodeGraph — Not Available</div>
+            <div class="codegraph-detail">CLI not found. Will use basic file scan.</div>
+          </div>
+        </div>`;
+    }
+  }).catch(() => {
+    el.innerHTML = `
+      <div class="codegraph-status-card codegraph-unavail">
+        <div class="codegraph-info">
+          <div class="codegraph-title">${icon("x", 16)} CodeGraph — Error</div>
+          <div class="codegraph-detail">Failed to check status.</div>
+        </div>
+      </div>`;
+  });
 }
 
 export async function renderWizard(container, params) {
@@ -99,7 +209,7 @@ export async function renderWizard(container, params) {
   function render() {
     setBreadcrumb([
       { label: "Sessions", href: "#/home" },
-      { label: "New Audit" },
+      { label: isNew ? "New Audit" : "Configure Audit" },
     ]);
 
     const totalSteps = reviewType === "all" ? 4 : 3;
@@ -147,24 +257,21 @@ export async function renderWizard(container, params) {
       <div class="card mb-4">
         <h2 class="font-semibold mb-4">Choose Review Type</h2>
         <div class="grid grid-cols-3 gap-4">
-          <div class="card card-clickable ${reviewType === "code" ? "selected" : ""}" data-type="code"
-               style="${reviewType === "code" ? "border-color:var(--accent);background:var(--accent-dim);box-shadow:inset 0 0 0 1px var(--border-accent)" : ""}">
+          <div class="card card-clickable ${reviewType === "code" ? "selected" : ""}" data-type="code">
             <div class="flex items-center gap-2 mb-2">
               ${icon("eye", 20)}
               <span class="font-medium">Code Review Only</span>
             </div>
             <div class="text-sm text-secondary">Review code changes for quality, security, and best practices.</div>
           </div>
-          <div class="card card-clickable ${reviewType === "all" ? "selected" : ""}" data-type="all"
-               style="${reviewType === "all" ? "border-color:var(--accent);background:var(--accent-dim);box-shadow:inset 0 0 0 1px var(--border-accent)" : ""}">
+          <div class="card card-clickable ${reviewType === "all" ? "selected" : ""}" data-type="all">
             <div class="flex items-center gap-2 mb-2">
               ${icon("clipboard", 20)}
               <span class="font-medium">Code + Story Alignment</span>
             </div>
             <div class="text-sm text-secondary">Also check that code changes align with story requirements.</div>
           </div>
-          <div class="card card-clickable ${reviewType === "project" ? "selected" : ""}" data-type="project"
-               style="${reviewType === "project" ? "border-color:var(--accent);background:var(--accent-dim);box-shadow:inset 0 0 0 1px var(--border-accent)" : ""}">
+          <div class="card card-clickable ${reviewType === "project" ? "selected" : ""}" data-type="project">
             <div class="flex items-center gap-2 mb-2">
               ${icon("search", 20)}
               <span class="font-medium">Project Scan</span>
@@ -233,13 +340,7 @@ export async function renderWizard(container, params) {
             <input id="project-dir" class="mt-1" placeholder="/path/to/project">
             <div class="text-xs text-muted mt-1">Leave empty to scan the current project.</div>
           </div>
-          <div>
-            <label class="checkbox-toggle">
-              <input id="use-codegraph" type="checkbox" checked>
-              <span class="text-sm">Use CodeGraph (if available)</span>
-            </label>
-            <div class="text-xs text-muted mt-1" style="margin-left:46px">AST-level analysis for more accurate call chain discovery.</div>
-          </div>
+          <div id="codegraph-status"></div>
         </div>
 
         <div class="mt-4 border-t" style="border-color:var(--border)">
@@ -263,6 +364,7 @@ export async function renderWizard(container, params) {
     api.getSession(sessionId).then(session => {
       const dirInput = document.getElementById("project-dir");
       if (dirInput && session.projectDir) dirInput.value = session.projectDir;
+      renderCodegraphStatus("codegraph-status", session.projectDir || "");
     }).catch(() => {});
 
     api.getReviewContext(sessionId).then(data => {
@@ -288,6 +390,18 @@ export async function renderWizard(container, params) {
         ctxTimer = setTimeout(async () => {
           try { await api.setReviewContext(sessionId, ctxInput.value); } catch {}
         }, 300);
+      });
+    }
+
+    // Re-check codegraph status when directory changes
+    let cgTimer = null;
+    const dirInput = document.getElementById("project-dir");
+    if (dirInput) {
+      dirInput.addEventListener("input", () => {
+        clearTimeout(cgTimer);
+        cgTimer = setTimeout(() => {
+          renderCodegraphStatus("codegraph-status", dirInput.value.trim());
+        }, 500);
       });
     }
 
@@ -334,14 +448,14 @@ export async function renderWizard(container, params) {
 
         <div class="mt-4 info-banner info-banner-amber">
           ${icon("zap", 16)}
-          <span>Click "Start Scan" below. The scan will discover entry points and analyze your project.</span>
+          <span>Click "Prepare Scan" below, then navigate to the Progress page to start the actual scan.</span>
         </div>
       </div>
       <div class="flex justify-between">
         <button id="project-ready-back" class="btn btn-ghost">${icon("arrowLeft", 14)} Back</button>
         <button id="start-project-scan-btn" class="btn btn-primary">
           ${icon("search", 14)}
-          Start Scan
+          Prepare Scan
         </button>
       </div>`;
 
@@ -352,7 +466,6 @@ export async function renderWizard(container, params) {
       try {
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner spinner-sm"></span> Preparing...';
-        await api.updateSessionStatus(sessionId, "ready");
         localStorage.removeItem(`audit-wizard-${sessionId}`);
         // Show confirmation
         const content = document.getElementById("wizard-content");
@@ -360,7 +473,7 @@ export async function renderWizard(container, params) {
           <div class="card" style="text-align:center;padding:var(--space-8) var(--space-6)">
             <div style="margin-bottom:var(--space-4);color:var(--accent)">${icon("check", 48)}</div>
             <h2 class="text-xl mb-3">Scan Ready</h2>
-            <p class="text-secondary mb-4">The project scan will begin automatically when you view progress.</p>
+            <p class="text-secondary mb-4">The project scan will begin when you view progress.</p>
             <div>
               <a href="#/progress/${sessionId}" class="btn btn-primary">${icon("search", 14)} View Progress</a>
             </div>
@@ -403,22 +516,8 @@ export async function renderWizard(container, params) {
         save();
         render();
       });
-      tab.addEventListener("keydown", (e) => {
-        const tabList = Array.from(scopeTabs.querySelectorAll(".tab"));
-        const idx = tabList.indexOf(tab);
-        if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
-          e.preventDefault();
-          const next = e.key === "ArrowRight"
-            ? tabList[(idx + 1) % tabList.length]
-            : tabList[(idx - 1 + tabList.length) % tabList.length];
-          next.focus();
-          next.click();
-        } else if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          tab.click();
-        }
-      });
     });
+    initTabKeyboard(scopeTabs);
 
     document.getElementById("step2-back").addEventListener("click", () => { step = 1; save(); render(); });
     document.getElementById("step2-confirm").addEventListener("click", async () => {
@@ -937,8 +1036,7 @@ export async function renderWizard(container, params) {
       try {
         btn.disabled = true;
         btn.innerHTML = `<span class="spinner spinner-sm"></span> Preparing...`;
-        await api.updateSessionStatus(sessionId, "ready");
-        localStorage.removeItem(savedKey);
+        localStorage.removeItem(`audit-wizard-${sessionId}`);
         // Show confirmation instead of navigating away
         const content = document.getElementById("wizard-content");
         content.innerHTML = `

@@ -74,6 +74,12 @@ export async function renderProgress(container, params) {
       if (phase === "scanning") {
         heading.textContent = "Scanning Project";
         subtitle.textContent = "Discovering entry points and call chains...";
+      } else if (phase === "scanned") {
+        heading.textContent = "Scan Complete";
+        subtitle.textContent = "Ready for file grouping.";
+      } else if (phase === "grouping") {
+        heading.textContent = "Grouping Files";
+        subtitle.textContent = "AI is analyzing dependencies...";
       } else if (phase === "reviewing") {
         heading.textContent = "AI Review in Progress";
         subtitle.textContent = "Reviewing scanned entry points.";
@@ -136,7 +142,7 @@ export async function renderProgress(container, params) {
       const scanStatusEl = document.getElementById("scan-status");
       const startBtn = document.getElementById("start-scan-btn");
 
-      if (session.type === "project" && (session.status === "created" || session.status === "scanning")) {
+      if (session.type === "project" && ["created", "scanning", "scanned", "grouping"].includes(session.status)) {
         scanOverlay.classList.remove("hidden");
         updateHeading(true, "scanning");
         document.getElementById("task-list").innerHTML = "";
@@ -145,7 +151,19 @@ export async function renderProgress(container, params) {
         document.getElementById("progress-fill").style.width = "0%";
         document.getElementById("session-badge").innerHTML = `<span class="badge badge-${escapeHtml(session.status)}">${escapeHtml(session.status)}</span>`;
 
-        if (session.status === "scanning") {
+        if (session.status === "scanned") {
+          startBtn.classList.add("hidden");
+          scanStatusEl.classList.remove("hidden");
+          scanStatusEl.textContent = "Scan complete. Go to the wizard to group files and confirm.";
+          updateHeading(true, "scanned");
+          document.getElementById("session-badge").innerHTML = `<span class="badge badge-scanned">scanned</span>`;
+        } else if (session.status === "grouping") {
+          startBtn.classList.add("hidden");
+          scanStatusEl.classList.remove("hidden");
+          scanStatusEl.textContent = "AI is analyzing dependencies and grouping files...";
+          updateHeading(true, "grouping");
+          document.getElementById("session-badge").innerHTML = `<span class="badge badge-grouping">grouping</span>`;
+        } else if (session.status === "scanning") {
           startBtn.classList.add("hidden");
           scanStatusEl.classList.remove("hidden");
           try {

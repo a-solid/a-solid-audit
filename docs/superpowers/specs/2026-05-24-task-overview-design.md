@@ -1,5 +1,7 @@
 # Task Overview — 调用链路概览与前端展示
 
+> **注意**：本文档已被 `2026-05-24-project-scan-design.md`（Redesign）吸收。YAML schema、入口识别规则、前端展示等内容已整合到主设计文档中。本文档保留供参考，以主设计文档为准。
+
 ## 概述
 
 为 Project Task YAML 新增 `type`、`entry`、`overview` 字段，在 AI sub-agent 审阅时自动生成调用链路图（Mermaid）和执行流程描述，前端 task 详情页展示概览区域。

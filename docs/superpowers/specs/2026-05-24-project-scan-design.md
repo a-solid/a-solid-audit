@@ -1,263 +1,400 @@
-# Project Scan — 项目级安全与业务逻辑扫描
+# Project Scan — 项目级安全与业务逻辑扫描（Redesign）
+
+> 覆盖 2026-05-24 旧版设计文档。旧版保留在 git 历史中供参考。
 
 ## 概述
 
-在现有 A-Solid Audit 系统中新增 `project-scan` 审计类型，对整个项目进行安全、业务逻辑、代码质量的全量扫描。区别于现有的基于 git diff 的逐文件审查，project-scan 从项目入口出发，追踪完整调用链，进行深度业务逻辑审查。
+在 A-Solid Audit 系统中新增 `project` 审计类型。从项目入口出发，利用 CodeGraph（可选）进行 AST 级调用链追踪，对每个入口的完整调用链做深度安全与业务逻辑审查。
 
-## 1. Session 类型扩展
+**核心简化**：旧版三阶段模型（知识生成 → 逐入口审查 → 横向关联审查）改为两阶段模型（Scan → Review），移除独立的知识生成和横向审查子代理，将共享上下文注入各任务的审查提示中。
 
-### 新增类型
-
-```
-Session types: code | all | project-scan
-```
+## 1. 架构：两阶段模型
 
 ### 状态机
 
-保持不变：`created -> scoped -> ready -> reviewing -> completed`
-
-`scoped` 阶段行为差异：
-- `code`/`all`：基于 git diff 生成 task
-- `project-scan`：基于项目目录结构 + 入口识别生成 task
-
-### 数据模型变更
-
-**`index.yaml` 新增字段**：
-```yaml
-session:
-  id: "..."
-  type: project-scan
-  status: "..."
-  projectDir: "/path/to/project"  # 外部项目路径，为空则用当前仓库
-  created: "..."
-projectTasks:
-  - file: "project-tasks/<entry-name>.yaml"
-    status: pending | reviewing | reviewed
+```
+created → scanning → ready → reviewing → completed
 ```
 
-**新增目录**：`project-tasks/` 存放项目扫描 task YAML
+| From | To | Trigger |
+|------|----|---------|
+| created | scanning | 用户点击 "Start Scan" |
+| scanning | ready | 扫描完成，入口已发现 |
+| ready | reviewing | 第一个 task 审查开始 |
+| reviewing | completed | 所有 task 审查完成 |
 
-### Project Task YAML 结构
+`resetReviewing()` 支持 `reviewing → ready` 恢复路径。
+
+### 阶段 1: Scan（扫描）
+
+服务器端执行，无需 AI 介入：
+
+1. **CodeGraph 索引**（可选）：`codegraph init -i && codegraph index`
+2. **入口发现**：框架路由检测 + 启发式路径匹配
+3. **调用链追踪**：CodeGraph `callees` 或正则 import 解析
+4. **覆盖率分析**：CodeGraph `impact` 检测孤立文件
+5. **Task 生成**：每个入口生成一个 project-task YAML
+
+### 阶段 2: Review（审查）
+
+AI sub-agent 逐任务审查：
+
+1. 读取任务关联的所有源文件
+2. 接收预生成的调用链信息和共享上下文
+3. 执行安全、业务逻辑、错误处理审查
+4. 生成 `overview`（Mermaid 图 + 描述）和 `review`（评分、发现、亮点、缺口）
+5. POST 结果回 API
+
+### 共享上下文注入
+
+替代独立的横向审查阶段。扫描阶段一次性提取：
+
+- 认证模式（如 "项目使用 JWT bearer token 认证"）
+- 数据库访问模式（如 "所有数据库访问通过 `lib/database.mjs`"）
+- 共享工具函数
+
+作为头部块注入每个 sub-agent 的审查提示中。
+
+## 2. CodeGraph CLI 集成
+
+### 概述
+
+CodeGraph 是可选的 AST 级代码分析工具，提供精确的调用链追踪。未安装时回退到启发式规则。
+
+### 扫描集成
+
+| 步骤 | CodeGraph 可用 | CodeGraph 不可用 |
+|------|---------------|-----------------|
+| 项目结构 | `codegraph files --json` | `fs.readdir` 递归扫描 |
+| 入口发现 | 框架路由检测 + `callers` | 启发式路径匹配 |
+| 调用链追踪 | `codegraph callees <file> --depth 5 --json` | 正则匹配 `import/require`（1 层）|
+| 覆盖率 | `codegraph impact <file> --json` | 无覆盖率检查 |
+
+### 检测逻辑
+
+```javascript
+async function detectCodeGraph() {
+  try {
+    const version = execSync("codegraph --version", { timeout: 5000 }).toString().trim();
+    return { available: true, version };
+  } catch {
+    return { available: false };
+  }
+}
+```
+
+### 入口发现详细流程
+
+1. **API 入口**：
+   - CodeGraph 检测 Express/Koa/Fastify 等框架路由
+   - 启发式回退：匹配 `handler|controller|route|api|endpoint` 路径关键词
+
+2. **定时任务入口**：
+   - 匹配 `cron|job|scheduler|task` 路径/文件名关键词
+
+3. **消费者入口**：
+   - 匹配 `consumer|subscriber|worker|queue|listener` 路径/文件名关键词
+
+4. **脚本入口**：
+   - 匹配 `script|bin|cli|migration` 路径/文件名关键词
+   - 检查 `package.json` 的 `bin` 字段
+
+5. **未知文件**：
+   - 不匹配以上任何模式的文件归入 `unknown` 类型
+
+### 调用链追踪
+
+CodeGraph 可用时：
+
+```
+codegraph callees <entry-file> --depth 5 --json
+```
+
+输出每个入口的完整调用树，用于填充 `files[]` 列表。
+
+仅启发式时：正则匹配 `import X from './xxx'`、`require('./xxx')`，只追踪相对路径，一层深度。
+
+### 覆盖率分析
+
+CodeGraph 可用时，使用 `impact` 检测未被任何入口覆盖的孤立文件，归入 `unknown` 类型任务。
+
+### 日志
+
+```
+[scan] CodeGraph v0.x.x detected — using AST-level analysis
+```
+
+或
+
+```
+[scan] CodeGraph not found — using heuristic fallback
+```
+
+## 3. 数据模型
+
+### index.yaml
 
 ```yaml
-name: "POST /api/users/create"
-type: api | scheduled | consumer | script
+session:
+  id: "abc123"
+  type: "project"                    # "code" | "story" | "project"
+  status: "scanning"                 # created | scanning | ready | reviewing | completed
+  projectDir: "/path/to/project"     # project 类型专用，替代 scope
+  created: "2026-05-24T10:00:00Z"
+
+codeTasks: []                        # 不变
+storyTasks: []                       # 不变
+projectTasks:                        # 必须在 writeIndexYaml 中正确写入
+  - file: "project-tasks/user-management.yaml"
+    type: api
+    entry: "scripts/server/handlers/users.mjs"
+    status: pending
+```
+
+### Project Task YAML
+
+```yaml
+name: "user-management"
+type: api                              # api | scheduled | consumer | script | unknown
 entry: "scripts/server/handlers/users.mjs"
 files:
   - "scripts/server/handlers/users.mjs"
   - "scripts/lib/user-service.mjs"
-  - "scripts/lib/db.mjs"
-status: pending | reviewing | reviewed
+  - "scripts/lib/database.mjs"
+status: pending                        # pending | reviewing | reviewed
+_callChain: "graph TD\n  A[users.mjs] --> B[user-service.mjs]"  # 内部数据，审查后删除
+overview:                              # 审查阶段填充
+  diagram: ""
+  description: ""
 review:
-  score: 0-10
-  summary: "..."
-  findings:
-    - severity: critical | major | minor | info
-      category: security | bug | logic | performance | best-practice
-      description: "..."
-      file: "path"
-      line: 42
-      code: "snippet"
-      suggestion: "fix"
-  positives: ["..."]
+  score: 0
+  summary: ""
+  findings: []
+  positives: []
+  gaps: []
 ```
 
-与 code-task 相比，新增 `type`（入口类型）、`entry`（入口文件）、`files`（调用链文件列表）和 `category`（发现分类）。
+### 目录结构
 
-### Review Context 扩展
-
-`review-context.md` 新增 `## Project Knowledge` 部分：
-
-```markdown
-## User Context
-<用户提供的项目背景>
-
-## Project Knowledge
-<!-- AI 自动生成并持续补充 -->
-- **技术栈**: ...
-- **架构模式**: ...
-- **关键模块**: ...
-- **数据流概览**: ...
-
-## Review Notes
-<!-- Subagent 交叉引用笔记 -->
+```
+reports/<session-id>/
+  index.yaml
+  code-tasks/
+  story-tasks/
+  project-tasks/                       # 新增
+    user-management.yaml
+    order-processing.yaml
+    ...
 ```
 
-## 2. 扫描流程 — 入口识别与 Task 拆分
+### 关键 Bug 修复
 
-### 整体流程
+以下现有 bug 必须修复：
 
-入口驱动的 task 拆分方案。从各种调用入口串联所有被引用的类和代码，形成一个 task。
+1. **`writeIndexYaml()`**：必须写入 `projectTasks`，当前静默丢弃
+2. **`listSessions()` / `getSession()`**：必须聚合三个 task 数组，当前显示 0/0
+3. **`initSession()`**：必须创建 `project-tasks/` 目录
+4. **`createSession()`**：必须接受 `type` 参数，当前硬编码 `"code"`
+5. **`resetReviewing()`**：必须迭代 `["codeTasks", "storyTasks", "projectTasks"]`
 
-**步骤**：
+### 向后兼容
 
-1. **目录结构扫描**：读取项目目录树，识别后端/数据库/脚本文件，排除噪音目录（node_modules, .git, dist, build, vendor, __pycache__ 等）
-2. **入口识别**：AI agent 分析项目结构，识别所有调用入口：
-   - API 路由（HTTP endpoints）
-   - 定时任务 / Cron jobs
-   - 消息队列消费者
-   - 脚本入口（CLI commands, main 函数）
-   - 数据库触发器 / 存储过程
-3. **调用链追踪**：对每个入口，沿 import/require/调用关系追踪所有涉及的文件
-4. **Task 生成**：每个入口 + 其调用链文件组合 = 一个 project-task
-5. **覆盖率报告**：识别未被任何 task 覆盖的文件，作为"未覆盖文件"列出
+- `projectTasks` 默认 `[]`，旧 session 不受影响
+- `session.type` 默认 `"code"`，旧 session 继续工作
+- `projectDir` 仅 project 类型使用
 
-**关键决策**：
-- 入口识别和调用链追踪由 AI agent 在 `setScope` 阶段执行（需要代码语义理解）
-- Task 拆分结果写入 `project-tasks/` 目录
-- 大项目（>50 个入口）支持用户在 UI 上选择要扫描的入口范围
+## 4. Sub-agent 编排协议
 
-### Wizard 步骤（project-scan 专用）
+### 审查触发
 
-| 步骤 | 内容 |
+Session 状态为 `ready` 时，前端展示 task 列表。每个 task 独立审查。
+
+### Sub-agent 输入
+
+1. **任务 YAML**：files 列表、type、entry
+2. **源文件内容**：所有 `files[]` 条目的完整源码
+3. **调用链信息**：`_callChain` 中的 Mermaid 源码（扫描阶段预生成）
+4. **共享上下文头部块**：认证模式、数据库访问模式、共享工具函数
+
+### Sub-agent 输出
+
+```json
+{
+  "status": "reviewed",
+  "score": 7,
+  "review": {
+    "summary": "...",
+    "findings": [],
+    "positives": [],
+    "gaps": []
+  },
+  "overview": {
+    "diagram": "graph TD\n  A --> B",
+    "description": "HTTP API 入口，接收用户请求..."
+  }
+}
+```
+
+### 服务端处理
+
+1. 验证状态转换（pending → reviewed）
+2. 写入 review + overview 到 task YAML
+3. 移除 `_callChain` 内部字段
+4. 更新 `index.yaml` — 所有 task reviewed 则设 `completed`
+
+### 并发
+
+每个 task 是独立 YAML 文件，理论上可并行审查。但 sub-agent 串行执行更简单可靠，作为默认行为。
+
+### 错误处理
+
+| 场景 | 行为 |
 |------|------|
-| 1. 选择类型 | 选择 `project-scan` |
-| 2. 选择项目 | 当前仓库 或 输入外部目录路径 |
-| 3. 提供背景 | 文本输入 + URL 输入（AI 抓取内容，可选） |
-| 4. 确认范围 | 展示识别出的入口列表 + 未覆盖文件，用户可排除 |
-| 5. 启动扫描 | 进入 reviewing 状态 |
+| Sub-agent 中途崩溃 | Task 保持 pending，可重试 |
+| Review 提交失败 | 重试一次，然后告警 |
+| 源文件读取失败 | Sub-agent 在 findings 中报告，继续审查可读文件 |
+| CodeGraph 未安装 | 使用启发式回退，不报错 |
 
-## 3. AI 审查流程与 Subagent 编排
+## 5. API 端点
 
-### 阶段 1：项目知识生成
-
-一个专用 subagent：
-- 读取项目背景信息和目录结构
-- 生成项目知识摘要写入 `review-context.md` 的 `## Project Knowledge` 部分
-- 内容：技术栈、架构模式、关键模块、数据流概览、已知风险点
-
-### 阶段 2：逐入口深度审查
-
-对每个 `project-task`，dispatch 一个 subagent：
-- 读取 `review-context.md`（项目知识 + 用户背景）
-- 读取 task 关联的所有源文件（完整源码，不仅是 diff）
-- 按需调用数据库 skill 获取存储过程定义
-- 审查维度：安全漏洞、业务逻辑 Bug、性能问题、异常处理、数据一致性
-- 结果 POST 回 API
-- 补充 `review-context.md` 的 Review Notes 和 Project Knowledge
-
-### 阶段 3：横向关联审查
-
-所有入口审查完成后，一个汇总 subagent：
-- 读取所有 task 审查结果
-- 识别入口间关联关系（共享数据、调用依赖、状态流转）
-- 发现跨入口业务逻辑问题（数据不一致、缺失校验、竞态条件）
-- 生成 `cross-cutting-review.yaml` 作为特殊 project-task
-
-### 与现有流程的关系
-
-- 审查结果通过 `POST /api/sessions/:id/project-tasks/:name/review` 提交
-- 前端 progress 视图沿用轮询机制
-- `review-context.md` 持续积累知识，后续 task 审查质量递增
-
-## 4. 数据库连接 Skill
-
-### 概述
-
-独立的 Claude Code skill（`/audit-db-connect`），供 AI agent 在审查过程中按需调用。
-
-### 功能
-
-- 获取存储过程定义
-- 查询表结构和索引
-- 分析 SQL 性能（慢查询、全表扫描等）
-- 支持数据库：MySQL / PostgreSQL / SQL Server
-
-### 配置
-
-连接信息通过 wizard 中的配置步骤或环境变量提供：
-- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_TYPE`
-
-### 实现方式
-
-遵循项目零依赖原则，通过 AI agent 调用系统已安装的数据库 CLI 工具：
-- MySQL: `mysql` CLI
-- PostgreSQL: `psql` CLI
-- SQL Server: `sqlcmd` CLI
-
-Skill 提供标准化的查询接口，agent 通过 Bash 工具执行 CLI 命令获取结果。无需安装 npm 依赖。
-
-### 输出
-
-数据库相关发现归入 `category: performance` 或 `category: security`，写入对应 project-task 的 findings。
-
-## 5. 前端集成
-
-### Wizard
-
-新增 `project-scan` 类型的 wizard 流程（4 步），复用现有 wizard 组件模式：
-- 步骤 2：目录选择器（当前仓库 / 外部路径输入）
-- 步骤 3：背景输入区（文本框 + URL 输入框，AI 抓取 URL 内容后精简整合到 review-context）
-- 步骤 4：入口列表展示（checkbox tree，可排除）
-
-### Progress
-
-复用现有 progress 视图，增加状态提示：
-- "正在生成项目知识..."
-- "正在审查入口 (3/15)..."
-- "正在执行横向关联审查..."
-
-### Review
-
-复用现有 review 视图，增加：
-- Task 详情展示增加 `category` 彩色标签
-- 横向审查结果单独展示
-- 入口类型图标（API / 定时任务 / 消费者 / 脚本）
-
-### Summary
-
-复用现有 summary 视图，统计增加：
-- 按 category 分布的图表
-- 项目知识概览部分
-- 横向关联审查摘要
-
-## 6. PDF 导出
-
-沿用现有 `print.html` 方式，增加：
-- 项目概览部分（项目知识摘要）
-- 按 category 分组的发现汇总
-- 横向关联审查结果
-- 入口类型标注
-
-## 7. API 新增端点
+### 新增端点
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| POST | `/api/sessions/:id/project-scan/scope` | 设置项目扫描范围（目录 + 入口识别）|
-| GET | `/api/sessions/:id/project-scan/entries` | 获取识别出的入口列表 |
-| PUT | `/api/sessions/:id/project-scan/entries` | 用户确认/排除入口 |
-| GET | `/api/sessions/:id/project-tasks` | 获取项目扫描 task 列表 |
-| GET | `/api/sessions/:id/project-tasks/:name` | 获取单个 project-task 详情 |
-| POST | `/api/sessions/:id/project-tasks/:name/review` | 提交 project-task 审查结果 |
+| POST | `/api/sessions/:id/scan` | 启动扫描（CodeGraph 索引 + 入口发现）|
+| GET | `/api/sessions/:id/scan/status` | 轮询扫描进度 |
+
+### 修改端点
+
+| Method | Path | 变更 |
+|--------|------|------|
+| POST | `/api/sessions` | 接受 `type`（`code`/`story`/`project`）和 `projectDir` |
+| GET | `/api/sessions/:id` | 包含 `projectTasks` 进度 |
+
+### 不变端点
+
+| Method | Path | 说明 |
+|--------|------|------|
+| POST | `/api/sessions/:id/tasks/:file/review` | 已支持 `overview`，无需修改 |
+
+### Scan 端点详情
+
+```
+POST /api/sessions/:id/scan
+Response: { ok: true, tasksFound: 12, codegraphUsed: true }
+```
+
+扫描异步执行：
+1. 设置 session status 为 `scanning`
+2. 运行 CodeGraph 索引（或启发式回退）
+3. 发现入口，追踪调用链
+4. 在 `project-tasks/` 创建 task YAML 文件
+5. 更新 `index.yaml` 的 `projectTasks`
+6. 设置 session status 为 `ready`
+
+客户端轮询 `GET /api/sessions/:id/scan/status` 获取进度。
+
+## 6. 前端变更
+
+### Review 视图 — Scan 按钮
+
+project 类型 session 在 `created` 状态显示 "Start Scan" 按钮。点击触发 `POST /api/sessions/:id/scan`，轮询完成。
+
+### Review 视图 — Task 列表
+
+在 progress 视图中，task name 旁显示入口类型图标：
+
+```
+[API]  user-management     7/10  reviewed
+[Cron] daily-cleanup       -     pending
+[Consumer] order-processor -     pending
+```
+
+### Task Detail（已实现）
+
+当前 `task-detail.mjs` 已正确渲染：
+- 入口类型 badge（颜色对应 `ENTRY_TYPES`）
+- Mermaid 图表（`encodeURIComponent`/`decodeURIComponent`）
+- 描述文本
+
+无需修改。
+
+### Summary / Overview
+
+不变。
+
+## 7. CodeGraph 安装
+
+### 自动安装脚本
+
+提供 `scripts/setup-codegraph.sh`：
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+INSTALL_DIR="${HOME}/.local/bin"
+REPO_DIR=$(mktemp -d)
+
+echo "==> Installing CodeGraph..."
+
+git clone https://github.com/colbymchenry/codegraph.git "$REPO_DIR"
+cd "$REPO_DIR"
+npm install && npm run build
+
+mkdir -p "$INSTALL_DIR"
+ln -sf "$(pwd)/bin/codegraph" "$INSTALL_DIR/codegraph"
+
+if command -v codegraph &>/dev/null; then
+  echo "==> CodeGraph installed: $(codegraph --version)"
+else
+  echo "==> Add $INSTALL_DIR to your PATH"
+fi
+
+rm -rf "$REPO_DIR"
+```
+
+### 手动安装
+
+```bash
+git clone https://github.com/colbymchenry/codegraph.git
+cd codegraph
+npm install && npm run build
+npm link
+codegraph --version
+```
+
+### 可选性
+
+CodeGraph 是可选依赖。未安装时 project scan 使用启发式规则工作，仅调用链追踪精度较低。
 
 ## 8. 文件影响范围
 
 ### 新增文件
 
-- `skills/audit/scripts/server/handlers/project-scan.mjs` — project-scan API handler
-- `skills/audit/scripts/lib/project-scan.mjs` — project-scan 业务逻辑（目录扫描、入口识别、调用链追踪）
-- `skills/audit/prompts/project-review.md` — 项目扫描 AI prompt 模板
-- `skills/audit/prompts/cross-cutting-review.md` — 横向关联审查 AI prompt 模板
-- `skills/audit/scripts/public/js/views/wizard-project-scan.mjs` — project-scan wizard 视图
-- `skills/audit/scripts/public/js/components/entry-tree.mjs` — 入口选择树组件
-- `skills/db-connect/SKILL.md` — 数据库连接 skill 定义
-- `skills/db-connect/scripts/connect.mjs` — 数据库连接脚本
+- `skills/audit/scripts/lib/project-scan.mjs` — 扫描逻辑（CodeGraph CLI + 启发式回退）
+- `skills/audit/scripts/server/handlers/project-scan.mjs` — scan API handler
+- `skills/audit/prompts/project-review.md` — 项目审查 AI prompt 模板
+- `scripts/setup-codegraph.sh` — CodeGraph 安装脚本
 
 ### 修改文件
 
-- `skills/audit/SKILL.md` — 增加 project-scan 类型支持
-- `skills/audit/scripts/server/router.mjs` — 注册新路由
-- `skills/audit/scripts/server/index.mjs` — 加载新 handler
-- `skills/audit/scripts/lib/session.mjs` — 支持 `project-scan` 类型和 `projectDir` 字段
-- `skills/audit/scripts/lib/yaml.mjs` — 可能需要调整序列化
-- `skills/audit/scripts/lib/paths.mjs` — 支持外部项目目录路径解析
-- `skills/audit/scripts/public/js/app.mjs` — 注册 project-scan wizard 路由
-- `skills/audit/scripts/public/js/api.mjs` — 新增 API 调用方法
-- `skills/audit/scripts/public/js/views/wizard.mjs` — 增加 project-scan 类型选项
-- `skills/audit/scripts/public/js/views/progress.mjs` — 增加阶段状态提示
-- `skills/audit/scripts/public/js/views/review.mjs` — 增加 category 标签展示
-- `skills/audit/scripts/public/js/views/summary.mjs` — 增加 category 统计
-- `skills/audit/scripts/public/js/constants.mjs` — 增加 category 颜色/标签定义
-- `skills/audit/scripts/public/styles.css` — project-scan 相关样式
-- `skills/audit/scripts/public/print.html` — 增加 project-scan 打印内容
-- `.claude-plugin/plugin.json` — 注册 db-connect skill
+- `skills/audit/scripts/lib/session.mjs` — 5 个 bug 修复（writeIndexYaml、listSessions、getSession、initSession、createSession、resetReviewing）
+- `skills/audit/scripts/lib/yaml.mjs` — `writeIndexYaml()` 写入 projectTasks
+- `skills/audit/scripts/lib/task.mjs` — getTasks/getTask/updateTask 已支持 projectTasks
+- `skills/audit/scripts/server/handlers/reviews.mjs` — 已支持 overview
+- `skills/audit/scripts/server/router.mjs` — 注册 scan 路由
+- `skills/audit/scripts/public/js/views/progress.mjs` — 入口类型图标
+- `skills/audit/scripts/public/styles.css` — scan 按钮和进度样式
+
+### 不变文件
+
+- `skills/audit/scripts/public/js/components/task-detail.mjs` — 已完整实现
+- `skills/audit/scripts/public/js/constants.mjs` — 已包含 ENTRY_TYPES
+- `skills/audit/SKILL.md` — 后续实现时更新
+
+### 删除文件（旧设计引用）
+
+- `skills/audit/prompts/cross-cutting-review.md` — 不再需要，横向审查已移除
+- `skills/audit/scripts/public/js/components/entry-tree.mjs` — 简化后无需入口选择树
+- `skills/audit/scripts/public/js/views/wizard-project-scan.mjs` — 简化为 scan 按钮，不需要独立 wizard

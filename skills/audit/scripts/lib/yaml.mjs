@@ -265,16 +265,30 @@ export function writeStoryTaskYaml(filePath, data) {
   });
 }
 
-export function writeIndexYaml(filePath, data) {
+export function writeProjectTaskYaml(filePath, data) {
   writeYaml(filePath, {
-    session: {
-      id: data.session.id,
-      type: data.session.type,
-      status: data.session.status || "created",
-      scope: data.session.scope,
-      created: data.session.created,
-    },
+    name: data.name,
+    status: data.status || "pending",
+    type: data.type || "unknown",
+    entry: data.entry || null,
+    files: data.files || [],
+    review: data.review || { score: 0, summary: "", findings: [], positives: [] },
+  });
+}
+
+export function writeIndexYaml(filePath, data) {
+  const session = {
+    id: data.session.id,
+    type: data.session.type,
+    status: data.session.status || "created",
+    scope: data.session.scope,
+    created: data.session.created,
+  };
+  if (data.session.projectDir) session.projectDir = data.session.projectDir;
+  writeYaml(filePath, {
+    session,
     codeTasks: (data.codeTasks || data.tasks || []).map(t => ({ file: t.file, status: t.status })),
     storyTasks: (data.storyTasks || []).map(t => ({ file: t.file, status: t.status })),
+    projectTasks: (data.projectTasks || []).map(t => ({ file: t.file, status: t.status })),
   });
 }

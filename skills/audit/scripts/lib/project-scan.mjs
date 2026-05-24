@@ -194,7 +194,7 @@ export function collectGraphData(projectDir, reportsDir, sid) {
   for (const f of files) {
     const type = classifyEntryType(f.path);
     if (type !== "unknown") {
-      entryFiles.push({ path: f.path, entryType: type });
+      entryFiles.push({ path: f.path, type });
     }
   }
   pushLog(safeSid, "info", `collectGraphData: ${entryFiles.length} entry files identified`);

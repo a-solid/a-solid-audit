@@ -11,9 +11,6 @@ import { initTheme } from "./theme.mjs";
 
 initTheme();
 
-const settingsBtn = document.getElementById("header-settings-btn");
-if (settingsBtn) settingsBtn.innerHTML = icon("settings", 16);
-
 const container = document.getElementById("app");
 const breadcrumbEl = document.getElementById("breadcrumb");
 let currentCleanup = null;
@@ -57,6 +54,10 @@ export function icon(name, size = 16) {
   const path = ICONS[name] || ICONS.shield;
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
 }
+
+// Initialize header settings button after icon function is defined
+const settingsBtn = document.getElementById("header-settings-btn");
+if (settingsBtn) settingsBtn.innerHTML = icon("settings", 16);
 
 // ─── Notes Panel ───
 const notesPanelRoot = document.getElementById("notes-panel-root");

@@ -11,6 +11,7 @@ export async function renderProgress(container, params) {
   let lastReviewedCount = 0;
   let stableCount = 0;
   let scanStarted = false;
+  let logEventSource = null;
 
   setBreadcrumb([
     { label: "Sessions", href: "#/home" },
@@ -47,6 +48,12 @@ export async function renderProgress(container, params) {
       <h2 class="text-lg mb-2">Project Scan</h2>
       <p class="text-sm text-muted mb-4" style="max-width:400px;margin:0 auto">Discovering entry points and analyzing call chains. This may take a minute for large projects.</p>
       <div id="scan-status" class="text-sm text-muted mb-4 hidden"></div>
+      <div class="scan-log-section">
+        <button id="scan-log-toggle" class="scan-log-toggle">
+          <span class="toggle-icon">${icon("chevronRight", 10)}</span> Scan Log
+        </button>
+        <div id="scan-log-panel" class="scan-log-panel"></div>
+      </div>
       <button id="start-scan-btn" class="btn btn-primary">${icon("search", 14)} Start Scan</button>
     </div>
 
@@ -80,6 +87,44 @@ export async function renderProgress(container, params) {
     }
   }
 
+  function startLogStream() {
+    if (logEventSource) return;
+    const logPanel = document.getElementById("scan-log-panel");
+    const logToggle = document.getElementById("scan-log-toggle");
+    if (!logPanel) return;
+
+    logEventSource = new EventSource(`/api/sessions/${sessionId}/scan/logs`);
+
+    logEventSource.onmessage = (e) => {
+      try {
+        const entry = JSON.parse(e.data);
+        const div = document.createElement("div");
+        div.className = "scan-log-entry";
+        div.innerHTML = `<span class="log-time">${escapeHtml(entry.timestamp)}</span>${escapeHtml(entry.message)}`;
+        logPanel.appendChild(div);
+        logPanel.scrollTop = logPanel.scrollHeight;
+
+        // Auto-expand on first entry
+        if (!logPanel.classList.contains("open")) {
+          logPanel.classList.add("open");
+          if (logToggle) logToggle.classList.add("open");
+        }
+      } catch {}
+    };
+
+    logEventSource.onerror = () => {
+      logEventSource?.close();
+      logEventSource = null;
+    };
+  }
+
+  function stopLogStream() {
+    if (logEventSource) {
+      logEventSource.close();
+      logEventSource = null;
+    }
+  }
+
   async function poll() {
     try {
       const session = await api.getSession(sessionId);
@@ -107,6 +152,9 @@ export async function renderProgress(container, params) {
             const scanStatus = await api.getScanStatus(sessionId);
             scanStatusEl.textContent = scanStatus.progress || "Scanning...";
           } catch { scanStatusEl.textContent = "Scanning..."; }
+        } else if (session.status === "created") {
+          scanStatusEl.classList.remove("hidden");
+          scanStatusEl.textContent = "Press the button below to begin scanning.";
         }
 
         pollTimer = setTimeout(poll, 3000);
@@ -129,6 +177,7 @@ export async function renderProgress(container, params) {
         try {
           await api.startScan(sessionId);
           scanStatusEl.textContent = "Scanning in progress...";
+          startLogStream();
         } catch (e) {
           scanStatusEl.textContent = "Scan failed to start. Click below to retry.";
           startBtn.classList.remove("hidden");
@@ -232,6 +281,7 @@ export async function renderProgress(container, params) {
     try {
       await api.startScan(sessionId);
       scanStatusEl.textContent = "Scanning in progress...";
+      startLogStream();
       pollInterval = 3000;
       pollTimer = setTimeout(poll, pollInterval);
     } catch (e) {
@@ -261,8 +311,17 @@ export async function renderProgress(container, params) {
 
   await poll();
 
+  // Scan log toggle
+  document.getElementById("scan-log-toggle")?.addEventListener("click", () => {
+    const panel = document.getElementById("scan-log-panel");
+    const toggle = document.getElementById("scan-log-toggle");
+    panel?.classList.toggle("open");
+    toggle?.classList.toggle("open");
+  });
+
   // Cleanup on navigation
   onNavigateCleanup(() => {
     if (pollTimer) clearTimeout(pollTimer);
+    stopLogStream();
   });
 }

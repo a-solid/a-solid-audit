@@ -90,7 +90,9 @@ export async function renderWizard(container, params) {
     const totalSteps = reviewType === "all" ? 4 : 3;
     const stepLabels = reviewType === "all"
       ? ["Review Type", "Scope", "Stories", "Ready"]
-      : ["Review Type", "Scope", "Ready"];
+      : reviewType === "project"
+        ? ["Review Type", "Configure", "Ready"]
+        : ["Review Type", "Scope", "Ready"];
 
     container.innerHTML = `
       <h1 class="text-2xl mb-6">New Audit</h1>
@@ -114,10 +116,13 @@ export async function renderWizard(container, params) {
       <div id="wizard-content" class="wizard-content-enter"></div>
     `;
 
-    const actualStep = reviewType === "code" && step === 4 ? 3 : step;
-    if (actualStep === 1) renderStep1();
-    else if (actualStep === 2) renderStep2();
-    else if (actualStep === 3 && reviewType === "all") renderStep3();
+    if (step === 1) renderStep1();
+    else if (step === 2 && reviewType === "project") renderProjectConfigure();
+    else if (step === 2) renderStep2();
+    else if (step === 3 && reviewType === "project") renderProjectReady();
+    else if (step === 3 && reviewType === "all") renderStep3();
+    else if (step === 3 && reviewType === "code") renderStep4();
+    else if (step === 4) renderStep4();
     else renderStep4();
   }
 
@@ -126,7 +131,7 @@ export async function renderWizard(container, params) {
     content.innerHTML = `
       <div class="card mb-4">
         <h2 class="font-semibold mb-4">Choose Review Type</h2>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-3 gap-4">
           <div class="card card-clickable ${reviewType === "code" ? "selected" : ""}" data-type="code"
                style="${reviewType === "code" ? "border-color:var(--accent);background:var(--accent-dim);box-shadow:inset 0 0 0 1px var(--border-accent)" : ""}">
             <div class="flex items-center gap-2 mb-2">
@@ -143,6 +148,14 @@ export async function renderWizard(container, params) {
             </div>
             <div class="text-sm text-secondary">Also check that code changes align with story requirements.</div>
           </div>
+          <div class="card card-clickable ${reviewType === "project" ? "selected" : ""}" data-type="project"
+               style="${reviewType === "project" ? "border-color:var(--accent);background:var(--accent-dim);box-shadow:inset 0 0 0 1px var(--border-accent)" : ""}">
+            <div class="flex items-center gap-2 mb-2">
+              ${icon("search", 20)}
+              <span class="font-medium">Project Scan</span>
+            </div>
+            <div class="text-sm text-secondary">Full project security and quality audit.</div>
+          </div>
         </div>
       </div>
       <div class="flex justify-end">
@@ -150,13 +163,158 @@ export async function renderWizard(container, params) {
       </div>`;
 
     content.querySelectorAll("[data-type]").forEach(card => {
-      card.addEventListener("click", () => {
-        reviewType = card.dataset.type;
+      card.addEventListener("click", async () => {
+        const newType = card.dataset.type;
+        if (newType === "project" && reviewType !== "project") {
+          try {
+            const { id } = await api.createSession({ type: "project" });
+            localStorage.removeItem(savedKey);
+            location.hash = `#/wizard/${id}`;
+            return;
+          } catch (e) { showToast("Failed to create session: " + e.message); }
+        }
+        reviewType = newType;
         save();
         render();
       });
     });
     document.getElementById("step1-next").addEventListener("click", () => { step = 2; save(); render(); });
+  }
+
+  function renderProjectConfigure() {
+    const content = document.getElementById("wizard-content");
+    content.innerHTML = `
+      <div class="card mb-4">
+        <h2 class="font-semibold mb-4">Configure Project Scan</h2>
+        <div class="space-y-4">
+          <div>
+            <label for="project-dir">Project Directory</label>
+            <input id="project-dir" class="mt-1" placeholder="/path/to/project">
+            <div class="text-xs text-muted mt-1">Leave empty to scan the current project.</div>
+          </div>
+          <div>
+            <label class="flex items-center gap-2">
+              <input id="use-codegraph" type="checkbox" checked>
+              <span class="text-sm">Use CodeGraph (if available)</span>
+            </label>
+            <div class="text-xs text-muted mt-1">AST-level analysis for more accurate call chain discovery.</div>
+          </div>
+        </div>
+
+        <div class="mt-4 border-t" style="border-color:var(--border)">
+          <div id="project-context-toggle" class="flex items-center gap-2 py-3 cursor-pointer" style="color:var(--text-secondary)">
+            ${icon("messageSquare", 16)}
+            <span class="text-sm font-medium">Review Context</span>
+            <span class="text-xs text-muted ml-1">(optional)</span>
+            <span id="project-context-chevron" class="ml-auto" style="transition:transform 200ms;transform:rotate(${contextExpanded ? "180" : "0"}deg)">${icon("chevronDown", 14)}</span>
+          </div>
+          <div id="project-context-panel" style="display:${contextExpanded ? "block" : "none"}">
+            <textarea id="project-context-input" class="w-full" rows="4" placeholder="Project background, key requirements, areas of concern..."></textarea>
+            <div class="text-xs text-muted mt-1">This context is passed to AI reviewers as additional guidance.</div>
+          </div>
+        </div>
+      </div>
+      <div class="flex justify-between">
+        <button id="project-back" class="btn btn-ghost">${icon("arrowLeft", 14)} Back</button>
+        <button id="project-next" class="btn btn-primary">Next ${icon("chevronRight", 14)}</button>
+      </div>`;
+
+    api.getSession(sessionId).then(session => {
+      const dirInput = document.getElementById("project-dir");
+      if (dirInput && session.projectDir) dirInput.value = session.projectDir;
+    }).catch(() => {});
+
+    api.getReviewContext(sessionId).then(data => {
+      const input = document.getElementById("project-context-input");
+      if (input && data.context) {
+        const match = data.context.match(/## User Context\n([\s\S]*?)(?=\n## Review Notes|$)/);
+        input.value = match ? match[1].trim() : data.context.trim();
+      }
+    }).catch(() => {});
+
+    document.getElementById("project-context-toggle").addEventListener("click", () => {
+      contextExpanded = !contextExpanded;
+      document.getElementById("project-context-panel").style.display = contextExpanded ? "block" : "none";
+      document.getElementById("project-context-chevron").style.transform = `rotate(${contextExpanded ? 180 : 0}deg)`;
+      save();
+    });
+
+    let ctxTimer = null;
+    const ctxInput = document.getElementById("project-context-input");
+    if (ctxInput) {
+      ctxInput.addEventListener("blur", () => {
+        clearTimeout(ctxTimer);
+        ctxTimer = setTimeout(async () => {
+          try { await api.setReviewContext(sessionId, ctxInput.value); } catch {}
+        }, 300);
+      });
+    }
+
+    document.getElementById("project-back").addEventListener("click", () => { step = 1; save(); render(); });
+    document.getElementById("project-next").addEventListener("click", async () => {
+      const btn = document.getElementById("project-next");
+      const originalHTML = btn.innerHTML;
+      try {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner spinner-sm"></span> Saving...';
+        if (ctxInput) {
+          try { await api.setReviewContext(sessionId, ctxInput.value); } catch {}
+        }
+        step = 3;
+        save();
+        render();
+      } catch (e) {
+        showToast("Failed: " + e.message);
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+      }
+    });
+  }
+
+  function renderProjectReady() {
+    const content = document.getElementById("wizard-content");
+    content.innerHTML = `
+      <div class="card mb-4">
+        <h2 class="font-semibold mb-4">Ready to Scan</h2>
+        <div class="space-y-3">
+          <div class="flex items-center gap-3">
+            <span style="color:var(--text-muted)">${icon("search", 18)}</span>
+            <div>
+              <div class="text-xs text-muted">Review Type</div>
+              <div class="text-sm font-medium">Project Scan</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-4 info-banner info-banner-amber">
+          ${icon("zap", 16)}
+          <span>Click "Start Scan" below. The scan will discover entry points and analyze your project.</span>
+        </div>
+      </div>
+      <div class="flex justify-between">
+        <button id="project-ready-back" class="btn btn-ghost">${icon("arrowLeft", 14)} Back</button>
+        <button id="start-project-scan-btn" class="btn btn-primary">
+          ${icon("search", 14)}
+          Start Scan
+        </button>
+      </div>`;
+
+    document.getElementById("project-ready-back").addEventListener("click", () => { step = 2; save(); render(); });
+    document.getElementById("start-project-scan-btn").addEventListener("click", async () => {
+      const btn = document.getElementById("start-project-scan-btn");
+      const originalHTML = btn.innerHTML;
+      try {
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner spinner-sm"></span> Preparing...';
+        await api.updateSessionStatus(sessionId, "ready");
+        localStorage.removeItem(savedKey);
+        location.hash = `#/progress/${sessionId}`;
+      } catch (e) {
+        showToast("Failed to start scan: " + e.message);
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+      }
+    });
   }
 
   function renderStep2() {

@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { execSync } from "node:child_process";
 import { jsonResponse, errorResponse, readBody } from "../index.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -25,14 +26,24 @@ function toPublicResponse(settings) {
     result.anthropic = { configured: false };
   }
   if (settings.jira) {
-    result.jira = { configured: !!(settings.jira.baseUrl && settings.jira.token) };
+    result.jira = {
+      configured: !!(settings.jira.baseUrl && settings.jira.token),
+      baseUrl: settings.jira.baseUrl || "",
+      email: settings.jira.email || "",
+    };
   } else {
-    result.jira = { configured: false };
+    result.jira = { configured: false, baseUrl: "", email: "" };
   }
   if (settings.database) {
-    result.database = { configured: !!(settings.database.host && settings.database.name) };
+    result.database = {
+      configured: !!(settings.database.host && settings.database.name),
+      host: settings.database.host || "",
+      port: settings.database.port || 5432,
+      name: settings.database.name || "",
+      user: settings.database.user || "",
+    };
   } else {
-    result.database = { configured: false };
+    result.database = { configured: false, host: "", port: 5432, name: "", user: "" };
   }
   result.codegraph = {
     path: settings.codegraph?.path || "~/.local/bin/codegraph",
@@ -72,6 +83,62 @@ export function registerSettingsRoutes(router) {
       errorResponse(res, "Failed to save settings: " + e.message, "INTERNAL_ERROR", 500);
     }
   });
-}
 
-export { loadSettings, SETTINGS_PATH };
+  // GET /api/codegraph/status
+  router.get("/api/codegraph/status", (req, res) => {
+    try {
+      const url = new URL(req.url, "http://localhost");
+      const dir = url.searchParams.get("dir") || "";
+      const result = { available: false, initialized: false, indexed: false, fileCount: null, symbolCount: null };
+
+      // Check CLI availability
+      try {
+        execSync("which codegraph", { encoding: "utf-8", timeout: 5000 });
+        result.available = true;
+      } catch {
+        return jsonResponse(res, result);
+      }
+
+      // Check .codegraph/ directory
+      if (!dir) return jsonResponse(res, result);
+      const codegraphDir = path.join(dir, ".codegraph");
+      if (!fs.existsSync(codegraphDir)) return jsonResponse(res, result);
+      result.initialized = true;
+
+      // Get index stats
+      try {
+        const raw = execSync(`codegraph status --json "${dir}"`, { encoding: "utf-8", timeout: 5000 });
+        const stats = JSON.parse(raw);
+        result.indexed = stats.initialized;
+        result.fileCount = stats.fileCount || null;
+        result.symbolCount = stats.nodeCount || null;
+      } catch {}
+
+      jsonResponse(res, result);
+    } catch (e) {
+      errorResponse(res, "Failed to check codegraph status: " + e.message, "INTERNAL_ERROR", 500);
+    }
+  });
+
+  // POST /api/codegraph/init
+  router.post("/api/codegraph/init", async (req, res) => {
+    try {
+      const body = JSON.parse(await readBody(req));
+      const dir = body?.projectDir;
+      if (!dir || !fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {
+        return errorResponse(res, "Invalid project directory", "VALIDATION_ERROR", 400);
+      }
+
+      console.log(`[codegraph] Initializing: ${dir}`);
+      execSync(`codegraph init -i "${dir}"`, { encoding: "utf-8", timeout: 30000 });
+      console.log(`[codegraph] Indexing: ${dir}`);
+      execSync(`codegraph index "${dir}"`, { encoding: "utf-8", timeout: 120000 });
+      console.log(`[codegraph] Done`);
+
+      jsonResponse(res, { ok: true });
+    } catch (e) {
+      console.error(`[codegraph] Init failed: ${e.message}`);
+      errorResponse(res, "CodeGraph init failed: " + e.message, "INTERNAL_ERROR", 500);
+    }
+  });
+}

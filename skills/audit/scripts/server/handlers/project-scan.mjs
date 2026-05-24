@@ -1,8 +1,7 @@
 // skills/audit/scripts/server/handlers/project-scan.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { scanProject } from "../../lib/project-scan.mjs";
-import { loadSettings } from "./settings.mjs";
+import { setProjectScope, getProjectMap } from "../../lib/project-scan.mjs";
 import { readYaml } from "../../lib/yaml.mjs";
 import { sanitizePath } from "../../lib/session.mjs";
 import { jsonResponse, errorResponse } from "../index.mjs";
@@ -35,9 +34,7 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
 
       let result;
       try {
-        const settings = loadSettings();
-        const apiKey = settings.anthropic?.apiKey || process.env.ANTHROPIC_API_KEY || "";
-        result = await scanProject(targetDir, reportsDir, safeSid, apiKey);
+        result = setProjectScope(targetDir, reportsDir, safeSid);
       } catch (e) {
         scanStatuses.set(safeSid, { status: "error", error: e.message });
         throw e;

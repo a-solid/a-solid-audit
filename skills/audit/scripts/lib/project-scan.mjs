@@ -1,517 +1,271 @@
 // skills/audit/scripts/lib/project-scan.mjs
 import fs from "node:fs";
 import path from "node:path";
-import https from "node:https";
-import { execSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
-import { writeYaml, readYaml, writeIndexYaml } from "./yaml.mjs";
 import { sanitizePath } from "./session.mjs";
+import { readYaml, writeYaml, writeIndexYaml, writeProjectTaskYaml } from "./yaml.mjs";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const EXCLUDED_DIRS = new Set([
+  "node_modules", ".git", "dist", "build", "vendor", "__pycache__",
+  ".next", "coverage", ".venv", "venv", ".idea", ".vscode",
+  "target", "bin", "obj", ".gradle", ".mvn", "logs",
+]);
 
-function callAnthropicAPI(systemPrompt, userMessage, apiKey) {
-  if (!apiKey) throw new Error("Anthropic API key not configured — set it in Settings");
+const CODE_EXTENSIONS = new Set([
+  "mjs", "js", "ts", "cjs", "jsx", "tsx",
+  "py", "rb", "go", "java", "kt", "scala", "cs",
+  "php", "sh", "bash", "zsh", "sql", "plsql",
+  "json", "yaml", "yml", "toml",
+]);
 
-  const body = JSON.stringify({
-    model: "claude-haiku-4-5-20251001",
-    max_tokens: 4096,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userMessage }],
-  });
-
-  return new Promise((resolve, reject) => {
-    const req = https.request({
-      hostname: "api.anthropic.com",
-      path: "/v1/messages",
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "Content-Length": Buffer.byteLength(body),
-      },
-      timeout: 60000,
-    }, (res) => {
-      let data = "";
-      res.on("data", (chunk) => { data += chunk; });
-      res.on("end", () => {
-        if (res.statusCode !== 200) {
-          reject(new Error("Anthropic API " + res.statusCode + ": " + data));
-          return;
-        }
-        try {
-          const json = JSON.parse(data);
-          const text = json.content?.[0]?.text || "";
-          resolve(text);
-        } catch (e) { reject(e); }
-      });
-    });
-    req.on("error", reject);
-    req.on("timeout", () => { req.destroy(); reject(new Error("Anthropic API timeout")); });
-    req.write(body);
-    req.end();
-  });
-}
-
-async function aiGroupEntries(matrix, apiKey) {
-  const promptPath = path.join(__dirname, "..", "..", "prompts", "project-scan-grouping.md");
-  const promptTemplate = fs.readFileSync(promptPath, "utf-8");
-
-  const entrySummaries = matrix.summaries.map(s =>
-    `- ${s.path} (type: ${s.type}, files: ${s.totalFiles}, services: [${s.services.join(", ")}], daos: [${s.daos.join(", ")}])`
-  ).join("\n");
-
-  const depPairs = matrix.pairs.map(p =>
-    `- ${p.entryA} <-> ${p.entryB}: shared ${p.sharedCount} files (${Math.round(p.sharedRatio * 100)}%), services: [${p.sharedServices.join(", ")}], daos: [${p.sharedDaos.join(", ")}]`
-  ).join("\n");
-
-  const userMessage = promptTemplate
-    .replace("{{entrySummaries}}", entrySummaries)
-    .replace("{{dependencyMatrix}}", depPairs || "（无共享依赖）");
-
-  const response = await callAnthropicAPI(
-    "你是一个代码分析助手，负责将项目入口点按业务领域分组。只输出 JSON。",
-    userMessage,
-    apiKey
-  );
-
-  const jsonMatch = response.match(/\[[\s\S]*\]/);
-  if (!jsonMatch) throw new Error("AI response contains no JSON array");
-
-  const groups = JSON.parse(jsonMatch[0]);
-  if (!Array.isArray(groups) || groups.length === 0) {
-    throw new Error("AI returned invalid grouping");
-  }
-
-  return groups;
-}
-
-const ENTRY_RULES = [
-  { type: "api", pathPatterns: /handler|controller|route|api|endpoint/i, filePatterns: /router|handler|controller/i },
-  { type: "scheduled", pathPatterns: /cron|job|scheduler/i, filePatterns: /cron|job|schedule/i },
-  { type: "consumer", pathPatterns: /consumer|subscriber|worker|queue|listener/i, filePatterns: /consumer|subscriber|worker|listener/i },
-  { type: "script", pathPatterns: /script|bin|cli|migration/i, filePatterns: /cli|migrate|seed|setup/i },
+const HIGH_PRIORITY_KEYWORDS = [
+  "server", "handler", "controller", "service", "api", "route",
+  "middleware", "model", "repository", "dao", "migration", "db",
+  "script", "scripts", "cron", "job", "worker", "consumer",
+  "trigger", "procedure",
 ];
 
-const SERVICE_PATTERNS = /service|dao|repository|model|entity/i;
+const MED_PRIORITY_KEYWORDS = [
+  "lib", "utils", "helpers", "common", "shared", "core", "config",
+];
 
-function classifyFile(filePath) {
-  if (SERVICE_PATTERNS.test(filePath)) {
-    if (/service/i.test(filePath)) return "service";
-    if (/dao|repository/i.test(filePath)) return "dao";
-    if (/model|entity/i.test(filePath)) return "model";
-  }
-  return "other";
-}
+const MAX_FILES_PER_CHUNK = 15;
 
-const IGNORE_DIRS = new Set(["node_modules", ".git", "dist", "build", "vendor", "__pycache__", ".audit", ".codegraph", "coverage", ".next", ".nuxt"]);
-
-function detectCodeGraph() {
-  try {
-    const version = execSync("codegraph --version", { timeout: 5000, encoding: "utf-8" }).trim();
-    console.log("[scan] CodeGraph " + version + " detected — using AST-level analysis");
-    return { available: true, version };
-  } catch {
-    console.log("[scan] CodeGraph not found — using heuristic fallback");
-    return { available: false };
-  }
-}
-
-function collectFiles(dir, base = dir) {
-  const results = [];
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    if (entry.isDirectory()) {
-      if (IGNORE_DIRS.has(entry.name)) continue;
-      results.push(...collectFiles(path.join(dir, entry.name), base));
-    } else {
-      const ext = path.extname(entry.name);
-      if ([".js", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".jsx", ".tsx"].includes(ext)) {
-        results.push(path.relative(base, path.join(dir, entry.name)));
-      }
+function classifyPriority(filePath) {
+  const normalized = filePath.toLowerCase().replace(/\\/g, "/");
+  for (const kw of HIGH_PRIORITY_KEYWORDS) {
+    if (normalized.includes("/" + kw) || normalized.includes(kw + "/") || normalized.includes(kw + ".")) {
+      return "high";
     }
   }
-  return results;
+  if (normalized.endsWith(".sql") || normalized.endsWith(".sh")) return "high";
+  for (const kw of MED_PRIORITY_KEYWORDS) {
+    if (normalized.includes("/" + kw) || normalized.includes(kw + "/")) {
+      return "medium";
+    }
+  }
+  return "low";
 }
 
-function identifyEntryType(filePath) {
-  for (const rule of ENTRY_RULES) {
-    if (rule.pathPatterns.test(filePath) || rule.filePatterns.test(path.basename(filePath, path.extname(filePath)))) {
-      return rule.type;
+const ENTRY_PATTERNS = [
+  { type: "api", keywords: ["handler", "controller", "route", "api", "endpoint"] },
+  { type: "scheduled", keywords: ["cron", "job", "scheduler"] },
+  { type: "consumer", keywords: ["consumer", "subscriber", "worker", "queue", "listener"] },
+  { type: "script", keywords: ["script", "bin", "cli", "migration"] },
+];
+
+function classifyEntryType(filePath) {
+  const normalized = filePath.toLowerCase().replace(/\\/g, "/");
+  const name = path.basename(normalized);
+  for (const { type, keywords } of ENTRY_PATTERNS) {
+    for (const kw of keywords) {
+      if (normalized.includes("/" + kw) || normalized.includes(kw + "/") || name.includes(kw)) {
+        return type;
+      }
     }
   }
   return "unknown";
 }
 
-function parseImports(content, filePath) {
-  const imports = [];
-  const dir = path.dirname(filePath);
-  const patterns = [
-    /import\s+.*?\s+from\s+['"](\.\/[^'"]+)['"]/g,
-    /import\s+.*?\s+from\s+['"](\.\.\/[^'"]+)['"]/g,
-    /require\s*\(\s*['"](\.\/[^'"]+)['"]\s*\)/g,
-    /require\s*\(\s*['"](\.\.\/[^'"]+)['"]\s*\)/g,
-  ];
-  for (const re of patterns) {
-    let match;
-    while ((match = re.exec(content)) !== null) {
-      const raw = match[1];
-      const resolved = path.normalize(path.join(dir, raw));
-      imports.push(resolved);
-    }
-  }
-  return imports;
-}
+const IMPORT_RE = /(?:import\s+.*?\s+from\s+['"])(\.{1,2}\/[^'"]+)(?:['"])|(?:require\s*\(\s*['"])(\.{1,2}\/[^'"]+)(?:['"])/g;
 
-function traceCallChainHeuristic(entryFile, projectDir, allFiles) {
-  const visited = new Set();
-  const chain = [];
-  const exts = [".js", ".mjs", ".cjs", ".ts", ".mts", ".cts", ""];
-
-  function walk(filePath) {
-    if (visited.has(filePath)) return;
-    visited.add(filePath);
-    chain.push(filePath);
-
-    const full = path.join(projectDir, filePath);
-    if (!fs.existsSync(full)) return;
-    const content = fs.readFileSync(full, "utf-8");
-    const imports = parseImports(content, filePath);
-
-    for (const imp of imports) {
-      let resolved = imp.startsWith("/") ? imp : path.normalize(imp);
-      let found = false;
-      for (const ext of exts) {
-        const candidate = resolved + ext;
-        if (allFiles.includes(candidate) && !visited.has(candidate)) {
-          walk(candidate);
-          found = true;
+function resolveImports(filePath, projectDir) {
+  const fullPath = path.join(projectDir, filePath);
+  if (!fs.existsSync(fullPath)) return [];
+  try {
+    const src = fs.readFileSync(fullPath, "utf-8");
+    const imports = [];
+    let m;
+    while ((m = IMPORT_RE.exec(src)) !== null) {
+      const raw = m[1] || m[2];
+      const resolved = path.normalize(path.join(path.dirname(filePath), raw));
+      let rel = resolved.replace(/\\/g, "/");
+      for (const ext of ["", ".mjs", ".js", ".ts", ".cjs"]) {
+        if (fs.existsSync(path.join(projectDir, rel + ext))) {
+          imports.push(rel + ext);
           break;
         }
       }
-      if (!found) {
-        for (const ext of exts) {
-          const candidate = path.join(resolved, "index" + ext);
-          if (allFiles.includes(candidate) && !visited.has(candidate)) {
-            walk(candidate);
-            break;
-          }
+      for (const ext of ["/index.mjs", "/index.js", "/index.ts"]) {
+        if (fs.existsSync(path.join(projectDir, rel + ext))) {
+          imports.push(rel + ext);
+          break;
         }
       }
     }
-  }
-
-  walk(entryFile);
-  return chain;
-}
-
-function traceCallChainCodeGraph(entryFile, projectDir) {
-  try {
-    const result = execSync(
-      `codegraph callees "${entryFile}" --depth 5 --json`,
-      { cwd: projectDir, timeout: 30000, encoding: "utf-8" }
-    );
-    const data = JSON.parse(result);
-    return (data.files || []).map(f => path.relative(projectDir, f));
-  } catch {
-    return null;
-  }
-}
-
-function detectBinEntries(projectDir) {
-  const pkgPath = path.join(projectDir, "package.json");
-  if (!fs.existsSync(pkgPath)) return [];
-  try {
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-    const bins = [];
-    if (pkg.bin) {
-      if (typeof pkg.bin === "string") bins.push(pkg.bin);
-      else Object.values(pkg.bin).forEach(b => bins.push(b));
-    }
-    return bins.filter(b => typeof b === "string").map(b => path.normalize(b));
+    return [...new Set(imports)];
   } catch {
     return [];
   }
 }
 
-function generateMermaidSource(entryFile, files) {
-  if (files.length <= 1) return "";
-  const nodes = files.map((f, i) => {
-    const name = path.basename(f, path.extname(f));
-    return `  N${i}[${name}]`;
-  });
-  const edges = [];
-  for (let i = 0; i < files.length - 1; i++) {
-    edges.push(`  N${i} --> N${i + 1}`);
-  }
-  return "graph TD\n" + nodes.join("\n") + "\n" + edges.join("\n");
-}
+export function scanProjectDir(projectDir, options = {}) {
+  const excludeDirs = new Set([...EXCLUDED_DIRS, ...(options.excludeDirs || [])]);
+  const minPriority = options.priority || "low";
+  const priorityOrder = { high: 0, medium: 1, low: 2 };
+  const minIdx = priorityOrder[minPriority] ?? 2;
 
-function computeDependencyMatrix(entryChains) {
-  // entryChains: Map<entryPath, { type, files: string[] }>
-  const entries = Array.from(entryChains.entries());
+  const files = [];
 
-  // Classify files per entry
-  const summaries = entries.map(([entryPath, info]) => {
-    const services = [];
-    const daos = [];
-    const otherFiles = [];
-    for (const f of info.files) {
-      const cls = classifyFile(f);
-      if (cls === "service") services.push(f);
-      else if (cls === "dao") daos.push(f);
-      else if (f !== entryPath) otherFiles.push(f);
-    }
-    return {
-      path: entryPath,
-      type: info.type,
-      services,
-      daos,
-      totalFiles: info.files.length,
-      mainFiles: otherFiles.slice(0, 5),
-    };
-  });
-
-  // Build shared dependency pairs
-  const pairs = [];
-  for (let i = 0; i < summaries.length; i++) {
-    for (let j = i + 1; j < summaries.length; j++) {
-      const a = new Set(entries[i][1].files);
-      const b = new Set(entries[j][1].files);
-      const shared = [...a].filter(f => b.has(f));
-      if (shared.length > 0) {
-        const sharedServices = shared.filter(f => /service/i.test(f));
-        const sharedDaos = shared.filter(f => /dao|repository/i.test(f));
-        const ratio = shared.length / Math.min(a.size, b.size);
-        pairs.push({
-          entryA: summaries[i].path,
-          entryB: summaries[j].path,
-          sharedCount: shared.length,
-          sharedRatio: Math.round(ratio * 100) / 100,
-          sharedServices,
-          sharedDaos,
-          sharedOther: shared.filter(f =>
-            !/service|dao|repository/i.test(f)
-          ),
-        });
+  function walk(dir) {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        if (excludeDirs.has(entry.name)) continue;
+        if (entry.name.startsWith(".") && entry.name !== ".env") continue;
+        walk(path.join(dir, entry.name));
+      } else if (entry.isFile()) {
+        const ext = entry.name.split(".").pop().toLowerCase();
+        if (!CODE_EXTENSIONS.has(ext)) continue;
+        const fullPath = path.join(dir, entry.name);
+        const relative = path.relative(projectDir, fullPath).replace(/\\/g, "/");
+        const priority = classifyPriority(relative);
+        if (priorityOrder[priority] > minIdx) continue;
+        files.push({ path: relative, priority });
       }
     }
   }
 
-  return { summaries, pairs };
+  walk(projectDir);
+  files.sort((a, b) => a.path.localeCompare(b.path));
+  return files;
 }
 
-function discoverEntriesCodeGraph(projectDir) {
-  const entries = new Map();
-  try {
-    const result = execSync(
-      'codegraph query "" --kind route --json --limit 500',
-      { cwd: projectDir, timeout: 30000, encoding: "utf-8" }
-    );
-    const data = JSON.parse(result);
-    const symbols = Array.isArray(data) ? data : (data.symbols || []);
-    for (const sym of symbols) {
-      if (sym.file) {
-        const relPath = path.relative(projectDir, sym.file);
-        entries.set(relPath, { type: "api", entry: relPath });
-      }
-    }
-  } catch (e) {
-    console.log("[scan] CodeGraph entry discovery failed: " + e.message);
-  }
-
-  const extraTypes = [
-    { kind: "function", patterns: /cron|job|schedule|worker|consumer|subscribe/i, type: "scheduled" },
-    { kind: "function", patterns: /consumer|subscribe|worker|queue|listen/i, type: "consumer" },
-  ];
-  for (const { kind, patterns, type } of extraTypes) {
-    try {
-      const result = execSync(
-        `codegraph query "" --kind ${kind} --json --limit 500`,
-        { cwd: projectDir, timeout: 30000, encoding: "utf-8" }
-      );
-      const data = JSON.parse(result);
-      const symbols = Array.isArray(data) ? data : (data.symbols || []);
-      for (const sym of symbols) {
-        if (sym.file && patterns.test(sym.name || sym.file)) {
-          const relPath = path.relative(projectDir, sym.file);
-          if (!entries.has(relPath)) {
-            entries.set(relPath, { type, entry: relPath });
-          }
-        }
-      }
-    } catch {
-      // Silently skip — best-effort
+export function chunkFiles(files, projectDir) {
+  const entries = [];
+  const nonEntries = [];
+  for (const f of files) {
+    const entryType = classifyEntryType(f.path);
+    if (entryType !== "unknown") {
+      entries.push({ ...f, entryType });
+    } else {
+      nonEntries.push(f);
     }
   }
 
-  return entries;
+  const claimed = new Set();
+  const chunks = [];
+  let chunkIdx = 1;
+
+  for (const entry of entries) {
+    const chain = new Set([entry.path]);
+    for (const imp of resolveImports(entry.path, projectDir)) {
+      chain.add(imp);
+      for (const imp2 of resolveImports(imp, projectDir)) {
+        chain.add(imp2);
+      }
+    }
+    const chainFiles = [...chain].filter(p => files.some(f => f.path === p));
+    chainFiles.forEach(p => claimed.add(p));
+
+    chunks.push({
+      id: "chunk-" + String(chunkIdx++).padStart(3, "0"),
+      name: entry.path,
+      type: entry.entryType,
+      entry: entry.path,
+      files: chainFiles,
+      priority: entry.priority,
+      fileCount: chainFiles.length,
+    });
+  }
+
+  const remaining = nonEntries.filter(f => !claimed.has(f.path));
+  const dirGroups = new Map();
+  for (const f of remaining) {
+    const dir = path.dirname(f.path);
+    if (!dirGroups.has(dir)) dirGroups.set(dir, []);
+    dirGroups.get(dir).push(f);
+  }
+  for (const [dir, dirFiles] of dirGroups) {
+    chunks.push({
+      id: "chunk-" + String(chunkIdx++).padStart(3, "0"),
+      name: dir === "." ? "root" : dir + "/",
+      type: "unknown",
+      entry: null,
+      files: dirFiles.map(f => f.path),
+      priority: dirFiles[0].priority,
+      fileCount: dirFiles.length,
+    });
+  }
+
+  const merged = [];
+  for (const chunk of chunks) {
+    if (merged.length > 0 && merged[merged.length - 1].type === "unknown" && chunk.type === "unknown"
+        && merged[merged.length - 1].fileCount + chunk.fileCount <= MAX_FILES_PER_CHUNK) {
+      const last = merged[merged.length - 1];
+      last.name = last.name + " + " + chunk.name;
+      last.files = [...last.files, ...chunk.files];
+      last.fileCount += chunk.fileCount;
+    } else {
+      merged.push({ ...chunk, files: [...chunk.files] });
+    }
+  }
+
+  return merged;
 }
 
-export async function scanProject(projectDir, reportsDir, sid, apiKey) {
+export function setProjectScope(projectDir, reportsDir, sid, scanOptions = {}) {
   const safeSid = sanitizePath(sid);
   const sessionDir = path.join(reportsDir, safeSid);
   const indexPath = path.join(sessionDir, "index.yaml");
   if (!fs.existsSync(indexPath)) throw new Error("Session not found: " + safeSid);
 
-  const codegraph = detectCodeGraph();
-
-  if (codegraph.available) {
-    try {
-      execSync("codegraph init -i", { cwd: projectDir, timeout: 10000, stdio: "pipe" });
-      execSync("codegraph index", { cwd: projectDir, timeout: 120000, stdio: "pipe" });
-    } catch (e) {
-      console.log("[scan] CodeGraph indexing failed, falling back: " + e.message);
-      codegraph.available = false;
-    }
-  }
-
-  const allFiles = collectFiles(projectDir);
-  console.log("[scan] Found " + allFiles.length + " source files");
-
-  const entries = new Map();
-
-  if (codegraph.available) {
-    const cgEntries = discoverEntriesCodeGraph(projectDir);
-    for (const [entryPath, info] of cgEntries) {
-      entries.set(entryPath, info);
-    }
-    console.log("[scan] CodeGraph discovered " + entries.size + " entry points");
-  }
-
-  // Regex fallback — always run to catch entries CodeGraph missed
-  for (const file of allFiles) {
-    const type = identifyEntryType(file);
-    if (type !== "unknown" && !entries.has(file)) {
-      entries.set(file, { type, entry: file });
-    }
-  }
-
-  for (const bin of detectBinEntries(projectDir)) {
-    if (!entries.has(bin)) {
-      entries.set(bin, { type: "script", entry: bin });
-    }
-  }
-
-  const entryFiles = new Set(entries.keys());
-  const assignedFiles = new Set();
+  const files = scanProjectDir(projectDir, scanOptions);
+  const chunks = chunkFiles(files, projectDir);
+  const exclude = new Set(scanOptions.excludeFiles || []);
 
   const tasksDir = path.join(sessionDir, "project-tasks");
   fs.mkdirSync(tasksDir, { recursive: true });
 
-  // Trace call chains for all entries
-  const entryChains = new Map();
-  for (const [entryFile, info] of entries) {
-    let files;
-    if (codegraph.available) {
-      files = traceCallChainCodeGraph(entryFile, projectDir);
-      if (!files) files = traceCallChainHeuristic(entryFile, projectDir, allFiles);
-    } else {
-      files = traceCallChainHeuristic(entryFile, projectDir, allFiles);
-    }
-    if (!files || files.length === 0) files = [entryFile];
-    entryChains.set(entryFile, { type: info.type, files });
-    for (const f of files) assignedFiles.add(f);
-  }
-
-  // AI grouping (only when multiple entry points with shared deps)
-  let groups = null;
-  if (entryChains.size > 1) {
-    console.log("[scan] Computing dependency matrix for " + entryChains.size + " entry points");
-    const matrix = computeDependencyMatrix(entryChains);
-
-    if (matrix.pairs.length > 0) {
-      console.log("[scan] Found " + matrix.pairs.length + " shared dependency pairs, calling AI grouping");
-      try {
-        groups = await aiGroupEntries(matrix, apiKey);
-        console.log("[scan] AI grouped into " + groups.length + " task groups");
-      } catch (e) {
-        console.log("[scan] AI grouping failed, falling back to per-entry tasks: " + e.message);
-        groups = null;
-      }
-    }
-  }
-
-  const projectTasks = [];
-
-  if (groups) {
-    // Generate YAML per group
-    for (const group of groups) {
-      const groupFiles = new Set();
-      let groupType = "api";
-
-      for (const entryPath of group.entries) {
-        const chain = entryChains.get(entryPath);
-        if (chain) {
-          for (const f of chain.files) groupFiles.add(f);
-          groupType = chain.type;
-        }
-      }
-
-      const filesArr = [...groupFiles];
-      const primaryEntry = group.entries[0];
-      const name = group.name.replace(/[^a-zA-Z0-9_一-鿿-]/g, "-");
-      const taskFile = "project-tasks/" + name.replace(/[^a-zA-Z0-9_-]/g, "-") + ".yaml";
-      const callChain = generateMermaidSource(primaryEntry, filesArr);
-
-      writeYaml(path.join(sessionDir, taskFile), {
-        name: group.name,
-        type: groupType,
-        entries: group.entries,
-        entry: primaryEntry,
-        files: filesArr,
-        status: "pending",
-        _callChain: callChain,
-        overview: { diagram: "", description: "" },
-        review: { score: 0, summary: "", findings: [], positives: [], gaps: [] },
-      });
-
-      projectTasks.push({ file: taskFile, type: groupType, entry: primaryEntry, status: "pending" });
-    }
-  } else {
-    // Fallback: one task per entry point (original behavior)
-    for (const [entryFile, info] of entryChains) {
-      const files = info.files;
-      const name = path.basename(entryFile, path.extname(entryFile));
-      const taskFile = "project-tasks/" + name.replace(/[^a-zA-Z0-9_-]/g, "-") + ".yaml";
-      const callChain = generateMermaidSource(entryFile, files);
-
-      writeYaml(path.join(sessionDir, taskFile), {
-        name,
-        type: info.type,
-        entry: entryFile,
-        files,
-        status: "pending",
-        _callChain: callChain,
-        overview: { diagram: "", description: "" },
-        review: { score: 0, summary: "", findings: [], positives: [], gaps: [] },
-      });
-
-      projectTasks.push({ file: taskFile, type: info.type, entry: entryFile, status: "pending" });
-    }
-  }
-
-  // Handle unassigned files
-  const orphans = allFiles.filter(f => !assignedFiles.has(f) && !entryFiles.has(f));
-  if (orphans.length > 0) {
-    const taskFile = "project-tasks/_unassigned.yaml";
-    writeYaml(path.join(sessionDir, taskFile), {
-      name: "unassigned-files",
-      type: "unknown",
-      entry: "",
-      files: orphans,
-      status: "pending",
-      _callChain: "",
-      overview: { diagram: "", description: "" },
-      review: { score: 0, summary: "", findings: [], positives: [], gaps: [] },
+  const tasks = [];
+  for (const chunk of chunks) {
+    const filtered = chunk.files.filter(f => !exclude.has(f));
+    if (filtered.length === 0) continue;
+    const tf = chunk.id + ".yaml";
+    writeProjectTaskYaml(path.join(tasksDir, tf), {
+      name: chunk.name,
+      type: chunk.type || "unknown",
+      entry: chunk.entry || null,
+      files: filtered,
     });
-    projectTasks.push({ file: taskFile, type: "unknown", entry: "", status: "pending" });
+    tasks.push({ file: "project-tasks/" + tf, status: "pending" });
   }
+
+  writeYaml(path.join(sessionDir, "project-map.yaml"), {
+    projectDir,
+    totalFiles: files.length,
+    scannedFiles: files.length,
+    excludedDirs: [...(scanOptions.excludeDirs || [])],
+    chunks: chunks.map(c => ({
+      id: c.id,
+      name: c.name,
+      type: c.type,
+      entry: c.entry,
+      files: c.files,
+      priority: c.priority,
+      fileCount: c.fileCount,
+    })),
+  });
 
   const index = readYaml(indexPath);
-  index.projectTasks = projectTasks;
-  index.session.status = "ready";
-  writeIndexYaml(indexPath, index);
+  writeIndexYaml(indexPath, {
+    session: {
+      ...index.session,
+      type: "project-scan",
+      status: "scoped",
+      scope: { method: "directory-scan", ref: "" },
+      projectDir,
+    },
+    codeTasks: index.codeTasks || [],
+    storyTasks: index.storyTasks || [],
+    projectTasks: tasks,
+  });
 
-  console.log("[scan] Discovered " + projectTasks.length + " tasks (" + entryChains.size + " entry points), " + orphans.length + " unassigned files");
-  return { tasksFound: projectTasks.length, codegraphUsed: codegraph.available, orphans: orphans.length, groupingUsed: !!groups };
+  return { taskCount: tasks.length, totalFiles: files.length, chunks };
+}
+
+export function getProjectMap(reportsDir, sid) {
+  const safeSid = sanitizePath(sid);
+  const mapPath = path.join(reportsDir, safeSid, "project-map.yaml");
+  if (!fs.existsSync(mapPath)) return null;
+  return readYaml(mapPath);
 }

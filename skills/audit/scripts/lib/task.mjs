@@ -29,7 +29,6 @@ export function updateTask(reportsDir, sid, taskFile, status, score, reviewData,
   if (overview && (overview.diagram || overview.description)) {
     task.overview = overview;
   }
-  if (task._callChain !== undefined) delete task._callChain;
   writeYaml(taskPath, task);
 
   const index = readYaml(indexPath);

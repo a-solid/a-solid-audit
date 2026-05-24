@@ -117,6 +117,68 @@ function resolveImports(filePath, projectDir) {
   }
 }
 
+// ── CodeGraph-based import resolver ──
+let _codegraphCache = null;
+let _codegraphCacheDir = null;
+
+function resolveImportsViaCodegraph(filePath, projectDir, sid) {
+  try {
+    // One CLI call per scan — cache results per projectDir
+    if (_codegraphCacheDir !== projectDir || !_codegraphCache) {
+      const cmd = `codegraph query --json -k import -l 1000 "" -p "${projectDir}"`;
+      pushLog(sid, "info", `codegraph: ${cmd}`);
+      const start = Date.now();
+      const raw = execSync(cmd, { encoding: "utf-8", timeout: 30000, stdio: ["pipe", "pipe", "pipe"] });
+      const data = JSON.parse(raw);
+      pushLog(sid, "info", `codegraph: returned ${data.length} import edges in ${Date.now() - start}ms`);
+
+      // Build map: source file → [resolved target files]
+      const fileImports = new Map();
+      for (const item of data) {
+        const n = item.node;
+        const src = n.filePath;
+        // Skip worktree/duplicate paths
+        if (src.includes("worktree")) continue;
+        const impPath = n.qualifiedName || n.name;
+        if (!impPath || impPath.startsWith("node:")) continue;
+
+        if (!fileImports.has(src)) fileImports.set(src, []);
+        fileImports.get(src).push(impPath);
+      }
+      _codegraphCache = fileImports;
+      _codegraphCacheDir = projectDir;
+    }
+
+    // Find imports for our file
+    const rawImports = _codegraphCache.get(filePath) || [];
+    const resolved = [];
+    for (const imp of rawImports) {
+      const resolvedPath = path.normalize(path.join(path.dirname(filePath), imp)).replace(/\\/g, "/");
+      for (const ext of ["", ".mjs", ".js", ".ts", ".cjs"]) {
+        if (fs.existsSync(path.join(projectDir, resolvedPath + ext))) {
+          resolved.push(resolvedPath + ext);
+          break;
+        }
+      }
+      for (const ext of ["/index.mjs", "/index.js", "/index.ts"]) {
+        if (fs.existsSync(path.join(projectDir, resolvedPath + ext))) {
+          resolved.push(resolvedPath + ext);
+          break;
+        }
+      }
+    }
+    return [...new Set(resolved)];
+  } catch (e) {
+    pushLog(sid, "warn", `codegraph: fallback to regex — ${e.message}`);
+    return resolveImports(filePath, projectDir);
+  }
+}
+
+export function resetCodegraphCache() {
+  _codegraphCache = null;
+  _codegraphCacheDir = null;
+}
+
 export function scanProjectDir(projectDir, options = {}) {
   const excludeDirs = new Set([...EXCLUDED_DIRS, ...(options.excludeDirs || [])]);
   const minPriority = options.priority || "low";

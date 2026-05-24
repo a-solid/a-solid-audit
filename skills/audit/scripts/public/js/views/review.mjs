@@ -1,6 +1,6 @@
 // skills/audit/scripts/public/js/views/review.mjs
 import { api } from "../api.mjs";
-import { renderTaskDetail } from "../components/task-detail.mjs";
+import { renderTaskDetail, renderMermaidDiagrams } from "../components/task-detail.mjs";
 import { showToast, setBreadcrumb, icon, escapeHtml, onNavigateCleanup } from "../app.mjs";
 import { SEVERITY_LABELS, SEVERITY_COLORS } from "../constants.mjs";
 
@@ -277,6 +277,7 @@ export async function renderReview(container, params) {
 
     const detailPanel = document.getElementById("task-detail-panel");
     detailPanel.innerHTML = renderTaskDetail(tasks[currentTaskIdx], notes);
+    renderMermaidDiagrams(detailPanel);
 
     // Restore detail panel scroll (only if not task switch)
     detailPanel.scrollTop = preserveDetailScroll ? savedDetailScroll : 0;

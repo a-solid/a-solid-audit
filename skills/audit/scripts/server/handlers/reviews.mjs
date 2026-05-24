@@ -31,7 +31,7 @@ export function registerReviewRoutes(router, reportsDir) {
         return errorResponse(res, "Missing required field: status", "VALIDATION_ERROR", 400);
       }
 
-      const { status, score, review } = body;
+      const { status, score, review, overview } = body;
       if (!["reviewing", "reviewed"].includes(status)) {
         return errorResponse(res, "Invalid status: " + status + ". Must be reviewing or reviewed", "VALIDATION_ERROR", 400);
       }
@@ -51,7 +51,7 @@ export function registerReviewRoutes(router, reportsDir) {
       const currentTask = readYaml(taskPath);
       validateTransition(currentTask.status, status);
 
-      const result = updateTask(reportsDir, safeSid, safeTaskFile, status, score, review);
+      const result = updateTask(reportsDir, safeSid, safeTaskFile, status, score, review, overview);
 
       const index = readYaml(path.join(sessionDir, "index.yaml"));
       jsonResponse(res, { ok: true, file: result.file, status: result.status, sessionStatus: index.session.status });

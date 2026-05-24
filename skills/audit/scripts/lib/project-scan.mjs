@@ -9,9 +9,8 @@ import { sanitizePath } from "./session.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-function callAnthropicAPI(systemPrompt, userMessage) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
+function callAnthropicAPI(systemPrompt, userMessage, apiKey) {
+  if (!apiKey) throw new Error("Anthropic API key not configured — set it in Settings");
 
   const body = JSON.stringify({
     model: "claude-haiku-4-5-20251001",
@@ -54,7 +53,7 @@ function callAnthropicAPI(systemPrompt, userMessage) {
   });
 }
 
-async function aiGroupEntries(matrix) {
+async function aiGroupEntries(matrix, apiKey) {
   const promptPath = path.join(__dirname, "..", "..", "prompts", "project-scan-grouping.md");
   const promptTemplate = fs.readFileSync(promptPath, "utf-8");
 
@@ -72,7 +71,8 @@ async function aiGroupEntries(matrix) {
 
   const response = await callAnthropicAPI(
     "你是一个代码分析助手，负责将项目入口点按业务领域分组。只输出 JSON。",
-    userMessage
+    userMessage,
+    apiKey
   );
 
   const jsonMatch = response.match(/\[[\s\S]*\]/);
@@ -347,7 +347,7 @@ function discoverEntriesCodeGraph(projectDir) {
   return entries;
 }
 
-export async function scanProject(projectDir, reportsDir, sid) {
+export async function scanProject(projectDir, reportsDir, sid, apiKey) {
   const safeSid = sanitizePath(sid);
   const sessionDir = path.join(reportsDir, safeSid);
   const indexPath = path.join(sessionDir, "index.yaml");
@@ -422,7 +422,7 @@ export async function scanProject(projectDir, reportsDir, sid) {
     if (matrix.pairs.length > 0) {
       console.log("[scan] Found " + matrix.pairs.length + " shared dependency pairs, calling AI grouping");
       try {
-        groups = await aiGroupEntries(matrix);
+        groups = await aiGroupEntries(matrix, apiKey);
         console.log("[scan] AI grouped into " + groups.length + " task groups");
       } catch (e) {
         console.log("[scan] AI grouping failed, falling back to per-entry tasks: " + e.message);

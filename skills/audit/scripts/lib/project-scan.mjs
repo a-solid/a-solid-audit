@@ -1,6 +1,7 @@
 // skills/audit/scripts/lib/project-scan.mjs
 import fs from "node:fs";
 import path from "node:path";
+import { execSync } from "node:child_process";
 import { sanitizePath } from "./session.mjs";
 import { readYaml, writeYaml, writeIndexYaml, writeProjectTaskYaml } from "./yaml.mjs";
 
@@ -67,6 +68,24 @@ function classifyEntryType(filePath) {
 }
 
 const IMPORT_RE = /(?:import\s+.*?\s+from\s+['"])(\.{1,2}\/[^'"]+)(?:['"])|(?:require\s*\(\s*['"])(\.{1,2}\/[^'"]+)(?:['"])/g;
+
+// ── Scan log buffer (for SSE streaming) ──
+const scanLogs = new Map();
+
+function pushLog(sid, level, message) {
+  const entry = { timestamp: new Date().toISOString().slice(11, 19), level, message };
+  console.log(`[project-scan] ${entry.timestamp} [${level}] ${message}`);
+  if (!scanLogs.has(sid)) scanLogs.set(sid, []);
+  scanLogs.get(sid).push(entry);
+}
+
+export function getScanLogs(sid) {
+  return scanLogs.get(sid) || [];
+}
+
+export function clearScanLogs(sid) {
+  scanLogs.delete(sid);
+}
 
 function resolveImports(filePath, projectDir) {
   const fullPath = path.join(projectDir, filePath);
@@ -250,8 +269,7 @@ export function setProjectScope(projectDir, reportsDir, sid, scanOptions = {}) {
   writeIndexYaml(indexPath, {
     session: {
       ...index.session,
-      type: "project-scan",
-      status: "scoped",
+      type: "project",
       scope: { method: "directory-scan", ref: "" },
       projectDir,
     },

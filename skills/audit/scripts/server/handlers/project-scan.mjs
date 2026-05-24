@@ -34,7 +34,7 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
 
       let result;
       try {
-        result = scanProject(targetDir, reportsDir, safeSid);
+        result = await scanProject(targetDir, reportsDir, safeSid);
       } catch (e) {
         scanStatuses.set(safeSid, { status: "error", error: e.message });
         throw e;

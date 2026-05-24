@@ -179,6 +179,87 @@ export function resetCodegraphCache() {
   _codegraphCacheDir = null;
 }
 
+export function collectGraphData(projectDir, reportsDir, sid) {
+  const safeSid = sanitizePath(sid);
+  const sessionDir = path.join(reportsDir, safeSid);
+  const startTime = Date.now();
+  pushLog(safeSid, "info", `collectGraphData: starting graph collection for ${projectDir}`);
+
+  // 1. Get full file list
+  const files = scanProjectDir(projectDir, {}, safeSid);
+  pushLog(safeSid, "info", `collectGraphData: scanned ${files.length} files`);
+
+  // 2. Classify entry files
+  const entryFiles = [];
+  for (const f of files) {
+    const type = classifyEntryType(f.path);
+    if (type !== "unknown") {
+      entryFiles.push({ path: f.path, entryType: type });
+    }
+  }
+  pushLog(safeSid, "info", `collectGraphData: ${entryFiles.length} entry files identified`);
+
+  // 3. Collect import edges via codegraph
+  const imports = {};
+  try {
+    const cmd = `codegraph query --json -k import -l 2000 "" -p "${projectDir}"`;
+    pushLog(safeSid, "info", `collectGraphData: ${cmd}`);
+    const raw = execSync(cmd, { encoding: "utf-8", timeout: 30000, stdio: ["pipe", "pipe", "pipe"] });
+    const data = JSON.parse(raw);
+    for (const item of data) {
+      const src = item.node.filePath;
+      if (!src || src.includes("worktree")) continue;
+      const target = item.node.qualifiedName || item.node.name;
+      if (!target || target.startsWith("node:")) continue;
+      if (!imports[src]) imports[src] = [];
+      if (!imports[src].includes(target)) imports[src].push(target);
+    }
+    pushLog(safeSid, "info", `collectGraphData: collected imports for ${Object.keys(imports).length} source files`);
+  } catch (e) {
+    pushLog(safeSid, "warn", `collectGraphData: import collection failed — ${e.message}`);
+  }
+
+  // 4. Collect function/method symbols via codegraph
+  const symbols = {};
+  try {
+    const cmd = `codegraph query --json -k function -l 2000 "" -p "${projectDir}"`;
+    pushLog(safeSid, "info", `collectGraphData: ${cmd}`);
+    const raw = execSync(cmd, { encoding: "utf-8", timeout: 30000, stdio: ["pipe", "pipe", "pipe"] });
+    const data = JSON.parse(raw);
+    for (const item of data) {
+      const filePath = item.node.filePath;
+      if (!filePath || filePath.includes("worktree")) continue;
+      if (!symbols[filePath]) symbols[filePath] = [];
+      symbols[filePath].push({
+        name: item.node.name,
+        kind: item.node.kind,
+        signature: item.node.signature || "",
+      });
+    }
+    pushLog(safeSid, "info", `collectGraphData: collected symbols for ${Object.keys(symbols).length} files`);
+  } catch (e) {
+    pushLog(safeSid, "warn", `collectGraphData: symbol collection failed — ${e.message}`);
+  }
+
+  // 5. Build graphData object
+  const graphData = {
+    projectDir,
+    totalFiles: files.length,
+    files: files.map(f => ({ path: f.path, priority: f.priority, entryType: classifyEntryType(f.path) })),
+    imports,
+    symbols,
+    entryFiles,
+  };
+
+  // 6. Write to session directory
+  fs.mkdirSync(sessionDir, { recursive: true });
+  const graphDataPath = path.join(sessionDir, "graph-data.json");
+  fs.writeFileSync(graphDataPath, JSON.stringify(graphData, null, 2), "utf-8");
+
+  pushLog(safeSid, "info", `collectGraphData: completed in ${Date.now() - startTime}ms, written to ${graphDataPath}`);
+  return graphData;
+}
+
 export function scanProjectDir(projectDir, options = {}, sid) {
   const excludeDirs = new Set([...EXCLUDED_DIRS, ...(options.excludeDirs || [])]);
   const minPriority = options.priority || "low";

@@ -15,3 +15,11 @@ export const SEVERITY_COLORS = {
 export function scoreColor(score) {
   return score >= 7 ? "var(--accent)" : score >= 4 ? "var(--warning)" : "var(--danger)";
 }
+
+export const ENTRY_TYPES = {
+  api:       { label: "API",       color: "var(--info)" },
+  scheduled: { label: "Cron",      color: "var(--warning)" },
+  consumer:  { label: "Consumer",  color: "#a78bfa" },
+  script:    { label: "Script",    color: "var(--accent)" },
+  unknown:   { label: "Module",    color: "var(--text-muted)" },
+};

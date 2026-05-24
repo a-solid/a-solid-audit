@@ -260,6 +260,74 @@ export function collectGraphData(projectDir, reportsDir, sid) {
   return graphData;
 }
 
+export function generateTasksFromGroups(reportsDir, sid) {
+  const safeSid = sanitizePath(sid);
+  const sessionDir = path.join(reportsDir, safeSid);
+  const groupsPath = path.join(sessionDir, "groups.json");
+  const indexPath = path.join(sessionDir, "index.yaml");
+
+  if (!fs.existsSync(groupsPath)) {
+    throw new Error("groups.json not found — run grouping first");
+  }
+
+  const groups = JSON.parse(fs.readFileSync(groupsPath, "utf-8"));
+  pushLog(safeSid, "info", `generateTasksFromGroups: ${groups.length} groups`);
+
+  const tasksDir = path.join(sessionDir, "project-tasks");
+  fs.mkdirSync(tasksDir, { recursive: true });
+
+  const tasks = [];
+  for (let i = 0; i < groups.length; i++) {
+    const group = groups[i];
+    const tf = `group-${String(i + 1).padStart(3, "0")}.yaml`;
+    const entryFile = group.entryFiles && group.entryFiles.length > 0 ? group.entryFiles[0] : null;
+    writeProjectTaskYaml(path.join(tasksDir, tf), {
+      name: group.name || `Group ${i + 1}`,
+      type: group.type || "unknown",
+      entry: entryFile,
+      files: group.files || [],
+    });
+    tasks.push({
+      file: "project-tasks/" + tf,
+      status: "pending",
+      type: group.type || "unknown",
+      entry: entryFile,
+    });
+  }
+
+  // Write project-map.yaml
+  writeYaml(path.join(sessionDir, "project-map.yaml"), {
+    projectDir: groups.projectDir || null,
+    totalFiles: groups.totalFiles || tasks.reduce((sum, t) => sum, 0),
+    scannedFiles: groups.totalFiles || 0,
+    excludedDirs: [],
+    groups: groups.map((g, i) => ({
+      id: `group-${String(i + 1).padStart(3, "0")}`,
+      name: g.name || `Group ${i + 1}`,
+      type: g.type || "unknown",
+      files: g.files || [],
+      fileCount: (g.files || []).length,
+      rationale: g.rationale || "",
+    })),
+  });
+
+  // Update index.yaml with projectTasks
+  const index = readYaml(indexPath);
+  writeIndexYaml(indexPath, {
+    session: {
+      ...index.session,
+      type: "project",
+      scope: { method: "directory-scan", ref: "" },
+    },
+    codeTasks: index.codeTasks || [],
+    storyTasks: index.storyTasks || [],
+    projectTasks: tasks,
+  });
+
+  pushLog(safeSid, "info", `generateTasksFromGroups: ${tasks.length} tasks generated`);
+  return { taskCount: tasks.length };
+}
+
 export function scanProjectDir(projectDir, options = {}, sid) {
   const excludeDirs = new Set([...EXCLUDED_DIRS, ...(options.excludeDirs || [])]);
   const minPriority = options.priority || "low";

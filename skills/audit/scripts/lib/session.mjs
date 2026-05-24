@@ -90,7 +90,7 @@ export function updateSessionStatus(reportsDir, sid, newStatus) {
 
   // Valid transitions
   const transitions = {
-    created: ["scoped", "scanning"],
+    created: ["scoped", "scanning", "ready"],
     scoped: ["ready"],
     scanning: ["ready"],
     ready: ["reviewing"],

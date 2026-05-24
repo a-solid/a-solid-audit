@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { readYaml, writeIndexYaml, patchYaml } from "./yaml.mjs";
 
-const VALID_STATUSES = ["created", "scoped", "ready", "reviewing", "completed"];
+const VALID_STATUSES = ["created", "scoped", "ready", "scanning", "reviewing", "completed"];
 
 export function sanitizePath(segment) {
   const s = String(segment);
@@ -35,7 +35,7 @@ export function listSessions(reportsDir) {
   });
   return entries.map(id => {
     const index = readYaml(path.join(reportsDir, id, "index.yaml"));
-    const allTasks = [...(index.codeTasks || []), ...(index.storyTasks || [])];
+    const allTasks = [...(index.codeTasks || []), ...(index.storyTasks || []), ...(index.projectTasks || [])];
     const reviewed = allTasks.filter(t => t.status === "reviewed").length;
     return {
       id: index.session.id,
@@ -58,7 +58,7 @@ export function getSession(reportsDir, sid) {
   const indexPath = path.join(sessionDir, "index.yaml");
   if (!fs.existsSync(indexPath)) return null;
   const index = readYaml(indexPath);
-  const allTasks = [...(index.codeTasks || []), ...(index.storyTasks || [])];
+  const allTasks = [...(index.codeTasks || []), ...(index.storyTasks || []), ...(index.projectTasks || [])];
   const counts = { reviewed: 0, reviewing: 0, pending: 0 };
   for (const t of allTasks) {
     counts[t.status] = (counts[t.status] || 0) + 1;
@@ -68,6 +68,7 @@ export function getSession(reportsDir, sid) {
     status: index.session.status || "created",
     codeTasks: index.codeTasks || [],
     storyTasks: index.storyTasks || [],
+    projectTasks: index.projectTasks || [],
     progress: {
       total: allTasks.length,
       ...counts,
@@ -89,8 +90,9 @@ export function updateSessionStatus(reportsDir, sid, newStatus) {
 
   // Valid transitions
   const transitions = {
-    created: ["scoped"],
+    created: ["scoped", "scanning"],
     scoped: ["ready"],
+    scanning: ["ready"],
     ready: ["reviewing"],
     reviewing: ["completed"],
     completed: [],
@@ -111,6 +113,7 @@ export function initSession(reportsDir, sid) {
   const base = path.join(reportsDir, safeSid);
   fs.mkdirSync(path.join(base, "code-tasks"), { recursive: true });
   fs.mkdirSync(path.join(base, "story-tasks"), { recursive: true });
+  fs.mkdirSync(path.join(base, "project-tasks"), { recursive: true });
   fs.writeFileSync(
     path.join(base, "review-context.md"),
     "## User Context\n\n\n## Review Notes\n<!-- AI agents append shared observations here -->\n",
@@ -120,20 +123,22 @@ export function initSession(reportsDir, sid) {
 }
 
 // Create a new session with initial index.yaml
-export function createSession(reportsDir, sid) {
+export function createSession(reportsDir, sid, options = {}) {
   const safeSid = sanitizePath(sid);
   const base = initSession(reportsDir, safeSid);
   const indexPath = path.join(base, "index.yaml");
   writeIndexYaml(indexPath, {
     session: {
       id: safeSid,
-      type: "code",
+      type: options.type || "code",
       status: "created",
-      scope: { method: "", ref: "" },
+      scope: options.type === "project" ? null : { method: "", ref: "" },
+      projectDir: options.projectDir || null,
       created: new Date().toISOString(),
     },
     codeTasks: [],
     storyTasks: [],
+    projectTasks: [],
   });
   return { id: safeSid, dir: base };
 }
@@ -148,7 +153,7 @@ export function resetReviewing(reportsDir, sid) {
   const index = readYaml(indexPath);
   let resetCount = 0;
 
-  for (const taskGroup of ["codeTasks", "storyTasks"]) {
+  for (const taskGroup of ["codeTasks", "storyTasks", "projectTasks"]) {
     const tasks = index[taskGroup] || [];
     for (let i = 0; i < tasks.length; i++) {
       if (tasks[i].status === "reviewing") {

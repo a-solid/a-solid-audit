@@ -90,6 +90,31 @@ export async function renderProgress(container, params) {
         return;
       }
 
+      // Auto-trigger scan when project session becomes ready
+      if (session.type === "project" && session.status === "ready") {
+        scanOverlay.classList.remove("hidden");
+        document.getElementById("task-list").innerHTML = "";
+        document.getElementById("progress-text").textContent = "Auto-starting scan...";
+        document.getElementById("progress-pct").textContent = "";
+        document.getElementById("progress-fill").style.width = "0%";
+        document.getElementById("session-badge").innerHTML = `<span class="badge badge-ready">ready</span>`;
+        startBtn.classList.add("hidden");
+        scanStatusEl.classList.remove("hidden");
+        scanStatusEl.textContent = "Auto-starting scan...";
+        try {
+          await api.startScan(sessionId);
+          scanStatusEl.textContent = "Scanning in progress...";
+        } catch (e) {
+          scanStatusEl.textContent = "Auto-scan failed: " + e.message;
+          startBtn.classList.remove("hidden");
+          startBtn.disabled = false;
+          startBtn.innerHTML = `${icon("search", 14)} Start Scan`;
+          showToast("Auto-scan failed: " + e.message);
+        }
+        pollTimer = setTimeout(poll, 3000);
+        return;
+      }
+
       if (scanOverlay) scanOverlay.classList.add("hidden");
 
       const tasks = await api.getTasks(sessionId);

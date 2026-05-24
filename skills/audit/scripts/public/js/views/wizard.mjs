@@ -178,47 +178,48 @@ export async function renderWizard(container, params) {
       </div>`;
 
     content.querySelectorAll("[data-type]").forEach(card => {
-      card.addEventListener("click", async () => {
+      card.addEventListener("click", () => {
         const newType = card.dataset.type;
-
-        // For new wizard, create session on type selection
-        if (isNew) {
-          // Show loading state on the card
-          card.style.opacity = "0.6";
-          card.style.pointerEvents = "none";
-          const originalContent = card.querySelector(".font-medium");
-          const originalText = originalContent?.textContent;
-          if (originalContent) originalContent.innerHTML = '<span class="spinner spinner-sm"></span> Creating...';
-
-          try {
-            const { id } = await api.createSession({ type: newType });
-            localStorage.removeItem(`audit-wizard-${sessionId}`);
-            location.hash = `#/wizard/${id}`;
-            return;
-          } catch (e) {
-            showToast("Failed to create session: " + e.message);
-            card.style.opacity = "";
-            card.style.pointerEvents = "";
-            if (originalContent) originalContent.textContent = originalText;
-            return;
-          }
-        }
-
-        // For existing session, just switch type
-        if (newType === "project" && reviewType !== "project") {
-          try {
-            const { id } = await api.createSession({ type: "project" });
-            localStorage.removeItem(`audit-wizard-${sessionId}`);
-            location.hash = `#/wizard/${id}`;
-            return;
-          } catch (e) { showToast("Failed to create session: " + e.message); }
-        }
         reviewType = newType;
         save();
         render();
       });
     });
-    document.getElementById("step1-next").addEventListener("click", () => { step = 2; save(); render(); });
+    document.getElementById("step1-next").addEventListener("click", async () => {
+      const nextBtn = document.getElementById("step1-next");
+      // If new wizard, create session on Next
+      if (isNew) {
+        const originalHTML = nextBtn.innerHTML;
+        nextBtn.disabled = true;
+        nextBtn.innerHTML = '<span class="spinner spinner-sm"></span> Creating...';
+        try {
+          const { id } = await api.createSession({ type: reviewType });
+          sessionId = id;
+          location.hash = `#/wizard/${id}`;
+        } catch (e) {
+          showToast("Failed to create session: " + e.message);
+          nextBtn.disabled = false;
+          nextBtn.innerHTML = originalHTML;
+        }
+        return;
+      }
+      // For existing session switching to project, create new session
+      if (reviewType === "project" && !isNew) {
+        // Check if current session is already project type
+        try {
+          const session = await api.getSession(sessionId);
+          if (session?.type !== "project") {
+            const { id } = await api.createSession({ type: "project" });
+            localStorage.removeItem(`audit-wizard-${sessionId}`);
+            location.hash = `#/wizard/${id}`;
+            return;
+          }
+        } catch {}
+      }
+      step = 2;
+      save();
+      render();
+    });
   }
 
   function renderProjectConfigure() {
@@ -233,11 +234,11 @@ export async function renderWizard(container, params) {
             <div class="text-xs text-muted mt-1">Leave empty to scan the current project.</div>
           </div>
           <div>
-            <label class="flex items-center gap-2">
+            <label class="checkbox-toggle">
               <input id="use-codegraph" type="checkbox" checked>
               <span class="text-sm">Use CodeGraph (if available)</span>
             </label>
-            <div class="text-xs text-muted mt-1">AST-level analysis for more accurate call chain discovery.</div>
+            <div class="text-xs text-muted mt-1" style="margin-left:46px">AST-level analysis for more accurate call chain discovery.</div>
           </div>
         </div>
 

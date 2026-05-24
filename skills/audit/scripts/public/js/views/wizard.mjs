@@ -16,7 +16,8 @@ function formatScopeDisplay(method, ref) {
 }
 
 export async function renderWizard(container, params) {
-  const sessionId = params[0];
+  let sessionId = params[0];
+  const isNew = !sessionId || sessionId === "new";
   let step = 1;
   let reviewType = "code";
   let scopeMethod = "uncommitted";
@@ -29,57 +30,67 @@ export async function renderWizard(container, params) {
   let previewGeneration = 0;
   let pendingExpandIndex = -1;
 
-  const savedKey = `audit-wizard-${sessionId}`;
-  const saved = localStorage.getItem(savedKey);
-  if (saved) {
-    const state = JSON.parse(saved);
-    step = state.step || 1;
-    reviewType = state.reviewType || "code";
-    scopeMethod = state.scopeMethod || "uncommitted";
-    scopeRef = state.scopeRef || "";
-    stories = state.stories || [];
-    storyMappings = state.storyMappings || [];
-    contextExpanded = state.contextExpanded || false;
-    excludedFiles = state.excludedFiles || [];
-  }
+  // For "new" wizard, skip session restore — no session exists yet
+  if (!isNew) {
+    const savedKey = `audit-wizard-${sessionId}`;
+    const saved = localStorage.getItem(savedKey);
+    if (saved) {
+      const state = JSON.parse(saved);
+      step = state.step || 1;
+      reviewType = state.reviewType || "code";
+      scopeMethod = state.scopeMethod || "uncommitted";
+      scopeRef = state.scopeRef || "";
+      stories = state.stories || [];
+      storyMappings = state.storyMappings || [];
+      contextExpanded = state.contextExpanded || false;
+      excludedFiles = state.excludedFiles || [];
+    }
 
-  // If no localStorage data, try to restore from server for scoped sessions
-  if (!saved) {
-    try {
-      const session = await api.getSession(sessionId);
-      if (session?.status === "scoped") {
-        reviewType = session.type || "code";
-        if (session.scope) {
-          scopeMethod = session.scope.method || "uncommitted";
-          scopeRef = session.scope.ref || "";
+    // If no localStorage data, try to restore from server for scoped sessions
+    if (!saved) {
+      try {
+        const session = await api.getSession(sessionId);
+        if (session?.status === "scoped") {
+          reviewType = session.type || "code";
+          if (session.scope) {
+            scopeMethod = session.scope.method || "uncommitted";
+            scopeRef = session.scope.ref || "";
+          }
+          // Jump to the appropriate step (past scope selection)
+          step = reviewType === "all" ? 3 : 2;
+          // Load stories from server
+          try {
+            const serverStories = await api.getStories(sessionId);
+            stories = serverStories.map(s => ({
+              name: s.name,
+              description: s.description || "",
+              acceptance: s.acceptance || "",
+            }));
+            storyMappings = serverStories.map(s => ({
+              storyName: s.name,
+              files: (s.files || []).map(f => typeof f === "string" ? f : f.name),
+            }));
+          } catch (e) { /* no stories yet */ }
+          save();
+        } else if (session?.type === "project") {
+          reviewType = "project";
+          step = 2;
+          save();
+        } else if (session?.type && session.status === "created") {
+          // New session from type selection — skip to step 2
+          reviewType = session.type === "all" ? "all" : "code";
+          step = 2;
+          save();
         }
-        // Jump to the appropriate step (past scope selection)
-        step = reviewType === "all" ? 3 : 2;
-        // Load stories from server
-        try {
-          const serverStories = await api.getStories(sessionId);
-          stories = serverStories.map(s => ({
-            name: s.name,
-            description: s.description || "",
-            acceptance: s.acceptance || "",
-          }));
-          storyMappings = serverStories.map(s => ({
-            storyName: s.name,
-            files: (s.files || []).map(f => typeof f === "string" ? f : f.name),
-          }));
-        } catch (e) { /* no stories yet */ }
-        save();
-      } else if (session?.type === "project") {
-        reviewType = "project";
-        step = 2;
-        save();
+      } catch (e) {
+        // If server fetch fails, start fresh
       }
-    } catch (e) {
-      // If server fetch fails, start fresh
     }
   }
 
   function save() {
+    if (isNew) return;
+    const savedKey = `audit-wizard-${sessionId}`;
     localStorage.setItem(savedKey, JSON.stringify({
       step, reviewType, scopeMethod, scopeRef, stories, storyMappings, contextExpanded, excludedFiles,
     }));
@@ -169,10 +180,35 @@ export async function renderWizard(container, params) {
     content.querySelectorAll("[data-type]").forEach(card => {
       card.addEventListener("click", async () => {
         const newType = card.dataset.type;
+
+        // For new wizard, create session on type selection
+        if (isNew) {
+          // Show loading state on the card
+          card.style.opacity = "0.6";
+          card.style.pointerEvents = "none";
+          const originalContent = card.querySelector(".font-medium");
+          const originalText = originalContent?.textContent;
+          if (originalContent) originalContent.innerHTML = '<span class="spinner spinner-sm"></span> Creating...';
+
+          try {
+            const { id } = await api.createSession({ type: newType });
+            localStorage.removeItem(`audit-wizard-${sessionId}`);
+            location.hash = `#/wizard/${id}`;
+            return;
+          } catch (e) {
+            showToast("Failed to create session: " + e.message);
+            card.style.opacity = "";
+            card.style.pointerEvents = "";
+            if (originalContent) originalContent.textContent = originalText;
+            return;
+          }
+        }
+
+        // For existing session, just switch type
         if (newType === "project" && reviewType !== "project") {
           try {
             const { id } = await api.createSession({ type: "project" });
-            localStorage.removeItem(savedKey);
+            localStorage.removeItem(`audit-wizard-${sessionId}`);
             location.hash = `#/wizard/${id}`;
             return;
           } catch (e) { showToast("Failed to create session: " + e.message); }
@@ -261,6 +297,11 @@ export async function renderWizard(container, params) {
       try {
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner spinner-sm"></span> Saving...';
+        // Save project directory to session
+        const dirInput = document.getElementById("project-dir");
+        if (dirInput) {
+          try { await api.patchSession(sessionId, { projectDir: dirInput.value.trim() || null }); } catch {}
+        }
         if (ctxInput) {
           try { await api.setReviewContext(sessionId, ctxInput.value); } catch {}
         }
@@ -311,8 +352,18 @@ export async function renderWizard(container, params) {
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner spinner-sm"></span> Preparing...';
         await api.updateSessionStatus(sessionId, "ready");
-        localStorage.removeItem(savedKey);
-        location.hash = `#/progress/${sessionId}`;
+        localStorage.removeItem(`audit-wizard-${sessionId}`);
+        // Show confirmation
+        const content = document.getElementById("wizard-content");
+        content.innerHTML = `
+          <div class="card" style="text-align:center;padding:var(--space-8) var(--space-6)">
+            <div style="margin-bottom:var(--space-4);color:var(--accent)">${icon("check", 48)}</div>
+            <h2 class="text-xl mb-3">Scan Ready</h2>
+            <p class="text-secondary mb-4">The project scan will begin automatically when you view progress.</p>
+            <div>
+              <a href="#/progress/${sessionId}" class="btn btn-primary">${icon("search", 14)} View Progress</a>
+            </div>
+          </div>`;
       } catch (e) {
         showToast("Failed to start scan: " + e.message);
         btn.disabled = false;

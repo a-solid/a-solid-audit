@@ -17,7 +17,7 @@ export async function renderHome(container) {
     <div class="flex items-center justify-between mb-6">
       <div>
         <h1 class="text-2xl">Sessions</h1>
-        <p class="text-sm text-muted mt-1">Code review and story alignment audits</p>
+        <p class="text-sm text-muted mt-1">Code reviews, story alignment, and project scans</p>
       </div>
       <button id="new-audit-btn" class="btn btn-primary">
         ${icon("plus", 16)}
@@ -27,13 +27,8 @@ export async function renderHome(container) {
     <div id="session-list"></div>
   `;
 
-  document.getElementById("new-audit-btn").addEventListener("click", async () => {
-    try {
-      const { id } = await api.createSession();
-      location.hash = `#/wizard/${id}`;
-    } catch (e) {
-      showToast("Failed to create session: " + e.message);
-    }
+  document.getElementById("new-audit-btn").addEventListener("click", () => {
+    location.hash = "#/wizard/new";
   });
 
   const listEl = document.getElementById("session-list");
@@ -57,13 +52,8 @@ export async function renderHome(container) {
             New Audit
           </button>
         </div>`;
-      document.getElementById("empty-cta")?.addEventListener("click", async () => {
-        try {
-          const { id } = await api.createSession();
-          location.hash = `#/wizard/${id}`;
-        } catch (e) {
-          showToast("Failed to create session: " + e.message);
-        }
+      document.getElementById("empty-cta")?.addEventListener("click", () => {
+        location.hash = "#/wizard/new";
       });
       return;
     }
@@ -72,15 +62,18 @@ export async function renderHome(container) {
       ${sessions.map(s => {
       const cfg = STATUS_CONFIG[s.status] || STATUS_CONFIG.created;
       const pct = s.progress?.percentage ?? 0;
+      const isProject = s.type === "project";
+      const sessionIcon = isProject ? icon("search", 18) : icon("file", 18);
+      const typeLabel = isProject ? "Project Scan" : s.type === "all" ? "Code + Story" : "Code Review";
       return `
-        <div class="card card-clickable ${cfg.accent}" data-id="${s.id}" data-status="${s.status}">
+        <div class="card card-clickable ${cfg.accent}" data-id="${s.id}" data-status="${s.status}" data-type="${s.type}">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-3" style="min-width:0">
-              <div style="color:var(--text-muted);flex-shrink:0">${icon("file", 18)}</div>
+              <div style="color:${isProject ? "var(--info)" : "var(--text-muted)"};flex-shrink:0">${sessionIcon}</div>
               <div style="min-width:0">
                 <div class="font-mono text-sm truncate">${escapeHtml(s.id)}</div>
                 <div class="text-xs text-muted mt-1">
-                  ${s.type} &middot; ${new Date(s.created).toLocaleDateString()}
+                  ${typeLabel} &middot; ${new Date(s.created).toLocaleDateString()}
                 </div>
               </div>
             </div>

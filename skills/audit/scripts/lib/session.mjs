@@ -107,6 +107,22 @@ export function updateSessionStatus(reportsDir, sid, newStatus) {
   return index.session;
 }
 
+// Update mutable session fields (projectDir, etc.)
+const MUTABLE_FIELDS = ["projectDir"];
+export function updateSession(reportsDir, sid, updates) {
+  const safeSid = sanitizePath(sid);
+  const indexPath = path.join(reportsDir, safeSid, "index.yaml");
+  if (!fs.existsSync(indexPath)) throw new Error("Session not found: " + safeSid);
+  const index = readYaml(indexPath);
+  for (const key of MUTABLE_FIELDS) {
+    if (key in updates) {
+      index.session[key] = updates[key];
+    }
+  }
+  writeIndexYaml(indexPath, index);
+  return index.session;
+}
+
 // Initialize a new session directory
 export function initSession(reportsDir, sid) {
   const safeSid = sanitizePath(sid);

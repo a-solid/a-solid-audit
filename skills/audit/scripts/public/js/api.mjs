@@ -29,6 +29,8 @@ export const api = {
     request("POST", "/api/sessions", options),
   updateSessionStatus: (id, status) =>
     request("PUT", `/api/sessions/${encodeURIComponent(id)}/status`, { status }),
+  patchSession: (id, data) =>
+    request("PATCH", `/api/sessions/${encodeURIComponent(id)}`, data),
 
   // Git
   getCommits: () => request("GET", "/api/git/commits"),

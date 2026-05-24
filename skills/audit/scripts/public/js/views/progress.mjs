@@ -10,6 +10,7 @@ export async function renderProgress(container, params) {
   let pollInterval = 3000;
   let lastReviewedCount = 0;
   let stableCount = 0;
+  let scanStarted = false;
 
   setBreadcrumb([
     { label: "Sessions", href: "#/home" },
@@ -19,8 +20,8 @@ export async function renderProgress(container, params) {
   container.innerHTML = `
     <div class="flex items-center justify-between mb-6">
       <div>
-        <h1 class="text-2xl">AI Review in Progress</h1>
-        <p class="text-sm text-muted mt-1">Keep the AI terminal open.</p>
+        <h1 class="text-2xl" id="progress-heading">Loading...</h1>
+        <p class="text-sm text-muted mt-1" id="progress-subtitle"></p>
       </div>
       <div class="flex items-center gap-2">
         <div id="session-badge"></div>
@@ -44,7 +45,7 @@ export async function renderProgress(container, params) {
     <div id="scan-overlay" class="hidden card" style="text-align:center;padding:var(--space-8) var(--space-6);margin-bottom:var(--space-4)">
       <div style="margin-bottom:var(--space-4);color:var(--info)">${icon("search", 48)}</div>
       <h2 class="text-lg mb-2">Project Scan</h2>
-      <p class="text-sm text-muted mb-4" style="max-width:400px;margin:0 auto">Discover entry points and call chains. This may take a minute for large projects.</p>
+      <p class="text-sm text-muted mb-4" style="max-width:400px;margin:0 auto">Discovering entry points and analyzing call chains. This may take a minute for large projects.</p>
       <div id="scan-status" class="text-sm text-muted mb-4 hidden"></div>
       <button id="start-scan-btn" class="btn btn-primary">${icon("search", 14)} Start Scan</button>
     </div>
@@ -57,6 +58,27 @@ export async function renderProgress(container, params) {
       </div>
     </div>
   `;
+
+  function updateHeading(isProject, phase) {
+    const heading = document.getElementById("progress-heading");
+    const subtitle = document.getElementById("progress-subtitle");
+    if (!heading) return;
+    if (isProject) {
+      if (phase === "scanning") {
+        heading.textContent = "Scanning Project";
+        subtitle.textContent = "Discovering entry points and call chains...";
+      } else if (phase === "reviewing") {
+        heading.textContent = "AI Review in Progress";
+        subtitle.textContent = "Reviewing scanned entry points.";
+      } else {
+        heading.textContent = "Project Scan";
+        subtitle.textContent = "";
+      }
+    } else {
+      heading.textContent = "AI Review in Progress";
+      subtitle.textContent = "Keep the AI terminal open.";
+    }
+  }
 
   async function poll() {
     try {
@@ -71,6 +93,7 @@ export async function renderProgress(container, params) {
 
       if (session.type === "project" && (session.status === "created" || session.status === "scanning")) {
         scanOverlay.classList.remove("hidden");
+        updateHeading(true, "scanning");
         document.getElementById("task-list").innerHTML = "";
         document.getElementById("progress-text").textContent = "Project scan not started";
         document.getElementById("progress-pct").textContent = "";
@@ -91,31 +114,36 @@ export async function renderProgress(container, params) {
       }
 
       // Auto-trigger scan when project session becomes ready
-      if (session.type === "project" && session.status === "ready") {
+      if (session.type === "project" && session.status === "ready" && !scanStarted) {
+        scanStarted = true;
         scanOverlay.classList.remove("hidden");
+        updateHeading(true, "scanning");
         document.getElementById("task-list").innerHTML = "";
-        document.getElementById("progress-text").textContent = "Auto-starting scan...";
+        document.getElementById("progress-text").textContent = "Starting scan...";
         document.getElementById("progress-pct").textContent = "";
         document.getElementById("progress-fill").style.width = "0%";
         document.getElementById("session-badge").innerHTML = `<span class="badge badge-ready">ready</span>`;
         startBtn.classList.add("hidden");
         scanStatusEl.classList.remove("hidden");
-        scanStatusEl.textContent = "Auto-starting scan...";
+        scanStatusEl.textContent = "Starting scan...";
         try {
           await api.startScan(sessionId);
           scanStatusEl.textContent = "Scanning in progress...";
         } catch (e) {
-          scanStatusEl.textContent = "Auto-scan failed: " + e.message;
+          scanStatusEl.textContent = "Scan failed to start. Click below to retry.";
           startBtn.classList.remove("hidden");
           startBtn.disabled = false;
-          startBtn.innerHTML = `${icon("search", 14)} Start Scan`;
-          showToast("Auto-scan failed: " + e.message);
+          startBtn.innerHTML = `${icon("search", 14)} Retry Scan`;
+          scanStarted = false;
+          showToast("Scan failed: " + e.message);
         }
         pollTimer = setTimeout(poll, 3000);
         return;
       }
 
       if (scanOverlay) scanOverlay.classList.add("hidden");
+
+      updateHeading(session.type === "project", "reviewing");
 
       const tasks = await api.getTasks(sessionId);
 
@@ -149,7 +177,7 @@ export async function renderProgress(container, params) {
                   ? `<span style="color:var(--accent);flex-shrink:0">${icon("check", 16)}</span>`
                   : `<span style="color:var(--text-muted);flex-shrink:0">${icon("clock", 16)}</span>`
               }
-              <span class="text-sm font-mono truncate">${t.type && ENTRY_TYPES[t.type] ? `<span class="badge entry-type-badge" style="background:${ENTRY_TYPES[t.type].color}20;color:${ENTRY_TYPES[t.type].color};border:1px solid ${ENTRY_TYPES[t.type].color}40;margin-right:6px">${ENTRY_TYPES[t.type].label}</span>` : ""}${escapeHtml(t.name || t.file)}</span>
+              <span class="text-sm font-mono truncate">${t.type && ENTRY_TYPES[t.type] ? `<span class="badge entry-type-badge" style="color:${ENTRY_TYPES[t.type].color};border:1px solid ${ENTRY_TYPES[t.type].color};opacity:0.9;margin-right:6px">${ENTRY_TYPES[t.type].label}</span>` : ""}${escapeHtml(t.name || t.file)}</span>
             </div>
             <div class="flex items-center gap-3" style="flex-shrink:0">
               ${t.review?.score ? `<span class="text-sm font-mono ${scoreColor}">${t.review.score}/10</span>` : ""}
@@ -193,6 +221,8 @@ export async function renderProgress(container, params) {
   }
 
   document.getElementById("start-scan-btn").addEventListener("click", async () => {
+    if (scanStarted) return;
+    scanStarted = true;
     const startBtn = document.getElementById("start-scan-btn");
     const scanStatusEl = document.getElementById("scan-status");
     startBtn.disabled = true;
@@ -205,8 +235,9 @@ export async function renderProgress(container, params) {
       pollInterval = 3000;
       pollTimer = setTimeout(poll, pollInterval);
     } catch (e) {
+      scanStarted = false;
       startBtn.disabled = false;
-      startBtn.innerHTML = `${icon("search", 14)} Start Scan`;
+      startBtn.innerHTML = `${icon("search", 14)} Retry Scan`;
       scanStatusEl.textContent = "Scan failed: " + e.message;
       showToast("Scan failed: " + e.message, "error");
     }

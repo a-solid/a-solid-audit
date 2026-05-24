@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
-  listSessions, getSession, createSession, updateSessionStatus, sessionId, sanitizePath,
+  listSessions, getSession, createSession, updateSessionStatus, updateSession, sessionId, sanitizePath,
 } from "../../lib/session.mjs";
 import { jsonResponse, readBody, errorResponse } from "../index.mjs";
 
@@ -69,6 +69,21 @@ export function registerSessionRoutes(router, reportsDir) {
     } catch (e) {
       if (e.message.includes("Cannot transition")) return errorResponse(res, e.message, "CONFLICT", 409);
       if (e.message.includes("Invalid status")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
+      if (e.message.includes("not found")) return errorResponse(res, e.message, "NOT_FOUND", 404);
+      throw e;
+    }
+  });
+
+  // PATCH /api/sessions/:id — update mutable session fields
+  router.patch("/api/sessions/:id", async (req, res, params) => {
+    try {
+      const body = JSON.parse(await readBody(req));
+      if (!body || Object.keys(body).length === 0) {
+        return errorResponse(res, "No fields to update", "VALIDATION_ERROR", 400);
+      }
+      const session = updateSession(reportsDir, params.id, body);
+      jsonResponse(res, session);
+    } catch (e) {
       if (e.message.includes("not found")) return errorResponse(res, e.message, "NOT_FOUND", 404);
       throw e;
     }

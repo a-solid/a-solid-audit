@@ -1298,3 +1298,40 @@ code {
   .progress-fill { transition-duration: 0.01ms !important; }
   .app-main.fade-in { animation: none; opacity: 1; }
 }
+
+/* ─── Task Overview ─── */
+.task-overview {
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-3);
+}
+.overview-diagram {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-3) 0;
+}
+.overview-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+.overview-diagram .node rect,
+.overview-diagram .node polygon {
+  rx: 6;
+  ry: 6;
+}
+.entry-type-badge {
+  text-transform: uppercase;
+  font-size: var(--text-xs);
+  letter-spacing: 0.5px;
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+}
+.mermaid-placeholder {
+  padding: var(--space-4);
+  text-align: center;
+}
+[data-theme="light"] .overview-diagram .edgeLabel {
+  color: #374151;
+}

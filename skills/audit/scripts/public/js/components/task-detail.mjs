@@ -1,6 +1,6 @@
 // skills/audit/scripts/public/js/components/task-detail.mjs
 import { icon, escapeHtml } from "../app.mjs";
-import { scoreColor } from "../constants.mjs";
+import { scoreColor, ENTRY_TYPES } from "../constants.mjs";
 
 export function renderTaskDetail(task, notes) {
   if (!task) return `<div class="text-muted text-sm flex items-center gap-2">${icon("chevronRight", 16)} Select a task to view details.</div>`;
@@ -35,6 +35,25 @@ export function renderTaskDetail(task, notes) {
           <div class="text-xs text-muted mt-1">${score ?? "-"}/10 &middot; ${findings.length} findings</div>
         </div>
       </div>
+
+      ${task.overview ? `
+        <div class="task-overview">
+          ${task.type && ENTRY_TYPES[task.type] ? `
+            <div class="flex items-center gap-2 mb-3">
+              <span class="badge entry-type-badge" style="background:${ENTRY_TYPES[task.type].color}20;color:${ENTRY_TYPES[task.type].color};border:1px solid ${ENTRY_TYPES[task.type].color}40">${ENTRY_TYPES[task.type].label}</span>
+              ${task.entry ? `<span class="text-xs font-mono text-muted">${escapeHtml(task.entry)}</span>` : ""}
+            </div>
+          ` : ""}
+          ${task.overview.diagram ? `
+            <div class="overview-diagram" data-mermaid-source="${escapeHtml(task.overview.diagram)}">
+              <div class="mermaid-placeholder text-sm text-muted">Loading diagram...</div>
+            </div>
+          ` : ""}
+          ${task.overview.description ? `
+            <div class="overview-description text-sm text-secondary mt-2">${escapeHtml(task.overview.description)}</div>
+          ` : ""}
+        </div>
+      ` : ""}
 
       ${task.review?.summary ? `
         <div>
@@ -136,4 +155,19 @@ export function renderTaskDetail(task, notes) {
         </div>
       ` : ""}
     </div>`;
+}
+
+export async function renderMermaidDiagrams(container) {
+  const els = container.querySelectorAll("[data-mermaid-source]");
+  for (const el of els) {
+    if (el.dataset.rendered) continue;
+    el.dataset.rendered = "true";
+    try {
+      const src = el.dataset.mermaidSource;
+      const { svg } = await mermaid.render("mermaid-" + Math.random().toString(36).slice(2, 8), src);
+      el.innerHTML = svg;
+    } catch (e) {
+      el.innerHTML = `<pre class="text-xs text-muted">${escapeHtml(el.dataset.mermaidSource)}</pre>`;
+    }
+  }
 }

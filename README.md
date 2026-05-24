@@ -8,6 +8,7 @@ AI-powered code review and story alignment audit tool.
 
 - **AI Code Review** — automated analysis of correctness, quality, security, error handling, and best practices per file
 - **Story Alignment Review** — maps acceptance criteria to actual code changes with coverage evaluation
+- **Project Scan** — full project-level scan from entry points (API routes, cron jobs, consumers, scripts), traces call chains with optional [CodeGraph](https://github.com/colbymchenry/codegraph) AST analysis
 - **Live Web Report** — report server auto-starts before AI review, watch progress in real-time at `localhost:3456`
 - **Human Confirmation & Sign-off** — confirm/dismiss findings with reason selection, add notes, sign off with name and role
 - **Provider Plugin System** — extensible story providers (JIRA, Linear, etc.) via scripts in `scripts/providers/`
@@ -70,8 +71,9 @@ claude
 ```
 
 3. Follow the interactive prompts to:
-   - Select review type: **code review**, **story review**, or **both**
-   - Specify git scope: **uncommitted changes**, **two commits**, or **branch diff**
+   - Select review type: **code review**, **story review**, **project scan**, or **both**
+   - Specify git scope: **uncommitted changes**, **two commits**, or **branch diff** (for code/story review)
+   - For project scan: choose the target project directory
 
 4. AI agents review each file/story sequentially
 
@@ -82,6 +84,8 @@ http://localhost:3456
 ```
 
 ## Audit Flow
+
+### Code Review / Story Review
 
 ```dot
 digraph audit_flow {
@@ -107,6 +111,35 @@ digraph audit_flow {
     "Story review loop" -> "User review phase";
 }
 ```
+
+### Project Scan
+
+```dot
+digraph project_scan_flow {
+    "Init session" [shape=box];
+    "Start Scan" [shape=box];
+    "Entry discovery" [shape=box];
+    "Call chain tracing" [shape=box];
+    "Task generation" [shape=box];
+    "AI review per task" [shape=box];
+    "User review phase" [shape=doublecircle];
+
+    "Init session" -> "Start Scan";
+    "Start Scan" -> "Entry discovery";
+    "Entry discovery" -> "Call chain tracing";
+    "Call chain tracing" -> "Task generation";
+    "Task generation" -> "AI review per task";
+    "AI review per task" -> "User review phase";
+}
+```
+
+**How Project Scan works:**
+
+1. **Entry discovery** — scans the project for entry points by heuristic path matching (API handlers, cron jobs, message consumers, CLI scripts) or via [CodeGraph](https://github.com/colbymchenry/codegraph) framework-aware route detection
+2. **Call chain tracing** — for each entry point, traces the call chain to all related files (CodeGraph AST analysis when available, regex-based import resolution as fallback)
+3. **Task generation** — each entry point + its call chain becomes an independent review task with a Mermaid call chain diagram
+4. **AI review** — an AI sub-agent reviews each task for security vulnerabilities, business logic bugs, and code quality issues
+5. **User review** — browse findings, confirm or dismiss with reasons, sign off
 
 ## Web Report
 
@@ -173,12 +206,13 @@ The task table shows a Human Review column with three states:
 |---|---|
 | **audit** | Orchestrator — manages session lifecycle, git diff, task delegation, and report server |
 
-The orchestrator uses two internal prompts (not registered as standalone skills):
+The orchestrator uses three internal prompts (not registered as standalone skills):
 
 | Prompt | Description |
 |---|---|
 | **code-review** | Analyzes per-file diffs against 5 criteria, outputs severity-rated findings and score |
 | **story-review** | Evaluates acceptance criteria coverage against code changes |
+| **project-review** | Reviews entry-point call chains for security, business logic, and code quality |
 
 ## Session Data
 
@@ -192,10 +226,50 @@ Each audit session creates a `.audit/<session-id>/` directory:
       <path.to.file>.yaml   # Per-file code review task
     story-tasks/
       <story-name>.yaml     # Per-story alignment task
+    project-tasks/
+      <entry-name>.yaml     # Per-entry-point project scan task
     review-notes.yaml       # User notes, finding confirmations, sign-off
 ```
 
+### Project Task YAML
+
+Each project scan task contains:
+
+```yaml
+name: "user-management"
+type: api                         # api | scheduled | consumer | script | unknown
+entry: "src/handlers/users.mjs"   # Entry point file
+files:                            # All files in the call chain
+  - "src/handlers/users.mjs"
+  - "src/services/user-service.mjs"
+overview:
+  diagram: "graph TD\n  ..."      # Mermaid call chain diagram
+  description: "HTTP API ..."     # Execution flow description
+review:
+  score: 7
+  findings: [...]
+  positives: [...]
+```
+
 ## Configuration
+
+### CodeGraph (Optional)
+
+[CodeGraph](https://github.com/colbymchenry/codegraph) provides AST-level call chain analysis for more precise project scans. Without it, the scanner uses heuristic import resolution.
+
+Install via the bundled script:
+
+```bash
+bash scripts/setup-codegraph.sh
+```
+
+Or manually:
+
+```bash
+git clone https://github.com/colbymchenry/codegraph.git ~/.local/share/codegraph
+cd ~/.local/share/codegraph && npm install && npm run build
+npm link
+```
 
 ### Story Providers
 

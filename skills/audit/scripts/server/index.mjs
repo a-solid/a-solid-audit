@@ -11,6 +11,7 @@ import { registerTaskRoutes } from "./handlers/tasks.mjs";
 import { registerNoteRoutes } from "./handlers/notes.mjs";
 import { registerReviewRoutes } from "./handlers/reviews.mjs";
 import { registerProjectScanRoutes } from "./handlers/project-scan.mjs";
+import { registerSettingsRoutes } from "./handlers/settings.mjs";
 
 export function jsonResponse(res, data, status = 200) {
   res.writeHead(status, { "Content-Type": "application/json" });
@@ -41,6 +42,7 @@ export function startServer(projectDir, port = 3456) {
   registerNoteRoutes(router, reportsDir);
   registerReviewRoutes(router, reportsDir);
   registerProjectScanRoutes(router, reportsDir, projectDir);
+  registerSettingsRoutes(router);
 
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, `http://localhost:${port}`);

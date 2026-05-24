@@ -83,4 +83,10 @@ export const api = {
   // Settings
   getSettings: () => request("GET", "/api/settings"),
   updateSettings: (data) => request("PUT", "/api/settings", data),
+
+  // CodeGraph
+  getCodegraphStatus: (projectDir) =>
+    request("GET", `/api/codegraph/status?dir=${encodeURIComponent(projectDir)}`),
+  initCodegraph: (projectDir) =>
+    request("POST", "/api/codegraph/init", { projectDir }),
 };

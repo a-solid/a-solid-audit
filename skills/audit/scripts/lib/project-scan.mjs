@@ -443,10 +443,39 @@ export function setProjectScope(projectDir, reportsDir, sid, scanOptions = {}) {
   const indexPath = path.join(sessionDir, "index.yaml");
   if (!fs.existsSync(indexPath)) throw new Error("Session not found: " + safeSid);
 
+  const mode = scanOptions.mode || "classic";
   const startTime = Date.now();
   resetCodegraphCache();
-  pushLog(safeSid, "info", `setProjectScope: starting scan of ${projectDir}`);
+  pushLog(safeSid, "info", `setProjectScope: starting scan of ${projectDir} (mode: ${mode})`);
 
+  // Update index to mark as project type
+  const index = readYaml(indexPath);
+  writeIndexYaml(indexPath, {
+    session: {
+      ...index.session,
+      type: "project",
+      scope: { method: "directory-scan", ref: "" },
+      projectDir,
+    },
+    codeTasks: index.codeTasks || [],
+    storyTasks: index.storyTasks || [],
+    projectTasks: index.projectTasks || [],
+  });
+
+  if (mode === "scan") {
+    // New flow: scan + collect graph data, return without generating tasks
+    const graphData = collectGraphData(projectDir, reportsDir, safeSid);
+    pushLog(safeSid, "info", `setProjectScope (scan): ${graphData.totalFiles} files scanned in ${Date.now() - startTime}ms`);
+    return {
+      taskCount: 0,
+      totalFiles: graphData.totalFiles,
+      entryFiles: graphData.entryFiles.length,
+      hasGraph: Object.keys(graphData.imports).length > 0,
+      mode: "scan",
+    };
+  }
+
+  // Classic flow: scan + chunk + generate tasks
   const files = scanProjectDir(projectDir, scanOptions, safeSid);
   const chunks = chunkFiles(files, projectDir, safeSid);
   const exclude = new Set(scanOptions.excludeFiles || []);
@@ -484,21 +513,21 @@ export function setProjectScope(projectDir, reportsDir, sid, scanOptions = {}) {
     })),
   });
 
-  const index = readYaml(indexPath);
+  const idx = readYaml(indexPath);
   writeIndexYaml(indexPath, {
     session: {
-      ...index.session,
+      ...idx.session,
       type: "project",
       scope: { method: "directory-scan", ref: "" },
       projectDir,
     },
-    codeTasks: index.codeTasks || [],
-    storyTasks: index.storyTasks || [],
+    codeTasks: idx.codeTasks || [],
+    storyTasks: idx.storyTasks || [],
     projectTasks: tasks,
   });
 
-  pushLog(safeSid, "info", `setProjectScope: ${tasks.length} tasks from ${files.length} files in ${Date.now() - startTime}ms`);
-  return { taskCount: tasks.length, totalFiles: files.length, chunks };
+  pushLog(safeSid, "info", `setProjectScope (classic): ${tasks.length} tasks from ${files.length} files in ${Date.now() - startTime}ms`);
+  return { taskCount: tasks.length, totalFiles: files.length, chunks, mode: "classic" };
 }
 
 export function getProjectMap(reportsDir, sid) {

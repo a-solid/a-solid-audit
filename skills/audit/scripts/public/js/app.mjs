@@ -5,10 +5,14 @@ import { renderWizard } from "./views/wizard.mjs";
 import { renderProgress } from "./views/progress.mjs";
 import { renderReview } from "./views/review.mjs";
 import { renderSummary } from "./views/summary.mjs";
+import { renderSettings } from "./views/settings.mjs";
 import { initNotesPanel } from "./components/notes-panel.mjs";
 import { initTheme } from "./theme.mjs";
 
 initTheme();
+
+const settingsBtn = document.getElementById("header-settings-btn");
+if (settingsBtn) settingsBtn.innerHTML = icon("settings", 16);
 
 const container = document.getElementById("app");
 const breadcrumbEl = document.getElementById("breadcrumb");
@@ -116,6 +120,7 @@ const routes = {
   progress: renderProgress,
   review: renderReview,
   summary: renderSummary,
+  settings: renderSettings,
 };
 
 function parseHash() {

@@ -25,7 +25,8 @@ export const api = {
   // Sessions
   listSessions: () => request("GET", "/api/sessions"),
   getSession: (id) => request("GET", `/api/sessions/${encodeURIComponent(id)}`),
-  createSession: () => request("POST", "/api/sessions"),
+  createSession: (options = {}) =>
+    request("POST", "/api/sessions", options),
   updateSessionStatus: (id, status) =>
     request("PUT", `/api/sessions/${encodeURIComponent(id)}/status`, { status }),
 
@@ -70,4 +71,10 @@ export const api = {
   getReviewContext: (id) => request("GET", `/api/sessions/${encodeURIComponent(id)}/review-context`),
   setReviewContext: (id, context) =>
     request("PUT", `/api/sessions/${encodeURIComponent(id)}/review-context`, { context }),
+
+  // Project Scan
+  startScan: (id) =>
+    request("POST", `/api/sessions/${encodeURIComponent(id)}/scan`),
+  getScanStatus: (id) =>
+    request("GET", `/api/sessions/${encodeURIComponent(id)}/scan/status`),
 };

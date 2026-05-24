@@ -45,6 +45,32 @@ For each story task with status `pending` (sequentially):
 3. Sub-agent reads the story task YAML, reads referenced code task YAMLs for diffs, performs the review, and POSTs results via the review endpoint
 4. Sub-agent appends cross-file observations to `review-context.md`
 
-### 5. Completion
+### 5. Project Scan Loop (if `type === "project"` session)
+
+For each project task with status `pending` (sequentially):
+
+1. `POST /api/sessions/:id/tasks/:file/review` with `{"status":"reviewing"}` — sets task to reviewing
+2. Dispatch a sub-agent with `prompts/project-review.md`, passing `session-id` and `task-file` as context.
+3. Sub-agent reads the task YAML (contains `files[]`, `type`, `entry`), reads source files from the project directory, performs security and quality review, and POSTs results via the review endpoint
+4. Sub-agent generates an `overview` with a Mermaid diagram of the call chain and a description of execution flow
+5. Sub-agent appends cross-file observations to `review-context.md`
+
+### 4.5. Project Grouping (if type === "project" and status === "scanned")
+
+When user types "group <session-id>":
+
+1. `GET /api/sessions/<session-id>` — confirm status is `scanned`
+2. `PUT /api/sessions/<session-id>/status` with `{ status: "grouping" }`
+3. Dispatch a sub-agent with `prompts/project-group.md`, passing session-id as context. The sub-agent:
+   - Reads `.audit/<session-id>/graph-data.json`
+   - Analyzes the dependency graph
+   - Groups files into logical modules
+   - Writes `.audit/<session-id>/groups.json`
+4. After sub-agent completes, the web UI will poll and detect `groups.json`
+5. User reviews and adjusts groups in the browser UI
+6. User clicks "Confirm Groups" which triggers task generation
+7. Tell user: "Grouping complete. Review and adjust groups at http://localhost:3456."
+
+### 6. Completion
 
 When all tasks are reviewed, the review API automatically sets session status to `completed`. Tell the user: "Review complete. Findings at http://localhost:3456."

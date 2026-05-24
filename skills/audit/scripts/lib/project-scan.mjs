@@ -1,0 +1,271 @@
+// skills/audit/scripts/lib/project-scan.mjs
+import fs from "node:fs";
+import path from "node:path";
+import { sanitizePath } from "./session.mjs";
+import { readYaml, writeYaml, writeIndexYaml, writeProjectTaskYaml } from "./yaml.mjs";
+
+const EXCLUDED_DIRS = new Set([
+  "node_modules", ".git", "dist", "build", "vendor", "__pycache__",
+  ".next", "coverage", ".venv", "venv", ".idea", ".vscode",
+  "target", "bin", "obj", ".gradle", ".mvn", "logs",
+]);
+
+const CODE_EXTENSIONS = new Set([
+  "mjs", "js", "ts", "cjs", "jsx", "tsx",
+  "py", "rb", "go", "java", "kt", "scala", "cs",
+  "php", "sh", "bash", "zsh", "sql", "plsql",
+  "json", "yaml", "yml", "toml",
+]);
+
+const HIGH_PRIORITY_KEYWORDS = [
+  "server", "handler", "controller", "service", "api", "route",
+  "middleware", "model", "repository", "dao", "migration", "db",
+  "script", "scripts", "cron", "job", "worker", "consumer",
+  "trigger", "procedure",
+];
+
+const MED_PRIORITY_KEYWORDS = [
+  "lib", "utils", "helpers", "common", "shared", "core", "config",
+];
+
+const MAX_FILES_PER_CHUNK = 15;
+
+function classifyPriority(filePath) {
+  const normalized = filePath.toLowerCase().replace(/\\/g, "/");
+  for (const kw of HIGH_PRIORITY_KEYWORDS) {
+    if (normalized.includes("/" + kw) || normalized.includes(kw + "/") || normalized.includes(kw + ".")) {
+      return "high";
+    }
+  }
+  if (normalized.endsWith(".sql") || normalized.endsWith(".sh")) return "high";
+  for (const kw of MED_PRIORITY_KEYWORDS) {
+    if (normalized.includes("/" + kw) || normalized.includes(kw + "/")) {
+      return "medium";
+    }
+  }
+  return "low";
+}
+
+const ENTRY_PATTERNS = [
+  { type: "api", keywords: ["handler", "controller", "route", "api", "endpoint"] },
+  { type: "scheduled", keywords: ["cron", "job", "scheduler"] },
+  { type: "consumer", keywords: ["consumer", "subscriber", "worker", "queue", "listener"] },
+  { type: "script", keywords: ["script", "bin", "cli", "migration"] },
+];
+
+function classifyEntryType(filePath) {
+  const normalized = filePath.toLowerCase().replace(/\\/g, "/");
+  const name = path.basename(normalized);
+  for (const { type, keywords } of ENTRY_PATTERNS) {
+    for (const kw of keywords) {
+      if (normalized.includes("/" + kw) || normalized.includes(kw + "/") || name.includes(kw)) {
+        return type;
+      }
+    }
+  }
+  return "unknown";
+}
+
+const IMPORT_RE = /(?:import\s+.*?\s+from\s+['"])(\.{1,2}\/[^'"]+)(?:['"])|(?:require\s*\(\s*['"])(\.{1,2}\/[^'"]+)(?:['"])/g;
+
+function resolveImports(filePath, projectDir) {
+  const fullPath = path.join(projectDir, filePath);
+  if (!fs.existsSync(fullPath)) return [];
+  try {
+    const src = fs.readFileSync(fullPath, "utf-8");
+    const imports = [];
+    let m;
+    while ((m = IMPORT_RE.exec(src)) !== null) {
+      const raw = m[1] || m[2];
+      const resolved = path.normalize(path.join(path.dirname(filePath), raw));
+      let rel = resolved.replace(/\\/g, "/");
+      for (const ext of ["", ".mjs", ".js", ".ts", ".cjs"]) {
+        if (fs.existsSync(path.join(projectDir, rel + ext))) {
+          imports.push(rel + ext);
+          break;
+        }
+      }
+      for (const ext of ["/index.mjs", "/index.js", "/index.ts"]) {
+        if (fs.existsSync(path.join(projectDir, rel + ext))) {
+          imports.push(rel + ext);
+          break;
+        }
+      }
+    }
+    return [...new Set(imports)];
+  } catch {
+    return [];
+  }
+}
+
+export function scanProjectDir(projectDir, options = {}) {
+  const excludeDirs = new Set([...EXCLUDED_DIRS, ...(options.excludeDirs || [])]);
+  const minPriority = options.priority || "low";
+  const priorityOrder = { high: 0, medium: 1, low: 2 };
+  const minIdx = priorityOrder[minPriority] ?? 2;
+
+  const files = [];
+
+  function walk(dir) {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        if (excludeDirs.has(entry.name)) continue;
+        if (entry.name.startsWith(".") && entry.name !== ".env") continue;
+        walk(path.join(dir, entry.name));
+      } else if (entry.isFile()) {
+        const ext = entry.name.split(".").pop().toLowerCase();
+        if (!CODE_EXTENSIONS.has(ext)) continue;
+        const fullPath = path.join(dir, entry.name);
+        const relative = path.relative(projectDir, fullPath).replace(/\\/g, "/");
+        const priority = classifyPriority(relative);
+        if (priorityOrder[priority] > minIdx) continue;
+        files.push({ path: relative, priority });
+      }
+    }
+  }
+
+  walk(projectDir);
+  files.sort((a, b) => a.path.localeCompare(b.path));
+  return files;
+}
+
+export function chunkFiles(files, projectDir) {
+  const entries = [];
+  const nonEntries = [];
+  for (const f of files) {
+    const entryType = classifyEntryType(f.path);
+    if (entryType !== "unknown") {
+      entries.push({ ...f, entryType });
+    } else {
+      nonEntries.push(f);
+    }
+  }
+
+  const claimed = new Set();
+  const chunks = [];
+  let chunkIdx = 1;
+
+  for (const entry of entries) {
+    const chain = new Set([entry.path]);
+    for (const imp of resolveImports(entry.path, projectDir)) {
+      chain.add(imp);
+      for (const imp2 of resolveImports(imp, projectDir)) {
+        chain.add(imp2);
+      }
+    }
+    const chainFiles = [...chain].filter(p => files.some(f => f.path === p));
+    chainFiles.forEach(p => claimed.add(p));
+
+    chunks.push({
+      id: "chunk-" + String(chunkIdx++).padStart(3, "0"),
+      name: entry.path,
+      type: entry.entryType,
+      entry: entry.path,
+      files: chainFiles,
+      priority: entry.priority,
+      fileCount: chainFiles.length,
+    });
+  }
+
+  const remaining = nonEntries.filter(f => !claimed.has(f.path));
+  const dirGroups = new Map();
+  for (const f of remaining) {
+    const dir = path.dirname(f.path);
+    if (!dirGroups.has(dir)) dirGroups.set(dir, []);
+    dirGroups.get(dir).push(f);
+  }
+  for (const [dir, dirFiles] of dirGroups) {
+    chunks.push({
+      id: "chunk-" + String(chunkIdx++).padStart(3, "0"),
+      name: dir === "." ? "root" : dir + "/",
+      type: "unknown",
+      entry: null,
+      files: dirFiles.map(f => f.path),
+      priority: dirFiles[0].priority,
+      fileCount: dirFiles.length,
+    });
+  }
+
+  const merged = [];
+  for (const chunk of chunks) {
+    if (merged.length > 0 && merged[merged.length - 1].type === "unknown" && chunk.type === "unknown"
+        && merged[merged.length - 1].fileCount + chunk.fileCount <= MAX_FILES_PER_CHUNK) {
+      const last = merged[merged.length - 1];
+      last.name = last.name + " + " + chunk.name;
+      last.files = [...last.files, ...chunk.files];
+      last.fileCount += chunk.fileCount;
+    } else {
+      merged.push({ ...chunk, files: [...chunk.files] });
+    }
+  }
+
+  return merged;
+}
+
+export function setProjectScope(projectDir, reportsDir, sid, scanOptions = {}) {
+  const safeSid = sanitizePath(sid);
+  const sessionDir = path.join(reportsDir, safeSid);
+  const indexPath = path.join(sessionDir, "index.yaml");
+  if (!fs.existsSync(indexPath)) throw new Error("Session not found: " + safeSid);
+
+  const files = scanProjectDir(projectDir, scanOptions);
+  const chunks = chunkFiles(files, projectDir);
+  const exclude = new Set(scanOptions.excludeFiles || []);
+
+  const tasksDir = path.join(sessionDir, "project-tasks");
+  fs.mkdirSync(tasksDir, { recursive: true });
+
+  const tasks = [];
+  for (const chunk of chunks) {
+    const filtered = chunk.files.filter(f => !exclude.has(f));
+    if (filtered.length === 0) continue;
+    const tf = chunk.id + ".yaml";
+    writeProjectTaskYaml(path.join(tasksDir, tf), {
+      name: chunk.name,
+      type: chunk.type || "unknown",
+      entry: chunk.entry || null,
+      files: filtered,
+    });
+    tasks.push({ file: "project-tasks/" + tf, status: "pending" });
+  }
+
+  writeYaml(path.join(sessionDir, "project-map.yaml"), {
+    projectDir,
+    totalFiles: files.length,
+    scannedFiles: files.length,
+    excludedDirs: [...(scanOptions.excludeDirs || [])],
+    chunks: chunks.map(c => ({
+      id: c.id,
+      name: c.name,
+      type: c.type,
+      entry: c.entry,
+      files: c.files,
+      priority: c.priority,
+      fileCount: c.fileCount,
+    })),
+  });
+
+  const index = readYaml(indexPath);
+  writeIndexYaml(indexPath, {
+    session: {
+      ...index.session,
+      type: "project-scan",
+      status: "scoped",
+      scope: { method: "directory-scan", ref: "" },
+      projectDir,
+    },
+    codeTasks: index.codeTasks || [],
+    storyTasks: index.storyTasks || [],
+    projectTasks: tasks,
+  });
+
+  return { taskCount: tasks.length, totalFiles: files.length, chunks };
+}
+
+export function getProjectMap(reportsDir, sid) {
+  const safeSid = sanitizePath(sid);
+  const mapPath = path.join(reportsDir, safeSid, "project-map.yaml");
+  if (!fs.existsSync(mapPath)) return null;
+  return readYaml(mapPath);
+}

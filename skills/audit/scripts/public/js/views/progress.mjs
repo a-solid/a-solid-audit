@@ -1,6 +1,7 @@
 // skills/audit/scripts/public/js/views/progress.mjs
 import { api } from "../api.mjs";
 import { showToast, setBreadcrumb, icon, escapeHtml, onNavigateCleanup } from "../app.mjs";
+import { ENTRY_TYPES } from "../constants.mjs";
 
 export async function renderProgress(container, params) {
   const sessionId = params[0];
@@ -86,7 +87,7 @@ export async function renderProgress(container, params) {
                   ? `<span style="color:var(--accent);flex-shrink:0">${icon("check", 16)}</span>`
                   : `<span style="color:var(--text-muted);flex-shrink:0">${icon("clock", 16)}</span>`
               }
-              <span class="text-sm font-mono truncate">${escapeHtml(t.name || t.file)}</span>
+              <span class="text-sm font-mono truncate">${t.type && ENTRY_TYPES[t.type] ? `<span class="badge entry-type-badge" style="background:${ENTRY_TYPES[t.type].color}20;color:${ENTRY_TYPES[t.type].color};border:1px solid ${ENTRY_TYPES[t.type].color}40;margin-right:6px">${ENTRY_TYPES[t.type].label}</span>` : ""}${escapeHtml(t.name || t.file)}</span>
             </div>
             <div class="flex items-center gap-3" style="flex-shrink:0">
               ${t.review?.score ? `<span class="text-sm font-mono ${scoreColor}">${t.review.score}/10</span>` : ""}

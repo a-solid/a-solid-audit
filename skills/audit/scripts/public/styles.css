@@ -1302,7 +1302,7 @@ code {
 /* ─── Task Overview ─── */
 .task-overview {
   padding: var(--space-4);
-  background: var(--surface);
+  background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   margin-bottom: var(--space-3);

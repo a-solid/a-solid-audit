@@ -45,7 +45,7 @@ export function renderTaskDetail(task, notes) {
             </div>
           ` : ""}
           ${task.overview.diagram ? `
-            <div class="overview-diagram" data-mermaid-source="${escapeHtml(task.overview.diagram)}">
+            <div class="overview-diagram" data-mermaid-source="${encodeURIComponent(task.overview.diagram)}">
               <div class="mermaid-placeholder text-sm text-muted">Loading diagram...</div>
             </div>
           ` : ""}
@@ -163,11 +163,11 @@ export async function renderMermaidDiagrams(container) {
     if (el.dataset.rendered) continue;
     el.dataset.rendered = "true";
     try {
-      const src = el.dataset.mermaidSource;
+      const src = decodeURIComponent(el.dataset.mermaidSource);
       const { svg } = await mermaid.render("mermaid-" + Math.random().toString(36).slice(2, 8), src);
       el.innerHTML = svg;
     } catch (e) {
-      el.innerHTML = `<pre class="text-xs text-muted">${escapeHtml(el.dataset.mermaidSource)}</pre>`;
+      el.innerHTML = `<pre class="text-xs text-muted">${escapeHtml(decodeURIComponent(el.dataset.mermaidSource))}</pre>`;
     }
   }
 }

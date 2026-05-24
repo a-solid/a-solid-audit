@@ -1,12 +1,90 @@
 // skills/audit/scripts/lib/project-scan.mjs
 import fs from "node:fs";
 import path from "node:path";
+import https from "node:https";
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { writeYaml, readYaml, writeIndexYaml } from "./yaml.mjs";
 import { sanitizePath } from "./session.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+function callAnthropicAPI(systemPrompt, userMessage) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
+
+  const body = JSON.stringify({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 4096,
+    system: systemPrompt,
+    messages: [{ role: "user", content: userMessage }],
+  });
+
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: "api.anthropic.com",
+      path: "/v1/messages",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "Content-Length": Buffer.byteLength(body),
+      },
+      timeout: 60000,
+    }, (res) => {
+      let data = "";
+      res.on("data", (chunk) => { data += chunk; });
+      res.on("end", () => {
+        if (res.statusCode !== 200) {
+          reject(new Error("Anthropic API " + res.statusCode + ": " + data));
+          return;
+        }
+        try {
+          const json = JSON.parse(data);
+          const text = json.content?.[0]?.text || "";
+          resolve(text);
+        } catch (e) { reject(e); }
+      });
+    });
+    req.on("error", reject);
+    req.on("timeout", () => { req.destroy(); reject(new Error("Anthropic API timeout")); });
+    req.write(body);
+    req.end();
+  });
+}
+
+async function aiGroupEntries(matrix) {
+  const promptPath = path.join(__dirname, "..", "..", "prompts", "project-scan-grouping.md");
+  const promptTemplate = fs.readFileSync(promptPath, "utf-8");
+
+  const entrySummaries = matrix.summaries.map(s =>
+    `- ${s.path} (type: ${s.type}, files: ${s.totalFiles}, services: [${s.services.join(", ")}], daos: [${s.daos.join(", ")}])`
+  ).join("\n");
+
+  const depPairs = matrix.pairs.map(p =>
+    `- ${p.entryA} <-> ${p.entryB}: shared ${p.sharedCount} files (${Math.round(p.sharedRatio * 100)}%), services: [${p.sharedServices.join(", ")}], daos: [${p.sharedDaos.join(", ")}]`
+  ).join("\n");
+
+  const userMessage = promptTemplate
+    .replace("{{entrySummaries}}", entrySummaries)
+    .replace("{{dependencyMatrix}}", depPairs || "（无共享依赖）");
+
+  const response = await callAnthropicAPI(
+    "你是一个代码分析助手，负责将项目入口点按业务领域分组。只输出 JSON。",
+    userMessage
+  );
+
+  const jsonMatch = response.match(/\[[\s\S]*\]/);
+  if (!jsonMatch) throw new Error("AI response contains no JSON array");
+
+  const groups = JSON.parse(jsonMatch[0]);
+  if (!Array.isArray(groups) || groups.length === 0) {
+    throw new Error("AI returned invalid grouping");
+  }
+
+  return groups;
+}
 
 const ENTRY_RULES = [
   { type: "api", pathPatterns: /handler|controller|route|api|endpoint/i, filePatterns: /router|handler|controller/i },

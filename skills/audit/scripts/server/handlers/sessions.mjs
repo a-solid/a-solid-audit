@@ -31,9 +31,17 @@ export function registerSessionRoutes(router, reportsDir) {
   });
 
   // POST /api/sessions — create new session
-  router.post("/api/sessions", (req, res, params) => {
+  router.post("/api/sessions", async (req, res, params) => {
     const sid = sessionId();
-    const result = createSession(reportsDir, sid);
+    let options = { type: "code", projectDir: null };
+    try {
+      const body = JSON.parse(await readBody(req));
+      options = {
+        type: body.type || "code",
+        projectDir: body.projectDir || null,
+      };
+    } catch { /* use defaults */ }
+    const result = createSession(reportsDir, sid, options);
     jsonResponse(res, { id: result.id }, 201);
   });
 

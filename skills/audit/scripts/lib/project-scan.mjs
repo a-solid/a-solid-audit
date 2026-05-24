@@ -179,7 +179,7 @@ export function resetCodegraphCache() {
   _codegraphCacheDir = null;
 }
 
-export function scanProjectDir(projectDir, options = {}) {
+export function scanProjectDir(projectDir, options = {}, sid) {
   const excludeDirs = new Set([...EXCLUDED_DIRS, ...(options.excludeDirs || [])]);
   const minPriority = options.priority || "low";
   const priorityOrder = { high: 0, medium: 1, low: 2 };
@@ -207,11 +207,12 @@ export function scanProjectDir(projectDir, options = {}) {
   }
 
   walk(projectDir);
+  pushLog(sid, "info", `scanProjectDir: found ${files.length} files (high: ${files.filter(f => f.priority === "high").length}, medium: ${files.filter(f => f.priority === "medium").length}, low: ${files.filter(f => f.priority === "low").length})`);
   files.sort((a, b) => a.path.localeCompare(b.path));
   return files;
 }
 
-export function chunkFiles(files, projectDir) {
+export function chunkFiles(files, projectDir, sid) {
   const entries = [];
   const nonEntries = [];
   for (const f of files) {
@@ -223,15 +224,17 @@ export function chunkFiles(files, projectDir) {
     }
   }
 
+  pushLog(sid, "info", `chunkFiles: ${files.length} files, ${entries.length} entry points, ${nonEntries.length} non-entry files`);
+
   const claimed = new Set();
   const chunks = [];
   let chunkIdx = 1;
 
   for (const entry of entries) {
     const chain = new Set([entry.path]);
-    for (const imp of resolveImports(entry.path, projectDir)) {
+    for (const imp of resolveImportsViaCodegraph(entry.path, projectDir, sid)) {
       chain.add(imp);
-      for (const imp2 of resolveImports(imp, projectDir)) {
+      for (const imp2 of resolveImportsViaCodegraph(imp, projectDir, sid)) {
         chain.add(imp2);
       }
     }
@@ -281,6 +284,7 @@ export function chunkFiles(files, projectDir) {
     }
   }
 
+  pushLog(sid, "info", `chunkFiles: produced ${merged.length} chunks`);
   return merged;
 }
 
@@ -290,8 +294,12 @@ export function setProjectScope(projectDir, reportsDir, sid, scanOptions = {}) {
   const indexPath = path.join(sessionDir, "index.yaml");
   if (!fs.existsSync(indexPath)) throw new Error("Session not found: " + safeSid);
 
-  const files = scanProjectDir(projectDir, scanOptions);
-  const chunks = chunkFiles(files, projectDir);
+  const startTime = Date.now();
+  resetCodegraphCache();
+  pushLog(safeSid, "info", `setProjectScope: starting scan of ${projectDir}`);
+
+  const files = scanProjectDir(projectDir, scanOptions, safeSid);
+  const chunks = chunkFiles(files, projectDir, safeSid);
   const exclude = new Set(scanOptions.excludeFiles || []);
 
   const tasksDir = path.join(sessionDir, "project-tasks");
@@ -340,6 +348,7 @@ export function setProjectScope(projectDir, reportsDir, sid, scanOptions = {}) {
     projectTasks: tasks,
   });
 
+  pushLog(safeSid, "info", `setProjectScope: ${tasks.length} tasks from ${files.length} files in ${Date.now() - startTime}ms`);
   return { taskCount: tasks.length, totalFiles: files.length, chunks };
 }
 

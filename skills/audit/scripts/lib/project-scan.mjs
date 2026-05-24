@@ -2,8 +2,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { writeYaml, readYaml, writeIndexYaml } from "./yaml.mjs";
 import { sanitizePath } from "./session.mjs";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const ENTRY_RULES = [
   { type: "api", pathPatterns: /handler|controller|route|api|endpoint/i, filePatterns: /router|handler|controller/i },
@@ -217,6 +220,53 @@ function computeDependencyMatrix(entryChains) {
   }
 
   return { summaries, pairs };
+}
+
+function discoverEntriesCodeGraph(projectDir) {
+  const entries = new Map();
+  try {
+    const result = execSync(
+      'codegraph query "" --kind route --json --limit 500',
+      { cwd: projectDir, timeout: 30000, encoding: "utf-8" }
+    );
+    const data = JSON.parse(result);
+    const symbols = Array.isArray(data) ? data : (data.symbols || []);
+    for (const sym of symbols) {
+      if (sym.file) {
+        const relPath = path.relative(projectDir, sym.file);
+        entries.set(relPath, { type: "api", entry: relPath });
+      }
+    }
+  } catch (e) {
+    console.log("[scan] CodeGraph entry discovery failed: " + e.message);
+  }
+
+  const extraTypes = [
+    { kind: "function", patterns: /cron|job|schedule|worker|consumer|subscribe/i, type: "scheduled" },
+    { kind: "function", patterns: /consumer|subscribe|worker|queue|listen/i, type: "consumer" },
+  ];
+  for (const { kind, patterns, type } of extraTypes) {
+    try {
+      const result = execSync(
+        `codegraph query "" --kind ${kind} --json --limit 500`,
+        { cwd: projectDir, timeout: 30000, encoding: "utf-8" }
+      );
+      const data = JSON.parse(result);
+      const symbols = Array.isArray(data) ? data : (data.symbols || []);
+      for (const sym of symbols) {
+        if (sym.file && patterns.test(sym.name || sym.file)) {
+          const relPath = path.relative(projectDir, sym.file);
+          if (!entries.has(relPath)) {
+            entries.set(relPath, { type, entry: relPath });
+          }
+        }
+      }
+    } catch {
+      // Silently skip — best-effort
+    }
+  }
+
+  return entries;
 }
 
 export function scanProject(projectDir, reportsDir, sid) {

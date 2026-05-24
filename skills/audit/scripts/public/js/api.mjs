@@ -77,4 +77,8 @@ export const api = {
     request("POST", `/api/sessions/${encodeURIComponent(id)}/scan`),
   getScanStatus: (id) =>
     request("GET", `/api/sessions/${encodeURIComponent(id)}/scan/status`),
+
+  // Settings
+  getSettings: () => request("GET", "/api/settings"),
+  updateSettings: (data) => request("PUT", "/api/settings", data),
 };

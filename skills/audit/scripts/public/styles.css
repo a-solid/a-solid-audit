@@ -291,6 +291,7 @@ img, svg { display: block; }
   color: var(--text-primary);
   cursor: pointer;
   white-space: nowrap;
+  min-height: 36px;
   transition: all var(--duration-fast) var(--ease-spring);
 }
 .btn:hover { background: var(--bg-elevated); border-color: var(--border-hover); }
@@ -1381,4 +1382,62 @@ code {
 }
 [data-theme="light"] .overview-diagram .edgeLabel {
   color: #374151;
+}
+
+/* ─── CodeGraph Status Card ─── */
+.codegraph-status-card {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+.codegraph-status-card .codegraph-info { flex: 1; min-width: 0; }
+.codegraph-status-card .codegraph-title {
+  font-size: var(--text-sm); font-weight: 600; display: flex; align-items: center; gap: var(--space-2);
+}
+.codegraph-status-card .codegraph-detail {
+  font-size: var(--text-xs); color: var(--text-muted); margin-top: 2px;
+}
+.codegraph-ready { border-left: 3px solid var(--success); }
+.codegraph-ready .codegraph-title { color: var(--success); }
+.codegraph-uninit { border-left: 3px solid var(--warning); }
+.codegraph-uninit .codegraph-title { color: var(--warning); }
+.codegraph-unavail { border-left: 3px solid var(--text-muted); }
+.codegraph-unavail .codegraph-title { color: var(--text-muted); }
+.codegraph-loading { border-left: 3px solid var(--info); }
+
+/* ─── Scan Log Panel ─── */
+.scan-log-section { margin-top: var(--space-4); text-align: left; }
+.scan-log-toggle {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  padding: 0; border: none; background: none;
+  color: var(--text-muted); font-size: var(--text-xs);
+  font-family: var(--font-ui); cursor: pointer;
+  margin-bottom: var(--space-2);
+}
+.scan-log-toggle:hover { color: var(--text-secondary); }
+.scan-log-toggle .toggle-icon {
+  transition: transform var(--duration-fast) var(--ease-spring);
+  display: inline-flex;
+}
+.scan-log-toggle.open .toggle-icon { transform: rotate(90deg); }
+.scan-log-panel {
+  background: var(--bg-deep); border: 1px solid var(--border);
+  border-radius: var(--radius-md); max-height: 200px;
+  overflow-y: auto; padding: var(--space-2);
+  font-family: var(--font-mono); font-size: var(--text-xs);
+  line-height: 1.6; display: none;
+}
+.scan-log-panel.open { display: block; }
+.scan-log-entry {
+  animation: logFadeIn 200ms var(--ease-spring) forwards;
+  opacity: 0; color: var(--text-secondary);
+}
+.scan-log-entry .log-time { color: var(--text-muted); margin-right: var(--space-2); }
+@keyframes logFadeIn {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
 }

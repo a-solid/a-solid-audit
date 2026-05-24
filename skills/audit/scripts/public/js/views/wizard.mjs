@@ -69,6 +69,10 @@ export async function renderWizard(container, params) {
           }));
         } catch (e) { /* no stories yet */ }
         save();
+      } else if (session?.type === "project") {
+        reviewType = "project";
+        step = 2;
+        save();
       }
     } catch (e) {
       // If server fetch fails, start fresh

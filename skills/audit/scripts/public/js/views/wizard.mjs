@@ -212,11 +212,11 @@ export async function renderWizard(container, params) {
       { label: isNew ? "New Audit" : "Configure Audit" },
     ]);
 
-    const totalSteps = reviewType === "all" ? 4 : 3;
+    const totalSteps = reviewType === "all" ? 4 : (reviewType === "project" ? 4 : 3);
     const stepLabels = reviewType === "all"
       ? ["Review Type", "Scope", "Stories", "Ready"]
       : reviewType === "project"
-        ? ["Review Type", "Configure", "Ready"]
+        ? ["Review Type", "Configure", "Group", "Ready"]
         : ["Review Type", "Scope", "Ready"];
 
     container.innerHTML = `
@@ -244,9 +244,10 @@ export async function renderWizard(container, params) {
     if (step === 1) renderStep1();
     else if (step === 2 && reviewType === "project") renderProjectConfigure();
     else if (step === 2) renderStep2();
-    else if (step === 3 && reviewType === "project") renderProjectReady();
+    else if (step === 3 && reviewType === "project") renderGroupStep();
     else if (step === 3 && reviewType === "all") renderStep3();
     else if (step === 3 && reviewType === "code") renderStep4();
+    else if (step === 4 && reviewType === "project") renderProjectReady();
     else if (step === 4) renderStep4();
     else renderStep4();
   }
@@ -431,6 +432,154 @@ export async function renderWizard(container, params) {
     });
   }
 
+  function renderGroupStep() {
+    const content = document.getElementById("wizard-content");
+    content.innerHTML = `
+      <div class="card mb-4">
+        <h2 class="font-semibold mb-4">Group Files</h2>
+        <div id="group-step-content">
+          <div class="text-sm text-secondary"><span class="spinner spinner-sm"></span> Loading scan data...</div>
+        </div>
+      </div>
+      <div class="flex justify-between">
+        <button id="group-back" class="btn btn-ghost">${icon("arrowLeft", 14)} Back</button>
+        <button id="group-confirm-btn" class="btn btn-primary" disabled>Confirm Groups ${icon("check", 14)}</button>
+      </div>`;
+
+    document.getElementById("group-back").addEventListener("click", () => { step = 2; save(); render(); });
+
+    let groups = null;
+    let pollTimer = null;
+
+    function pollForGroups() {
+      api.getGroups(sessionId).then(data => {
+        if (data.status === "ready" && data.groups && data.groups.length > 0) {
+          groups = data.groups;
+          renderGroupsLoaded();
+        } else {
+          renderPending();
+        }
+      }).catch(() => renderPending());
+    }
+
+    function renderPending() {
+      const el = document.getElementById("group-step-content");
+      api.getGraphData(sessionId).then(graphData => {
+        const entryList = (graphData.entryFiles || []).slice(0, 8);
+        const moreCount = Math.max(0, (graphData.entryFiles || []).length - 8);
+        el.innerHTML = `
+          <div class="space-y-4">
+            <div class="text-sm text-secondary">
+              Scan complete — <strong>${graphData.totalFiles || 0}</strong> files found, <strong>${(graphData.entryFiles || []).length}</strong> entry points
+            </div>
+            ${entryList.length > 0 ? `
+            <div class="group-entry-list">
+              <div class="text-xs font-semibold text-muted mb-2" style="text-transform:uppercase;letter-spacing:0.5px">Entry Points</div>
+              ${entryList.map(e => `
+                <div class="group-entry-item">
+                  <span class="entry-file-badge entry-type-${e.type}">${e.type}</span>
+                  <span class="text-sm font-mono">${escapeHtml(e.path)}</span>
+                </div>
+              `).join("")}
+              ${moreCount > 0 ? `<div class="text-xs text-muted mt-1">... ${moreCount} more</div>` : ""}
+            </div>` : ""}
+            <div class="info-banner info-banner-amber">
+              ${icon("terminal", 16)}
+              <span>Go to your AI terminal and type: <code>group ${escapeHtml(sessionId)}</code></span>
+            </div>
+            <div class="flex items-center gap-2 text-sm text-muted">
+              <span class="spinner spinner-sm"></span> Waiting for grouping...
+            </div>
+          </div>`;
+      }).catch(() => {
+        el.innerHTML = `
+          <div class="info-banner info-banner-amber">
+            ${icon("terminal", 16)}
+            <span>Go to your AI terminal and type: <code>group ${escapeHtml(sessionId)}</code></span>
+          </div>
+          <div class="flex items-center gap-2 text-sm text-muted mt-3">
+            <span class="spinner spinner-sm"></span> Waiting for grouping...
+          </div>`;
+      });
+
+      // Poll every 3 seconds
+      pollTimer = setTimeout(pollForGroups, 3000);
+    }
+
+    function renderGroupsLoaded() {
+      if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+      const el = document.getElementById("group-step-content");
+      const confirmBtn = document.getElementById("group-confirm-btn");
+
+      el.innerHTML = `
+        <div class="text-sm text-secondary mb-4">
+          <strong>${groups.length}</strong> groups generated — review and adjust if needed
+        </div>
+        <div class="space-y-3" id="group-cards">
+          ${groups.map((g, i) => `
+            <div class="group-card" data-group-index="${i}">
+              <div class="group-card-header" data-index="${i}">
+                <div class="group-card-info">
+                  <div class="group-card-title">
+                    ${icon("package", 16)}
+                    <span class="font-medium">${escapeHtml(g.name || "Group " + (i + 1))}</span>
+                    <span class="text-xs text-muted">(${(g.files || []).length} files)</span>
+                  </div>
+                  ${g.rationale ? `<div class="group-rationale">${escapeHtml(g.rationale)}</div>` : ""}
+                </div>
+                <span class="group-chevron">${icon("chevronDown", 14)}</span>
+              </div>
+              <div class="group-card-body" id="group-body-${i}" style="display:none">
+                ${(g.files || []).map(f => {
+                  const isEntry = (g.entryFiles || []).includes(f);
+                  return `<div class="group-file-item">
+                    <label class="checkbox-toggle">
+                      <input type="checkbox" data-file="${escapeHtml(f)}" ${isEntry ? "checked disabled" : "checked"}>
+                      <span class="text-sm font-mono ${isEntry ? "text-accent" : ""}">${escapeHtml(f)}</span>
+                      ${isEntry ? '<span class="entry-file-badge entry-type-api ml-2">entry</span>' : ""}
+                    </label>
+                  </div>`;
+                }).join("")}
+              </div>
+            </div>
+          `).join("")}
+        </div>`;
+
+      confirmBtn.disabled = false;
+
+      // Wire up card expand/collapse
+      el.querySelectorAll(".group-card-header").forEach(header => {
+        header.addEventListener("click", () => {
+          const idx = header.dataset.index;
+          const body = document.getElementById(`group-body-${idx}`);
+          const card = header.closest(".group-card");
+          const isVisible = body.style.display !== "none";
+          body.style.display = isVisible ? "none" : "block";
+          card.classList.toggle("expanded", !isVisible);
+        });
+      });
+
+      // Wire up confirm button
+      confirmBtn.addEventListener("click", async () => {
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = '<span class="spinner spinner-sm"></span> Confirming...';
+        try {
+          await api.confirmGroups(sessionId);
+          step = 4;
+          save();
+          render();
+        } catch (e) {
+          showToast("Failed to confirm groups: " + e.message);
+          confirmBtn.disabled = false;
+          confirmBtn.innerHTML = `Confirm Groups ${icon("check", 14)}`;
+        }
+      });
+    }
+
+    // Start by polling
+    pollForGroups();
+  }
+
   function renderProjectReady() {
     const content = document.getElementById("wizard-content");
     content.innerHTML = `
@@ -459,7 +608,7 @@ export async function renderWizard(container, params) {
         </button>
       </div>`;
 
-    document.getElementById("project-ready-back").addEventListener("click", () => { step = 2; save(); render(); });
+    document.getElementById("project-ready-back").addEventListener("click", () => { step = 3; save(); render(); });
     document.getElementById("start-project-scan-btn").addEventListener("click", async () => {
       const btn = document.getElementById("start-project-scan-btn");
       const originalHTML = btn.innerHTML;

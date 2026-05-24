@@ -12,6 +12,17 @@ const ENTRY_RULES = [
   { type: "script", pathPatterns: /script|bin|cli|migration/i, filePatterns: /cli|migrate|seed|setup/i },
 ];
 
+const SERVICE_PATTERNS = /service|dao|repository|model|entity/i;
+
+function classifyFile(filePath) {
+  if (SERVICE_PATTERNS.test(filePath)) {
+    if (/service/i.test(filePath)) return "service";
+    if (/dao|repository/i.test(filePath)) return "dao";
+    if (/model|entity/i.test(filePath)) return "model";
+  }
+  return "other";
+}
+
 const IGNORE_DIRS = new Set(["node_modules", ".git", "dist", "build", "vendor", "__pycache__", ".audit", ".codegraph", "coverage", ".next", ".nuxt"]);
 
 function detectCodeGraph() {
@@ -152,6 +163,60 @@ function generateMermaidSource(entryFile, files) {
     edges.push(`  N${i} --> N${i + 1}`);
   }
   return "graph TD\n" + nodes.join("\n") + "\n" + edges.join("\n");
+}
+
+function computeDependencyMatrix(entryChains) {
+  // entryChains: Map<entryPath, { type, files: string[] }>
+  const entries = Array.from(entryChains.entries());
+
+  // Classify files per entry
+  const summaries = entries.map(([entryPath, info]) => {
+    const services = [];
+    const daos = [];
+    const otherFiles = [];
+    for (const f of info.files) {
+      const cls = classifyFile(f);
+      if (cls === "service") services.push(f);
+      else if (cls === "dao") daos.push(f);
+      else if (f !== entryPath) otherFiles.push(f);
+    }
+    return {
+      path: entryPath,
+      type: info.type,
+      services,
+      daos,
+      totalFiles: info.files.length,
+      mainFiles: otherFiles.slice(0, 5),
+    };
+  });
+
+  // Build shared dependency pairs
+  const pairs = [];
+  for (let i = 0; i < summaries.length; i++) {
+    for (let j = i + 1; j < summaries.length; j++) {
+      const a = new Set(entries[i][1].files);
+      const b = new Set(entries[j][1].files);
+      const shared = [...a].filter(f => b.has(f));
+      if (shared.length > 0) {
+        const sharedServices = shared.filter(f => /service/i.test(f));
+        const sharedDaos = shared.filter(f => /dao|repository/i.test(f));
+        const ratio = shared.length / Math.min(a.size, b.size);
+        pairs.push({
+          entryA: summaries[i].path,
+          entryB: summaries[j].path,
+          sharedCount: shared.length,
+          sharedRatio: Math.round(ratio * 100) / 100,
+          sharedServices,
+          sharedDaos,
+          sharedOther: shared.filter(f =>
+            !/service|dao|repository/i.test(f)
+          ),
+        });
+      }
+    }
+  }
+
+  return { summaries, pairs };
 }
 
 export function scanProject(projectDir, reportsDir, sid) {

@@ -89,4 +89,14 @@ export const api = {
     request("GET", `/api/codegraph/status?dir=${encodeURIComponent(projectDir)}`),
   initCodegraph: (projectDir) =>
     request("POST", "/api/codegraph/init", { projectDir }),
+
+  // Smart Grouping
+  getGraphData: (id) =>
+    request("GET", `/api/sessions/${encodeURIComponent(id)}/graph-data`),
+  getGroups: (id) =>
+    request("GET", `/api/sessions/${encodeURIComponent(id)}/groups`),
+  updateGroups: (id, groups) =>
+    request("PUT", `/api/sessions/${encodeURIComponent(id)}/groups`, { groups }),
+  confirmGroups: (id) =>
+    request("POST", `/api/sessions/${encodeURIComponent(id)}/groups/confirm`),
 };

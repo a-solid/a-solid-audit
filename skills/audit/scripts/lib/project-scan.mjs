@@ -347,7 +347,7 @@ function discoverEntriesCodeGraph(projectDir) {
   return entries;
 }
 
-export function scanProject(projectDir, reportsDir, sid) {
+export async function scanProject(projectDir, reportsDir, sid) {
   const safeSid = sanitizePath(sid);
   const sessionDir = path.join(reportsDir, safeSid);
   const indexPath = path.join(sessionDir, "index.yaml");
@@ -370,9 +370,18 @@ export function scanProject(projectDir, reportsDir, sid) {
 
   const entries = new Map();
 
+  if (codegraph.available) {
+    const cgEntries = discoverEntriesCodeGraph(projectDir);
+    for (const [entryPath, info] of cgEntries) {
+      entries.set(entryPath, info);
+    }
+    console.log("[scan] CodeGraph discovered " + entries.size + " entry points");
+  }
+
+  // Regex fallback — always run to catch entries CodeGraph missed
   for (const file of allFiles) {
     const type = identifyEntryType(file);
-    if (type !== "unknown") {
+    if (type !== "unknown" && !entries.has(file)) {
       entries.set(file, { type, entry: file });
     }
   }
@@ -389,8 +398,8 @@ export function scanProject(projectDir, reportsDir, sid) {
   const tasksDir = path.join(sessionDir, "project-tasks");
   fs.mkdirSync(tasksDir, { recursive: true });
 
-  const projectTasks = [];
-
+  // Trace call chains for all entries
+  const entryChains = new Map();
   for (const [entryFile, info] of entries) {
     let files;
     if (codegraph.available) {
@@ -399,29 +408,89 @@ export function scanProject(projectDir, reportsDir, sid) {
     } else {
       files = traceCallChainHeuristic(entryFile, projectDir, allFiles);
     }
-
     if (!files || files.length === 0) files = [entryFile];
-
+    entryChains.set(entryFile, { type: info.type, files });
     for (const f of files) assignedFiles.add(f);
-
-    const name = path.basename(entryFile, path.extname(entryFile));
-    const taskFile = "project-tasks/" + name.replace(/[^a-zA-Z0-9_-]/g, "-") + ".yaml";
-    const callChain = generateMermaidSource(entryFile, files);
-
-    writeYaml(path.join(sessionDir, taskFile), {
-      name,
-      type: info.type,
-      entry: entryFile,
-      files,
-      status: "pending",
-      _callChain: callChain,
-      overview: { diagram: "", description: "" },
-      review: { score: 0, summary: "", findings: [], positives: [], gaps: [] },
-    });
-
-    projectTasks.push({ file: taskFile, type: info.type, entry: entryFile, status: "pending" });
   }
 
+  // AI grouping (only when multiple entry points with shared deps)
+  let groups = null;
+  if (entryChains.size > 1) {
+    console.log("[scan] Computing dependency matrix for " + entryChains.size + " entry points");
+    const matrix = computeDependencyMatrix(entryChains);
+
+    if (matrix.pairs.length > 0) {
+      console.log("[scan] Found " + matrix.pairs.length + " shared dependency pairs, calling AI grouping");
+      try {
+        groups = await aiGroupEntries(matrix);
+        console.log("[scan] AI grouped into " + groups.length + " task groups");
+      } catch (e) {
+        console.log("[scan] AI grouping failed, falling back to per-entry tasks: " + e.message);
+        groups = null;
+      }
+    }
+  }
+
+  const projectTasks = [];
+
+  if (groups) {
+    // Generate YAML per group
+    for (const group of groups) {
+      const groupFiles = new Set();
+      let groupType = "api";
+
+      for (const entryPath of group.entries) {
+        const chain = entryChains.get(entryPath);
+        if (chain) {
+          for (const f of chain.files) groupFiles.add(f);
+          groupType = chain.type;
+        }
+      }
+
+      const filesArr = [...groupFiles];
+      const primaryEntry = group.entries[0];
+      const name = group.name.replace(/[^a-zA-Z0-9_一-鿿-]/g, "-");
+      const taskFile = "project-tasks/" + name.replace(/[^a-zA-Z0-9_-]/g, "-") + ".yaml";
+      const callChain = generateMermaidSource(primaryEntry, filesArr);
+
+      writeYaml(path.join(sessionDir, taskFile), {
+        name: group.name,
+        type: groupType,
+        entries: group.entries,
+        entry: primaryEntry,
+        files: filesArr,
+        status: "pending",
+        _callChain: callChain,
+        overview: { diagram: "", description: "" },
+        review: { score: 0, summary: "", findings: [], positives: [], gaps: [] },
+      });
+
+      projectTasks.push({ file: taskFile, type: groupType, entry: primaryEntry, status: "pending" });
+    }
+  } else {
+    // Fallback: one task per entry point (original behavior)
+    for (const [entryFile, info] of entryChains) {
+      const files = info.files;
+      const name = path.basename(entryFile, path.extname(entryFile));
+      const taskFile = "project-tasks/" + name.replace(/[^a-zA-Z0-9_-]/g, "-") + ".yaml";
+      const callChain = generateMermaidSource(entryFile, files);
+
+      writeYaml(path.join(sessionDir, taskFile), {
+        name,
+        type: info.type,
+        entry: entryFile,
+        files,
+        status: "pending",
+        _callChain: callChain,
+        overview: { diagram: "", description: "" },
+        review: { score: 0, summary: "", findings: [], positives: [], gaps: [] },
+      });
+
+      projectTasks.push({ file: taskFile, type: info.type, entry: entryFile, status: "pending" });
+    }
+  }
+
+  // Handle unassigned files
   const orphans = allFiles.filter(f => !assignedFiles.has(f) && !entryFiles.has(f));
   if (orphans.length > 0) {
     const taskFile = "project-tasks/_unassigned.yaml";
@@ -443,6 +512,6 @@ export function scanProject(projectDir, reportsDir, sid) {
   index.session.status = "ready";
   writeIndexYaml(indexPath, index);
 
-  console.log("[scan] Discovered " + projectTasks.length + " entry points, " + orphans.length + " unassigned files");
-  return { tasksFound: projectTasks.length, codegraphUsed: codegraph.available, orphans: orphans.length };
+  console.log("[scan] Discovered " + projectTasks.length + " tasks (" + entryChains.size + " entry points), " + orphans.length + " unassigned files");
+  return { tasksFound: projectTasks.length, codegraphUsed: codegraph.available, orphans: orphans.length, groupingUsed: !!groups };
 }

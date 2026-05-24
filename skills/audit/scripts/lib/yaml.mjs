@@ -272,9 +272,11 @@ export function writeIndexYaml(filePath, data) {
       type: data.session.type,
       status: data.session.status || "created",
       scope: data.session.scope,
+      projectDir: data.session.projectDir || null,
       created: data.session.created,
     },
     codeTasks: (data.codeTasks || data.tasks || []).map(t => ({ file: t.file, status: t.status })),
     storyTasks: (data.storyTasks || []).map(t => ({ file: t.file, status: t.status })),
+    projectTasks: (data.projectTasks || []).map(t => ({ file: t.file, type: t.type, entry: t.entry, status: t.status })),
   });
 }

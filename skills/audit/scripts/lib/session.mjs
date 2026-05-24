@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { readYaml, writeIndexYaml, patchYaml } from "./yaml.mjs";
 
-const VALID_STATUSES = ["created", "scoped", "ready", "scanning", "reviewing", "completed"];
+const VALID_STATUSES = ["created", "scanned", "scoped", "ready", "scanning", "grouping", "reviewing", "completed"];
 
 export function sanitizePath(segment) {
   const s = String(segment);
@@ -91,8 +91,10 @@ export function updateSessionStatus(reportsDir, sid, newStatus) {
   // Valid transitions
   const transitions = {
     created: ["scoped", "scanning", "ready"],
+    scanned: ["grouping", "ready"],
+    grouping: ["scanned", "ready"],
     scoped: ["ready"],
-    scanning: ["ready"],
+    scanning: ["ready", "scanned"],
     ready: ["reviewing"],
     reviewing: ["completed"],
     completed: [],

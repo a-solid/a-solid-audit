@@ -41,6 +41,14 @@ export async function renderProgress(container, params) {
 
     <div id="task-list" class="space-y-2" role="list" aria-label="Task progress"></div>
 
+    <div id="scan-overlay" class="hidden card" style="text-align:center;padding:var(--space-8) var(--space-6);margin-bottom:var(--space-4)">
+      <div style="margin-bottom:var(--space-4);color:var(--info)">${icon("search", 48)}</div>
+      <h2 class="text-lg mb-2">Project Scan</h2>
+      <p class="text-sm text-muted mb-4" style="max-width:400px;margin:0 auto">Discover entry points and call chains. This may take a minute for large projects.</p>
+      <div id="scan-status" class="text-sm text-muted mb-4 hidden"></div>
+      <button id="start-scan-btn" class="btn btn-primary">${icon("search", 14)} Start Scan</button>
+    </div>
+
     <div id="poll-warning" class="hidden mt-4">
       <div class="info-banner info-banner-amber">
         ${icon("alertTriangle", 16)}
@@ -53,9 +61,38 @@ export async function renderProgress(container, params) {
   async function poll() {
     try {
       const session = await api.getSession(sessionId);
-      const tasks = await api.getTasks(sessionId);
       pollFailures = 0;
       document.getElementById("poll-warning").classList.add("hidden");
+
+      // Handle project sessions in created/scanning state
+      const scanOverlay = document.getElementById("scan-overlay");
+      const scanStatusEl = document.getElementById("scan-status");
+      const startBtn = document.getElementById("start-scan-btn");
+
+      if (session.type === "project" && (session.status === "created" || session.status === "scanning")) {
+        scanOverlay.classList.remove("hidden");
+        document.getElementById("task-list").innerHTML = "";
+        document.getElementById("progress-text").textContent = "Project scan not started";
+        document.getElementById("progress-pct").textContent = "";
+        document.getElementById("progress-fill").style.width = "0%";
+        document.getElementById("session-badge").innerHTML = `<span class="badge badge-${escapeHtml(session.status)}">${escapeHtml(session.status)}</span>`;
+
+        if (session.status === "scanning") {
+          startBtn.classList.add("hidden");
+          scanStatusEl.classList.remove("hidden");
+          try {
+            const scanStatus = await api.getScanStatus(sessionId);
+            scanStatusEl.textContent = scanStatus.progress || "Scanning...";
+          } catch { scanStatusEl.textContent = "Scanning..."; }
+        }
+
+        pollTimer = setTimeout(poll, 3000);
+        return;
+      }
+
+      if (scanOverlay) scanOverlay.classList.add("hidden");
+
+      const tasks = await api.getTasks(sessionId);
 
       const total = tasks.length;
       const reviewed = tasks.filter(t => t.status === "reviewed").length;
@@ -129,6 +166,26 @@ export async function renderProgress(container, params) {
     // Schedule next poll
     pollTimer = setTimeout(poll, pollInterval);
   }
+
+  document.getElementById("start-scan-btn").addEventListener("click", async () => {
+    const startBtn = document.getElementById("start-scan-btn");
+    const scanStatusEl = document.getElementById("scan-status");
+    startBtn.disabled = true;
+    startBtn.textContent = "Starting scan...";
+    scanStatusEl.classList.remove("hidden");
+    scanStatusEl.textContent = "Initiating scan...";
+    try {
+      await api.startScan(sessionId);
+      scanStatusEl.textContent = "Scanning in progress...";
+      pollInterval = 3000;
+      pollTimer = setTimeout(poll, pollInterval);
+    } catch (e) {
+      startBtn.disabled = false;
+      startBtn.innerHTML = `${icon("search", 14)} Start Scan`;
+      scanStatusEl.textContent = "Scan failed: " + e.message;
+      showToast("Scan failed: " + e.message, "error");
+    }
+  });
 
   document.getElementById("manual-refresh-btn").addEventListener("click", () => {
     pollFailures = 0;

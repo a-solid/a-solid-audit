@@ -137,74 +137,25 @@ export async function renderProgress(container, params) {
       pollFailures = 0;
       document.getElementById("poll-warning").classList.add("hidden");
 
-      // Handle project sessions in created/scanning state
       const scanOverlay = document.getElementById("scan-overlay");
-      const scanStatusEl = document.getElementById("scan-status");
-      const startBtn = document.getElementById("start-scan-btn");
 
+      // If project session is still in configuration states, redirect to wizard
       if (session.type === "project" && ["created", "scanning", "scanned", "grouping"].includes(session.status)) {
         scanOverlay.classList.remove("hidden");
-        updateHeading(true, "scanning");
+        updateHeading(true, session.status);
         document.getElementById("task-list").innerHTML = "";
-        document.getElementById("progress-text").textContent = "Project scan not started";
+        document.getElementById("progress-text").textContent = "";
         document.getElementById("progress-pct").textContent = "";
         document.getElementById("progress-fill").style.width = "0%";
         document.getElementById("session-badge").innerHTML = `<span class="badge badge-${escapeHtml(session.status)}">${escapeHtml(session.status)}</span>`;
 
-        if (session.status === "scanned") {
-          startBtn.classList.add("hidden");
-          scanStatusEl.classList.remove("hidden");
-          scanStatusEl.textContent = "Scan complete. Go to the wizard to group files and confirm.";
-          updateHeading(true, "scanned");
-          document.getElementById("session-badge").innerHTML = `<span class="badge badge-scanned">scanned</span>`;
-        } else if (session.status === "grouping") {
-          startBtn.classList.add("hidden");
-          scanStatusEl.classList.remove("hidden");
-          scanStatusEl.textContent = "AI is analyzing dependencies and grouping files...";
-          updateHeading(true, "grouping");
-          document.getElementById("session-badge").innerHTML = `<span class="badge badge-grouping">grouping</span>`;
-        } else if (session.status === "scanning") {
-          startBtn.classList.add("hidden");
-          scanStatusEl.classList.remove("hidden");
-          try {
-            const scanStatus = await api.getScanStatus(sessionId);
-            scanStatusEl.textContent = scanStatus.progress || "Scanning...";
-          } catch { scanStatusEl.textContent = "Scanning..."; }
-        } else if (session.status === "created") {
-          scanStatusEl.classList.remove("hidden");
-          scanStatusEl.textContent = "Press the button below to begin scanning.";
-        }
-
-        pollTimer = setTimeout(poll, 3000);
-        return;
-      }
-
-      // Auto-trigger scan when project session becomes ready
-      if (session.type === "project" && session.status === "ready" && !scanStarted) {
-        scanStarted = true;
-        scanOverlay.classList.remove("hidden");
-        updateHeading(true, "scanning");
-        document.getElementById("task-list").innerHTML = "";
-        document.getElementById("progress-text").textContent = "Starting scan...";
-        document.getElementById("progress-pct").textContent = "";
-        document.getElementById("progress-fill").style.width = "0%";
-        document.getElementById("session-badge").innerHTML = `<span class="badge badge-ready">ready</span>`;
-        startBtn.classList.add("hidden");
+        const scanStatusEl = document.getElementById("scan-status");
         scanStatusEl.classList.remove("hidden");
-        scanStatusEl.textContent = "Starting scan...";
-        try {
-          await api.startScan(sessionId);
-          scanStatusEl.textContent = "Scanning in progress...";
-          startLogStream();
-        } catch (e) {
-          scanStatusEl.textContent = "Scan failed to start. Click below to retry.";
-          startBtn.classList.remove("hidden");
-          startBtn.disabled = false;
-          startBtn.innerHTML = `${icon("search", 14)} Retry Scan`;
-          scanStarted = false;
-          showToast("Scan failed: " + e.message);
-        }
-        pollTimer = setTimeout(poll, 3000);
+        const startBtn = document.getElementById("start-scan-btn");
+        startBtn.classList.add("hidden");
+        scanStatusEl.innerHTML = `Session is still being configured. <a href="#/wizard/${sessionId}" style="color:var(--accent);text-decoration:underline">Go to wizard</a> to continue.`;
+
+        pollTimer = setTimeout(poll, 5000);
         return;
       }
 

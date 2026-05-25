@@ -1,6 +1,6 @@
 // skills/audit/scripts/public/js/views/progress.mjs
 import { api } from "../api.mjs";
-import { showToast, setBreadcrumb, icon, escapeHtml, onNavigateCleanup } from "../app.mjs";
+import { showToast, setBreadcrumb, icon, escapeHtml, onNavigateCleanup, renderTerminalCard } from "../app.mjs";
 import { ENTRY_TYPES } from "../constants.mjs";
 
 export async function renderProgress(container, params) {
@@ -142,22 +142,54 @@ export async function renderProgress(container, params) {
 
       const scanOverlay = document.getElementById("scan-overlay");
 
-      // If project session is still in configuration states, redirect to wizard
-      if (session.type === "project" && ["created", "scanning", "scanned", "grouping"].includes(session.status)) {
+      if (session.type === "project" && ["created", "scanning", "scanned", "grouping", "ready"].includes(session.status)) {
+        if (session.status === "scanning") {
+          scanOverlay.classList.remove("hidden");
+          updateHeading(true, session.status);
+          document.getElementById("task-list").innerHTML = "";
+          document.getElementById("progress-text").textContent = "";
+          document.getElementById("progress-pct").textContent = "";
+          document.getElementById("progress-fill").style.width = "0%";
+          document.getElementById("session-badge").innerHTML = `<span class="badge badge-${escapeHtml(session.status)}">${escapeHtml(session.status)}</span>`;
+          const scanStatusEl = document.getElementById("scan-status");
+          scanStatusEl.classList.remove("hidden");
+          scanStatusEl.innerHTML = `<span class="spinner spinner-sm"></span> Scanning in progress...`;
+          document.getElementById("start-scan-btn").classList.add("hidden");
+          pollTimer = setTimeout(poll, 3000);
+          return;
+        }
+
+        if (session.status === "grouping") {
+          scanOverlay.classList.remove("hidden");
+          updateHeading(true, "grouping");
+          document.getElementById("task-list").innerHTML = "";
+          document.getElementById("progress-text").textContent = "";
+          document.getElementById("progress-pct").textContent = "";
+          document.getElementById("progress-fill").style.width = "0%";
+          document.getElementById("session-badge").innerHTML = `<span class="badge badge-${escapeHtml(session.status)}">${escapeHtml(session.status)}</span>`;
+          const scanStatusEl = document.getElementById("scan-status");
+          scanStatusEl.classList.remove("hidden");
+          scanStatusEl.innerHTML = `<span class="spinner spinner-sm"></span> Grouping in progress...`;
+          document.getElementById("start-scan-btn").classList.add("hidden");
+          pollTimer = setTimeout(poll, 3000);
+          return;
+        }
+
+        // scanned or ready — show terminal card
         scanOverlay.classList.remove("hidden");
-        updateHeading(true, session.status);
+        const phase = session.status === "scanned" ? "scanned" : "ready";
+        updateHeading(true, phase);
         document.getElementById("task-list").innerHTML = "";
         document.getElementById("progress-text").textContent = "";
         document.getElementById("progress-pct").textContent = "";
         document.getElementById("progress-fill").style.width = "0%";
         document.getElementById("session-badge").innerHTML = `<span class="badge badge-${escapeHtml(session.status)}">${escapeHtml(session.status)}</span>`;
-
+        document.getElementById("start-scan-btn").classList.add("hidden");
         const scanStatusEl = document.getElementById("scan-status");
         scanStatusEl.classList.remove("hidden");
-        const startBtn = document.getElementById("start-scan-btn");
-        startBtn.classList.add("hidden");
-        scanStatusEl.innerHTML = `Session is still being configured. <a href="#/wizard/${sessionId}" style="color:var(--accent);text-decoration:underline">Go to wizard</a> to continue.`;
-
+        scanStatusEl.innerHTML = "";
+        const cmd = session.status === "scanned" ? `group ${escapeHtml(sessionId)}` : "start review";
+        renderTerminalCard(scanStatusEl, cmd);
         pollTimer = setTimeout(poll, 5000);
         return;
       }

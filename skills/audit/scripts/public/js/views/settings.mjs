@@ -2,11 +2,13 @@
 import { api } from "../api.mjs";
 import { showToast, setBreadcrumb, icon, escapeHtml } from "../app.mjs";
 
+const PLACEHOLDER = "••••••••••••••••";
+
 export async function renderSettings(container) {
   setBreadcrumb([{ label: "Settings" }]);
 
   let settings = {};
-  try { settings = await api.getSettings(); } catch (e) { showToast("Failed to load settings"); }
+  try { settings = await api.getSettings(); } catch (e) { showToast("Failed to load settings: " + e.message); }
 
   container.innerHTML = `
     <div class="flex items-center justify-between mb-6">
@@ -17,37 +19,25 @@ export async function renderSettings(container) {
     </div>
 
     <div class="card mb-4">
-      <h2 class="font-semibold mb-4">${icon("zap", 16)} Anthropic</h2>
-      <div class="space-y-3">
-        <div>
-          <label for="anthropic-key">API Key</label>
-          <input id="anthropic-key" type="password" class="mt-1" placeholder="sk-ant-..."
-            value="${settings.anthropic?.configured ? "••••••••••••••••" : ""}">
-          ${settings.anthropic?.configured
-            ? '<span class="text-xs text-success mt-1 block">已配置</span>'
-            : '<span class="text-xs text-muted mt-1 block">未配置</span>'}
-        </div>
-      </div>
-    </div>
-
-    <div class="card mb-4">
       <h2 class="font-semibold mb-4">JIRA</h2>
-      <div class="grid grid-cols-3 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div>
           <label for="jira-url">Base URL</label>
-          <input id="jira-url" class="mt-1" placeholder="https://your-domain.atlassian.net">
+          <input id="jira-url" class="mt-1" placeholder="https://your-domain.atlassian.net"
+            value="${escapeHtml(settings.jira?.baseUrl || "")}">
         </div>
         <div>
           <label for="jira-email">Email</label>
-          <input id="jira-email" class="mt-1" placeholder="user@example.com">
+          <input id="jira-email" class="mt-1" placeholder="user@example.com"
+            value="${escapeHtml(settings.jira?.email || "")}">
         </div>
         <div>
           <label for="jira-token">API Token</label>
           <input id="jira-token" type="password" class="mt-1" placeholder="Token"
-            value="${settings.jira?.configured ? "••••••••••••••••" : ""}">
+            value="${settings.jira?.configured ? PLACEHOLDER : ""}">
           ${settings.jira?.configured
-            ? '<span class="text-xs text-success mt-1 block">已配置</span>'
-            : '<span class="text-xs text-muted mt-1 block">未配置</span>'}
+            ? '<span class="text-xs text-success mt-1 block">Configured</span>'
+            : '<span class="text-xs text-muted mt-1 block">Not configured</span>'}
         </div>
       </div>
     </div>
@@ -57,27 +47,31 @@ export async function renderSettings(container) {
       <div class="grid grid-cols-5 gap-4">
         <div>
           <label for="db-host">Host</label>
-          <input id="db-host" class="mt-1" placeholder="localhost">
+          <input id="db-host" class="mt-1" placeholder="localhost"
+            value="${escapeHtml(settings.database?.host || "")}">
         </div>
         <div>
           <label for="db-port">Port</label>
-          <input id="db-port" type="number" class="mt-1" placeholder="5432">
+          <input id="db-port" type="number" class="mt-1" placeholder="5432"
+            value="${settings.database?.port || ""}">
         </div>
         <div>
           <label for="db-name">Database</label>
-          <input id="db-name" class="mt-1" placeholder="mydb">
+          <input id="db-name" class="mt-1" placeholder="mydb"
+            value="${escapeHtml(settings.database?.name || "")}">
         </div>
         <div>
           <label for="db-user">User</label>
-          <input id="db-user" class="mt-1" placeholder="user">
+          <input id="db-user" class="mt-1" placeholder="user"
+            value="${escapeHtml(settings.database?.user || "")}">
         </div>
         <div>
           <label for="db-password">Password</label>
           <input id="db-password" type="password" class="mt-1" placeholder="Password"
-            value="${settings.database?.configured ? "••••••••••••••••" : ""}">
+            value="${settings.database?.configured ? PLACEHOLDER : ""}">
           ${settings.database?.configured
-            ? '<span class="text-xs text-success mt-1 block">已配置</span>'
-            : '<span class="text-xs text-muted mt-1 block">未配置</span>'}
+            ? '<span class="text-xs text-success mt-1 block">Configured</span>'
+            : '<span class="text-xs text-muted mt-1 block">Not configured</span>'}
         </div>
       </div>
     </div>
@@ -107,7 +101,7 @@ export async function renderSettings(container) {
   if (customVars.length === 0) {
     addVarRow(varsList, "", "");
   } else {
-    customVars.forEach(v => addVarRow(varsList, v.key, v.configured ? "••••••••" : ""));
+    customVars.forEach(v => addVarRow(varsList, v.key, v.configured ? PLACEHOLDER : ""));
   }
 
   document.getElementById("add-var-btn").addEventListener("click", () => {
@@ -132,30 +126,24 @@ export async function renderSettings(container) {
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner spinner-sm"></span> Saving...';
 
-    const anthropicKey = document.getElementById("anthropic-key").value;
-    const jiraToken = document.getElementById("jira-token").value;
-    const dbPassword = document.getElementById("db-password").value;
-
     const payload = {};
-
-    if (anthropicKey && !anthropicKey.startsWith("••")) {
-      payload.anthropic = { apiKey: anthropicKey };
-    }
 
     const jiraUrl = document.getElementById("jira-url").value;
     const jiraEmail = document.getElementById("jira-email").value;
-    if (jiraUrl || jiraEmail || (jiraToken && !jiraToken.startsWith("••"))) {
-      payload.jira = { baseUrl: jiraUrl, email: jiraEmail, token: jiraToken && !jiraToken.startsWith("••") ? jiraToken : undefined };
+    const jiraToken = document.getElementById("jira-token").value;
+    if (jiraUrl || jiraEmail || (jiraToken && jiraToken !== PLACEHOLDER)) {
+      payload.jira = { baseUrl: jiraUrl, email: jiraEmail, token: jiraToken !== PLACEHOLDER ? jiraToken : undefined };
     }
 
     const dbHost = document.getElementById("db-host").value;
     const dbPort = parseInt(document.getElementById("db-port").value, 10) || 5432;
     const dbName = document.getElementById("db-name").value;
     const dbUser = document.getElementById("db-user").value;
-    if (dbHost || dbName || dbUser || (dbPassword && !dbPassword.startsWith("••"))) {
+    const dbPassword = document.getElementById("db-password").value;
+    if (dbHost || dbName || dbUser || (dbPassword && dbPassword !== PLACEHOLDER)) {
       payload.database = {
         host: dbHost, port: dbPort, name: dbName, user: dbUser,
-        password: dbPassword && !dbPassword.startsWith("••") ? dbPassword : undefined,
+        password: dbPassword !== PLACEHOLDER ? dbPassword : undefined,
       };
     }
 
@@ -167,17 +155,20 @@ export async function renderSettings(container) {
     customVarRows.forEach(row => {
       const k = row.querySelector(".custom-var-key").value.trim();
       const v = row.querySelector(".custom-var-value").value;
-      if (k) vars.push({ key: k, value: v && !v.startsWith("••") ? v : undefined });
+      if (k) vars.push({ key: k, value: v !== PLACEHOLDER ? v : undefined });
     });
     if (vars.length > 0) payload.customVars = vars;
 
     try {
       if (Object.keys(payload).length > 0) {
-        await api.updateSettings(payload);
+        const updated = await api.updateSettings(payload);
         showToast("Settings saved", "success");
-        setTimeout(() => renderSettings(container), 500);
+        // Update status indicators without full re-render
+        updateStatusIndicators(updated);
+        btn.innerHTML = originalHTML;
+        btn.disabled = false;
       } else {
-        showToast("No changes to save");
+        showToast("No changes to save", "warning");
         btn.disabled = false;
         btn.innerHTML = originalHTML;
       }
@@ -187,4 +178,21 @@ export async function renderSettings(container) {
       btn.innerHTML = originalHTML;
     }
   });
+
+  function updateStatusIndicators(updated) {
+    const jiraTokenInput = document.getElementById("jira-token");
+    const jiraStatus = jiraTokenInput?.nextElementSibling;
+    if (jiraStatus && updated.jira) {
+      jiraStatus.textContent = updated.jira.configured ? "Configured" : "Not configured";
+      jiraStatus.className = `text-xs ${updated.jira.configured ? "text-success" : "text-muted"} mt-1 block`;
+    }
+    if (updated.jira?.configured) jiraTokenInput.value = PLACEHOLDER;
+    const dbPasswordInput = document.getElementById("db-password");
+    const dbStatus = dbPasswordInput?.nextElementSibling;
+    if (dbStatus && updated.database) {
+      dbStatus.textContent = updated.database.configured ? "Configured" : "Not configured";
+      dbStatus.className = `text-xs ${updated.database.configured ? "text-success" : "text-muted"} mt-1 block`;
+    }
+    if (updated.database?.configured) dbPasswordInput.value = PLACEHOLDER;
+  }
 }

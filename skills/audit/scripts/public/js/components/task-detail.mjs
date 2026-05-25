@@ -23,7 +23,8 @@ export function renderTaskDetail(task, notes) {
   const positives = task.review?.positives || [];
   const gaps = task.review?.gaps || [];
   const circumference = 2 * Math.PI * 42;
-  const offset = circumference * (1 - (score || 0) / 10);
+  const clampedScore = score != null ? Math.max(score, 0.3) : 0;
+  const offset = circumference * (1 - clampedScore / 10);
 
   const noteTask = notes?.tasks?.find(t => t.file === task.file);
 
@@ -95,14 +96,16 @@ export function renderTaskDetail(task, notes) {
                     ${isDismissed ? `<span class="badge dismiss-reason-badge"${reason ? ` title="${escapeHtml(reason)}"` : ""} style="background:var(--warning-dim);color:var(--warning)">${icon("x", 10)} Dismissed${reason ? ": " + escapeHtml(reason.length > 20 ? reason.slice(0, 20) + "..." : reason) : ""}</span>` : ""}
                   </div>
                   <div class="flex gap-1">
-                    <button class="btn btn-sm btn-icon ${isConfirmed || isUnreviewed ? "" : "btn-ghost"} btn-confirm" data-idx="${i}"
+                    <button class="btn btn-sm btn-icon ${isConfirmed ? "" : "btn-ghost"} btn-confirm" data-idx="${i}"
                       title="Confirm" aria-label="Confirm finding"
-                      style="${isConfirmed || isUnreviewed ? "color:var(--accent);border-color:var(--accent);background:var(--accent-dim)" : "color:var(--accent)"}">
+                      ${isConfirmed ? "disabled" : ""}
+                      style="${isConfirmed ? "color:var(--accent);border-color:var(--accent);background:var(--accent-dim);opacity:0.6" : isUnreviewed ? "color:var(--accent);border-color:var(--accent);background:var(--accent-dim)" : "color:var(--accent)"}">
                       ${icon("check", 14)}
                     </button>
                     <button class="btn btn-sm btn-icon ${isDismissed ? "" : "btn-ghost"} btn-dismiss" data-idx="${i}"
                       title="Dismiss" aria-label="Dismiss finding"
-                      style="${isDismissed ? "color:var(--warning);border-color:var(--warning);background:var(--warning-dim)" : "color:var(--text-muted)"}">
+                      ${isDismissed ? "disabled" : ""}
+                      style="${isDismissed ? "color:var(--warning);border-color:var(--warning);background:var(--warning-dim);opacity:0.6" : "color:var(--text-muted)"}">
                       ${icon("x", 14)}
                     </button>
                   </div>
@@ -172,14 +175,24 @@ export function renderTaskDetail(task, notes) {
 
 export async function renderMermaidDiagrams(container) {
   const els = container.querySelectorAll("[data-mermaid-source]");
+  if (els.length === 0) return;
+  if (typeof mermaid === "undefined") {
+    console.error("[mermaid] mermaid global not found — CDN may have failed to load");
+    return;
+  }
+  const theme = document.documentElement.dataset.theme === "light" ? "default" : "dark";
+  mermaid.initialize({ startOnLoad: false, theme, securityLevel: "loose" });
   for (const el of els) {
     if (el.dataset.rendered) continue;
     el.dataset.rendered = "true";
     try {
       const src = decodeURIComponent(el.dataset.mermaidSource);
-      const { svg } = await mermaid.render("mermaid-" + Math.random().toString(36).slice(2, 8), src);
-      el.innerHTML = svg;
+      const id = "mermaid-" + Math.random().toString(36).slice(2, 8);
+      const result = await mermaid.render(id, src);
+      el.innerHTML = result.svg;
+      if (result.bindFunctions) result.bindFunctions(el);
     } catch (e) {
+      console.error("[mermaid] render failed:", e);
       el.innerHTML = `<pre class="text-xs text-muted">${escapeHtml(decodeURIComponent(el.dataset.mermaidSource))}</pre>`;
     }
   }

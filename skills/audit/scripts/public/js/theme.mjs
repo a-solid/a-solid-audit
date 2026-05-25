@@ -17,7 +17,7 @@ function applyTheme(theme) {
   document.documentElement.setAttribute("data-theme", theme);
   const btn = document.getElementById("theme-toggle");
   if (btn) {
-    btn.innerHTML = theme === "dark" ? moonSVG : sunSVG;
+    btn.innerHTML = theme === "dark" ? sunSVG : moonSVG;
     btn.setAttribute("aria-pressed", theme === "dark" ? "true" : "false");
     btn.setAttribute("aria-label", theme === "dark" ? "Switch to light theme" : "Switch to dark theme");
   }

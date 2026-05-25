@@ -271,23 +271,23 @@ export async function renderWizard(container, params) {
     content.innerHTML = `
       <div class="card mb-4">
         <h2 class="font-semibold mb-4">Choose Review Type</h2>
-        <div class="grid grid-cols-3 gap-4">
+        <div class="grid grid-cols-3 gap-6">
           <div class="card card-clickable ${reviewType === "code" ? "selected" : ""}" data-type="code">
-            <div class="flex items-center gap-2 mb-2">
+            <div class="flex items-center gap-3 mb-3">
               ${icon("eye", 20)}
               <span class="font-medium">Code Review Only</span>
             </div>
             <div class="text-sm text-secondary">Review code changes for quality, security, and best practices.</div>
           </div>
           <div class="card card-clickable ${reviewType === "all" ? "selected" : ""}" data-type="all">
-            <div class="flex items-center gap-2 mb-2">
+            <div class="flex items-center gap-3 mb-3">
               ${icon("clipboard", 20)}
               <span class="font-medium">Code + Story Alignment</span>
             </div>
             <div class="text-sm text-secondary">Also check that code changes align with story requirements.</div>
           </div>
           <div class="card card-clickable ${reviewType === "project" ? "selected" : ""}" data-type="project">
-            <div class="flex items-center gap-2 mb-2">
+            <div class="flex items-center gap-3 mb-3">
               ${icon("search", 20)}
               <span class="font-medium">Project Scan</span>
             </div>
@@ -300,11 +300,16 @@ export async function renderWizard(container, params) {
       </div>`;
 
     content.querySelectorAll("[data-type]").forEach(card => {
+      card.tabIndex = 0;
+      card.setAttribute("role", "button");
       card.addEventListener("click", () => {
         const newType = card.dataset.type;
         reviewType = newType;
         save();
         render();
+      });
+      card.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); card.click(); }
       });
     });
     document.getElementById("step1-next").addEventListener("click", async () => {
@@ -554,12 +559,19 @@ export async function renderWizard(container, params) {
         schedulePoll(pollScanStatus, 2000);
       }).catch(e => {
         const el = document.getElementById("group-step-content");
+        const isNotFound = e.message?.includes("not found");
         el.innerHTML = `
           <div class="space-y-4">
             <div class="text-sm text-danger">${icon("alertTriangle", 14)} Scan failed: ${escapeHtml(e.message)}</div>
-            <button id="retry-scan-btn" class="btn btn-sm">Retry Scan</button>
+            ${isNotFound ? `
+              <div class="text-sm text-secondary">The session may not be fully configured yet. Try going back and re-entering the project directory.</div>
+              <button id="group-back-retry" class="btn btn-sm">${icon("arrowLeft", 14)} Back to Configure</button>
+            ` : `
+              <button id="retry-scan-btn" class="btn btn-sm">Retry Scan</button>
+            `}
           </div>`;
         document.getElementById("retry-scan-btn")?.addEventListener("click", () => triggerScan());
+        document.getElementById("group-back-retry")?.addEventListener("click", () => { clearPoll(); step = 2; save(); render(); });
       });
     }
 
@@ -699,11 +711,26 @@ export async function renderWizard(container, params) {
         step = 4;
         save();
         render();
+      } else if (data.status === "scanning") {
+        renderScanning();
+        schedulePoll(pollScanStatus, 2000);
       } else {
         triggerScan();
       }
-    }).catch(() => {
-      triggerScan();
+    }).catch(e => {
+      const el = document.getElementById("group-step-content");
+      el.innerHTML = `
+        <div class="space-y-4">
+          <div class="text-sm text-danger">${icon("alertTriangle", 14)} Failed to check scan status: ${escapeHtml(e.message)}</div>
+          <button id="retry-scan-btn" class="btn btn-sm">Retry</button>
+        </div>`;
+      document.getElementById("retry-scan-btn")?.addEventListener("click", () => {
+        el.innerHTML = `<div class="text-sm text-secondary"><span class="spinner spinner-sm"></span> Checking scan status...</div>`;
+        api.getScanStatus(sessionId).then(data => {
+          if (data.status === "scanned") pollForGroups();
+          else triggerScan();
+        }).catch(() => triggerScan());
+      });
     });
 
     onNavigateCleanup(() => clearPoll());
@@ -976,6 +1003,9 @@ export async function renderWizard(container, params) {
         pendingExpandIndex = stories.length - 1;
         save();
         render();
+        requestAnimationFrame(() => {
+          document.getElementById("file-mapping-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
       } catch (e) { showToast("Failed to save story: " + e.message); }
     });
 

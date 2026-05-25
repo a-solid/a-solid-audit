@@ -220,7 +220,6 @@ export async function renderSummary(container, params) {
         notesTimer = setTimeout(async () => {
           try {
             await api.updateSummary(sessionId, { notes: notesEl.value });
-            showToast("Notes saved", "success");
           } catch (e) { /* next save will retry */ }
         }, 1500);
       });

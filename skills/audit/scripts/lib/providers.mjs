@@ -15,7 +15,7 @@ export function listProviders() {
   }).map(f => path.basename(f, path.extname(f)));
 }
 
-export function fetchFromProvider(providerName, storyIds) {
+export function fetchFromProvider(providerName, storyIds, env = {}) {
   if (!fs.existsSync(PROVIDERS_DIR)) throw new Error("No providers directory found");
 
   const candidates = fs.readdirSync(PROVIDERS_DIR).filter(f => {
@@ -30,6 +30,7 @@ export function fetchFromProvider(providerName, storyIds) {
   try {
     stdout = execFileSync(providerPath, storyIds, {
       encoding: "utf8", timeout: 60000, maxBuffer: 1024 * 1024 * 10,
+      env: { ...process.env, ...env },
     });
   } catch (e) {
     throw new Error("Provider '" + providerName + "' failed: " + (e.stderr || e.message));

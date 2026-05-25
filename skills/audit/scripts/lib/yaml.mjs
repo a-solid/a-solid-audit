@@ -133,15 +133,17 @@ function parseBlock(lines, startIdx, baseIndent) {
           const kv = subLine.trim().match(/^(\S+): (.*)$/);
           if (kv) {
             const [, subKey, subValRaw] = kv;
-            if (subValRaw === "|" || subValRaw === "") {
+            if (subValRaw === "|" || subValRaw === ">" || subValRaw === "") {
+              const folded = subValRaw === ">";
               i++;
-              if (subValRaw === "|") {
+              if (subValRaw === "|" || subValRaw === ">") {
                 const blockLines = [];
                 while (i < lines.length && (lines[i].trim() === "" || getIndent(lines[i]) > subIndent)) {
                   blockLines.push(lines[i].substring(subIndent + 2));
                   i++;
                 }
-                obj[subKey] = blockLines.join("\n").replace(/\n+$/, "");
+                const raw = blockLines.join("\n").replace(/\n+$/, "");
+                obj[subKey] = folded ? raw.replace(/(?<!\n)\n(?!\n)/g, " ") : raw;
               } else {
                 obj[subKey] = "";
               }
@@ -187,14 +189,20 @@ function parseBlock(lines, startIdx, baseIndent) {
     const kvIndent = rawPad.length;
     if (kvIndent < baseIndent && baseIndent > 0) break;
 
-    if (valRaw === "|") {
+    if (valRaw === "|" || valRaw === ">") {
+      const folded = valRaw === ">";
       i++;
       const blockLines = [];
       while (i < lines.length && (lines[i].trim() === "" || getIndent(lines[i]) > kvIndent)) {
         blockLines.push(lines[i].substring(kvIndent + 2));
         i++;
       }
-      result[key] = blockLines.join("\n").replace(/\n+$/, "");
+      const raw = blockLines.join("\n").replace(/\n+$/, "");
+      if (folded) {
+        result[key] = raw.replace(/(?<!\n)\n(?!\n)/g, " ");
+      } else {
+        result[key] = raw;
+      }
     } else if (valRaw === "") {
       i++;
       if (i < lines.length) {
@@ -289,6 +297,11 @@ export function writeIndexYaml(filePath, data) {
     session,
     codeTasks: (data.codeTasks || data.tasks || []).map(t => ({ file: t.file, status: t.status })),
     storyTasks: (data.storyTasks || []).map(t => ({ file: t.file, status: t.status })),
-    projectTasks: (data.projectTasks || []).map(t => ({ file: t.file, status: t.status })),
+    projectTasks: (data.projectTasks || []).map(t => {
+      const entry = { file: t.file, status: t.status };
+      if (t.type) entry.type = t.type;
+      if (t.entry) entry.entry = t.entry;
+      return entry;
+    }),
   });
 }

@@ -2,16 +2,21 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { execSync } from "node:child_process";
+import { execSync, execFileSync } from "node:child_process";
 import { jsonResponse, errorResponse, readBody } from "../index.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SETTINGS_PATH = path.join(__dirname, "..", "..", "settings.json");
 
-function loadSettings() {
+export function loadSettings() {
   if (!fs.existsSync(SETTINGS_PATH)) return {};
   try { return JSON.parse(fs.readFileSync(SETTINGS_PATH, "utf-8")); }
   catch { return {}; }
+}
+
+export function codegraphBin() {
+  const settings = loadSettings();
+  return settings.codegraph?.path || "codegraph";
 }
 
 function saveSettings(data) {
@@ -20,11 +25,6 @@ function saveSettings(data) {
 
 function toPublicResponse(settings) {
   const result = {};
-  if (settings.anthropic) {
-    result.anthropic = { configured: !!(settings.anthropic.apiKey) };
-  } else {
-    result.anthropic = { configured: false };
-  }
   if (settings.jira) {
     result.jira = {
       configured: !!(settings.jira.baseUrl && settings.jira.token),
@@ -71,7 +71,6 @@ export function registerSettingsRoutes(router) {
       }
       const existing = loadSettings();
 
-      if (body.anthropic) existing.anthropic = body.anthropic;
       if (body.jira) existing.jira = body.jira;
       if (body.database) existing.database = body.database;
       if (body.codegraph) existing.codegraph = body.codegraph;
@@ -92,8 +91,9 @@ export function registerSettingsRoutes(router) {
       const result = { available: false, initialized: false, indexed: false, fileCount: null, symbolCount: null };
 
       // Check CLI availability
+      const bin = codegraphBin();
       try {
-        execSync("which codegraph", { encoding: "utf-8", timeout: 5000 });
+        execFileSync("which", [bin === "codegraph" ? "codegraph" : bin], { encoding: "utf-8", timeout: 5000 });
         result.available = true;
       } catch {
         return jsonResponse(res, result);
@@ -107,7 +107,7 @@ export function registerSettingsRoutes(router) {
 
       // Get index stats
       try {
-        const raw = execSync(`codegraph status --json "${dir}"`, { encoding: "utf-8", timeout: 5000 });
+        const raw = execFileSync(bin, ["status", "--json", dir], { encoding: "utf-8", timeout: 5000 });
         const stats = JSON.parse(raw);
         result.indexed = stats.initialized;
         result.fileCount = stats.fileCount || null;
@@ -130,9 +130,10 @@ export function registerSettingsRoutes(router) {
       }
 
       console.log(`[codegraph] Initializing: ${dir}`);
-      execSync(`codegraph init -i "${dir}"`, { encoding: "utf-8", timeout: 30000 });
+      const bin = codegraphBin();
+      execFileSync(bin, ["init", "-i", dir], { encoding: "utf-8", timeout: 30000 });
       console.log(`[codegraph] Indexing: ${dir}`);
-      execSync(`codegraph index "${dir}"`, { encoding: "utf-8", timeout: 120000 });
+      execFileSync(bin, ["index", dir], { encoding: "utf-8", timeout: 120000 });
       console.log(`[codegraph] Done`);
 
       jsonResponse(res, { ok: true });

@@ -62,7 +62,7 @@ export async function renderReview(container, params) {
       }
       noteTask.findings = noteFindings;
       const desc = task.review?.findings?.[findingIdx]?.description || "";
-      const snippet = desc.length > 40 ? desc.slice(0, 40) + "..." : desc;
+      const snippet = desc.length > 60 ? desc.slice(0, 60) + "..." : desc;
       showToast(
         status === "confirmed"
           ? `Confirmed: ${snippet}`
@@ -112,11 +112,11 @@ export async function renderReview(container, params) {
     } catch (e) { return 0; }
   }
 
-  function renderContent() {
+  async function renderContent() {
     const content = document.getElementById("review-content");
     if (!content) return;
     if (currentTab === "overview") renderOverview(content);
-    else renderTasksTab(content);
+    else await renderTasksTab(content);
   }
 
   function getSeverityIcon(sev) {
@@ -267,7 +267,7 @@ export async function renderReview(container, params) {
     });
   }
 
-  function renderTasksTab(el) {
+  async function renderTasksTab(el) {
     // Preserve sidebar scroll position across re-renders
     const savedScrollTop = document.getElementById("task-sidebar")?.scrollTop || 0;
     const savedDetailScroll = preserveDetailScroll
@@ -337,7 +337,7 @@ export async function renderReview(container, params) {
 
     const detailPanel = document.getElementById("task-detail-panel");
     detailPanel.innerHTML = renderTaskDetail(tasks[currentTaskIdx], notes);
-    renderMermaidDiagrams(detailPanel);
+    await renderMermaidDiagrams(detailPanel);
 
     // Restore detail panel scroll (only if not task switch)
     detailPanel.scrollTop = preserveDetailScroll ? savedDetailScroll : 0;

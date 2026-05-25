@@ -6,6 +6,19 @@ import { taskFileName } from "../../lib/git.mjs";
 import { readYaml, writeYaml, writeIndexYaml, writeStoryTaskYaml } from "../../lib/yaml.mjs";
 import { listProviders, fetchFromProvider } from "../../lib/providers.mjs";
 import { jsonResponse, readBody, errorResponse } from "../index.mjs";
+import { loadSettings } from "./settings.mjs";
+
+function getProviderEnv(providerName) {
+  const settings = loadSettings();
+  if (providerName === "jira" && settings.jira) {
+    return {
+      JIRA_BASE_URL: settings.jira.baseUrl || "",
+      JIRA_USER_EMAIL: settings.jira.email || "",
+      JIRA_API_TOKEN: settings.jira.token || "",
+    };
+  }
+  return {};
+}
 
 export function registerStoryRoutes(router, reportsDir) {
   // GET /api/providers
@@ -21,7 +34,7 @@ export function registerStoryRoutes(router, reportsDir) {
       if (!ids || !Array.isArray(ids) || ids.length === 0) {
         return errorResponse(res, "Missing required field: ids (non-empty array)", "VALIDATION_ERROR", 400);
       }
-      const stories = fetchFromProvider(params.name, ids);
+      const stories = fetchFromProvider(params.name, ids, getProviderEnv(params.name));
       jsonResponse(res, stories);
     } catch (e) {
       if (e.message.includes("Provider not found")) return errorResponse(res, e.message, "NOT_FOUND", 404);

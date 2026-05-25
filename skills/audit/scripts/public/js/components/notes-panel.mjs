@@ -17,7 +17,7 @@ export function initNotesPanel(root) {
           <span class="font-medium text-sm">Review Context</span>
           <div class="text-xs text-muted" style="margin-top:2px">Project context for AI reviewers</div>
         </div>
-        <button id="notes-close" class="btn btn-ghost btn-sm">${icon("x", 14)}</button>
+        <button id="notes-close" class="btn btn-ghost btn-sm" aria-label="Close panel">${icon("x", 14)}</button>
       </div>
       <textarea id="notes-textarea" class="notes-textarea" placeholder="Add review context, key concerns, known issues..."></textarea>
       <div class="notes-panel-footer">

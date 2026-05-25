@@ -86,7 +86,7 @@ export async function renderHome(container) {
       const typeLabel = isProject ? "Project Scan" : s.type === "all" ? "Code + Story" : "Code Review";
       const progressLabel = s.totalTasks ? `${s.reviewedTasks || 0}/${s.totalTasks}` : '';
       return `
-        <div class="session-card card card-clickable ${cfg.accent}" data-id="${s.id}" data-status="${s.status}" data-type="${s.type}">
+        <div class="session-card card card-clickable ${cfg.accent}" data-id="${s.id}" data-status="${s.status}" data-type="${s.type}" tabindex="0" role="button" aria-label="${escapeHtml(s.id)}, ${s.status}">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-3" style="min-width:0">
               <div class="session-card-type-icon">${typeIcon}</div>
@@ -121,6 +121,12 @@ export async function renderHome(container) {
         if (status === "completed") location.hash = `#/review/${id}`;
         else if (status === "created" || status === "scoped") location.hash = `#/wizard/${id}`;
         else location.hash = `#/progress/${id}`;
+      });
+      card.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          card.click();
+        }
       });
     });
   } catch (e) {

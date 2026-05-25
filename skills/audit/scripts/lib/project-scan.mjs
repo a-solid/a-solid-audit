@@ -1,9 +1,19 @@
 // skills/audit/scripts/lib/project-scan.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { sanitizePath } from "./session.mjs";
 import { readYaml, writeYaml, writeIndexYaml, writeProjectTaskYaml } from "./yaml.mjs";
+
+const SETTINGS_PATH = path.join(import.meta.dirname, "..", "settings.json");
+
+function codegraphBin() {
+  try {
+    const raw = fs.readFileSync(SETTINGS_PATH, "utf-8");
+    const settings = JSON.parse(raw);
+    return settings.codegraph?.path || "codegraph";
+  } catch { return "codegraph"; }
+}
 
 const EXCLUDED_DIRS = new Set([
   "node_modules", ".git", "dist", "build", "vendor", "__pycache__",
@@ -125,10 +135,11 @@ function resolveImportsViaCodegraph(filePath, projectDir, sid) {
   try {
     // One CLI call per scan — cache results per projectDir
     if (_codegraphCacheDir !== projectDir || !_codegraphCache) {
-      const cmd = `codegraph query --json -k import -l 1000 "" -p "${projectDir}"`;
-      pushLog(sid, "info", `codegraph: ${cmd}`);
+      const bin = codegraphBin();
+      const args = ["query", "--json", "-k", "import", "-l", "1000", "", "-p", projectDir];
+      pushLog(sid, "info", `codegraph: ${bin} ${args.join(" ")}`);
       const start = Date.now();
-      const raw = execSync(cmd, { encoding: "utf-8", timeout: 30000, stdio: ["pipe", "pipe", "pipe"] });
+      const raw = execFileSync(bin, args, { encoding: "utf-8", timeout: 30000 });
       const data = JSON.parse(raw);
       pushLog(sid, "info", `codegraph: returned ${data.length} import edges in ${Date.now() - start}ms`);
 
@@ -202,9 +213,10 @@ export function collectGraphData(projectDir, reportsDir, sid) {
   // 3. Collect import edges via codegraph
   const imports = {};
   try {
-    const cmd = `codegraph query --json -k import -l 2000 "" -p "${projectDir}"`;
-    pushLog(safeSid, "info", `collectGraphData: ${cmd}`);
-    const raw = execSync(cmd, { encoding: "utf-8", timeout: 30000, stdio: ["pipe", "pipe", "pipe"] });
+    const bin = codegraphBin();
+    const args = ["query", "--json", "-k", "import", "-l", "2000", "", "-p", projectDir];
+    pushLog(safeSid, "info", `collectGraphData: ${bin} ${args.join(" ")}`);
+    const raw = execFileSync(bin, args, { encoding: "utf-8", timeout: 30000 });
     const data = JSON.parse(raw);
     for (const item of data) {
       const src = item.node.filePath;
@@ -222,9 +234,10 @@ export function collectGraphData(projectDir, reportsDir, sid) {
   // 4. Collect function/method symbols via codegraph
   const symbols = {};
   try {
-    const cmd = `codegraph query --json -k function -l 2000 "" -p "${projectDir}"`;
-    pushLog(safeSid, "info", `collectGraphData: ${cmd}`);
-    const raw = execSync(cmd, { encoding: "utf-8", timeout: 30000, stdio: ["pipe", "pipe", "pipe"] });
+    const bin = codegraphBin();
+    const args = ["query", "--json", "-k", "function", "-l", "2000", "", "-p", projectDir];
+    pushLog(safeSid, "info", `collectGraphData: ${bin} ${args.join(" ")}`);
+    const raw = execFileSync(bin, args, { encoding: "utf-8", timeout: 30000 });
     const data = JSON.parse(raw);
     for (const item of data) {
       const filePath = item.node.filePath;

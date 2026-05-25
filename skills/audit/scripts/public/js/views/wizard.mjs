@@ -479,6 +479,7 @@ export async function renderWizard(container, params) {
           <div class="flex items-center gap-2 text-sm text-secondary">
             <span class="spinner spinner-sm"></span> Scanning project files...
           </div>
+          <div class="scan-progress-bar"><div class="progress-fill"></div></div>
           <div class="scan-log-section">
             <button id="scan-log-toggle" class="scan-log-toggle">
               <span class="toggle-icon">${icon("chevronRight", 10)}</span> Scan Log
@@ -506,8 +507,9 @@ export async function renderWizard(container, params) {
             const div = document.createElement("div");
             div.className = "scan-log-entry";
             div.innerHTML = `<span class="log-time">${escapeHtml(entry.timestamp)}</span>${escapeHtml(entry.message)}`;
+            const wasAtBottom = logPanel.scrollHeight - logPanel.scrollTop - logPanel.clientHeight < 30;
             logPanel.appendChild(div);
-            logPanel.scrollTop = logPanel.scrollHeight;
+            if (wasAtBottom) logPanel.scrollTop = logPanel.scrollHeight;
             if (!logPanel.classList.contains("open")) {
               logPanel.classList.add("open");
               if (logToggle) logToggle.classList.add("open");
@@ -572,9 +574,8 @@ export async function renderWizard(container, params) {
         const moreCount = Math.max(0, (graphData.entryFiles || []).length - 8);
         el.innerHTML = `
           <div class="space-y-4">
-            <div class="text-sm text-secondary">
-              Scan complete — <strong>${graphData.totalFiles || 0}</strong> files found, <strong>${(graphData.entryFiles || []).length}</strong> entry points
-            </div>
+            <div class="scan-file-count">${icon("file", 12)} Found ${graphData.totalFiles || 0} files</div>
+            <div class="text-sm text-secondary">${(graphData.entryFiles || []).length} entry points detected</div>
             ${entryList.length > 0 ? `
             <div class="group-entry-list">
               <div class="text-xs font-semibold text-muted mb-2" style="text-transform:uppercase;letter-spacing:0.5px">Entry Points</div>
@@ -623,9 +624,9 @@ export async function renderWizard(container, params) {
               <div class="group-card-header" data-index="${i}">
                 <div class="group-card-info">
                   <div class="group-card-title">
-                    ${icon("package", 16)}
+                    ${icon("folder", 16)}
                     <span class="font-medium">${escapeHtml(g.name || "Group " + (i + 1))}</span>
-                    <span class="text-xs text-muted">(${(g.files || []).length} files)</span>
+                    <span class="group-file-count-badge">${(g.files || []).length} files</span>
                   </div>
                   ${g.rationale ? `<div class="group-rationale">${escapeHtml(g.rationale)}</div>` : ""}
                 </div>
@@ -645,7 +646,8 @@ export async function renderWizard(container, params) {
               </div>
             </div>
           `).join("")}
-        </div>`;
+        </div>
+        <div class="group-confirm-totals">${groups.length} groups, ${groups.reduce((sum, g) => sum + (g.files ? g.files.length : 0), 0)} files</div>`;
 
       confirmBtn.disabled = false;
 
@@ -665,9 +667,14 @@ export async function renderWizard(container, params) {
         confirmBtn.innerHTML = '<span class="spinner spinner-sm"></span> Confirming...';
         try {
           await api.confirmGroups(sessionId);
-          step = 4;
-          save();
-          render();
+          const stepContent = document.getElementById("group-step-content");
+          if (stepContent) {
+            stepContent.innerHTML = `<div style="text-align:center;padding:var(--space-8)">
+              <div class="confirm-success-check">${icon("check", 24)}</div>
+              <p style="margin-top:var(--space-4);color:var(--accent);font-weight:600">Groups confirmed</p>
+            </div>`;
+          }
+          setTimeout(() => { step = 4; save(); render(); }, 800);
         } catch (e) {
           showToast("Failed to confirm groups: " + e.message);
           confirmBtn.disabled = false;

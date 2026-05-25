@@ -1527,6 +1527,33 @@ code {
   from { opacity: 0; transform: translateY(2px); }
   to { opacity: 1; transform: translateY(0); }
 }
+.scan-progress-bar {
+  height: 4px;
+  background: var(--bg-active);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: var(--space-4);
+}
+.scan-progress-bar .progress-fill {
+  width: 100%;
+  background: linear-gradient(90deg, var(--info), var(--accent), var(--info));
+  background-size: 200% 100%;
+  animation: scanShimmer 1.5s ease-in-out infinite;
+}
+@keyframes scanShimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.scan-file-count {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  padding: var(--space-1) var(--space-3);
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  margin-bottom: var(--space-4);
+}
 
 /* ─── Group Card ─── */
 .group-card {
@@ -1577,6 +1604,36 @@ code {
 }
 .group-file-item .text-sm {
   font-size: var(--text-xs);
+}
+.group-file-count-badge {
+  display: inline-flex; align-items: center; gap: var(--space-1);
+  padding: 2px 8px;
+  background: var(--accent-dim);
+  color: var(--accent);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.group-confirm-totals {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-4);
+  display: flex; align-items: center; gap: var(--space-2);
+}
+.confirm-success-check {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  color: var(--accent);
+  animation: confirmPulse 600ms var(--ease-spring);
+}
+@keyframes confirmPulse {
+  0% { transform: scale(0.5); opacity: 0; }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
 }
 
 /* ─── Entry File Badge ─── */

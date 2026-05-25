@@ -760,6 +760,41 @@ img, svg { display: block; }
   background: var(--bg-muted);
 }
 
+/* ─── Quick Stats Row ─── */
+.quick-stats-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+.quick-stat {
+  text-align: center;
+  padding: var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.quick-stat-value {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+.quick-stat-value-confirmed { color: var(--accent); }
+.quick-stat-value-dismissed { color: var(--warning); }
+.quick-stat-value-unreviewed { color: var(--text-muted); }
+.quick-stat-label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-top: var(--space-1);
+}
+.severity-bar-pct {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  min-width: 36px;
+  text-align: right;
+}
+
 /* ─── Form Elements ─── */
 input, select, textarea {
   font-family: var(--font-ui); font-size: var(--text-base);

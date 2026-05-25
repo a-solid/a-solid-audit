@@ -119,6 +119,19 @@ export async function renderReview(container, params) {
     else renderTasksTab(content);
   }
 
+  function getSeverityIcon(sev) {
+    const m = {
+      critical: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+      major: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+      high: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+      minor: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+      medium: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+      info: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>',
+      low: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>',
+    };
+    return m[sev] || '';
+  }
+
   function renderOverview(el) {
     const totalFindings = tasks.reduce((sum, t) => sum + (t.review?.findings?.length || 0), 0);
     const bySeverity = {};
@@ -132,6 +145,15 @@ export async function renderReview(container, params) {
       : 0;
 
     const maxSevCount = Math.max(...Object.values(bySeverity), 1);
+
+    const allFindings = tasks.flatMap(t => t.review?.findings || []);
+    const confirmed = allFindings.filter(f => f.status === "confirmed").length;
+    const dismissed = allFindings.filter(f => f.status === "deferred").length;
+    const unreviewedCount = allFindings.length - confirmed - dismissed;
+    const findingsTotal = allFindings.length || 1;
+    const confirmPct = Math.round(confirmed / findingsTotal * 100);
+    const dismissPct = Math.round(dismissed / findingsTotal * 100);
+    const unreviewedPct = 100 - confirmPct - dismissPct;
 
     el.innerHTML = `
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -149,6 +171,21 @@ export async function renderReview(container, params) {
         </div>
       </div>
 
+      <div class="quick-stats-row">
+        <div class="quick-stat">
+          <div class="quick-stat-value quick-stat-value-confirmed">${confirmPct}%</div>
+          <div class="quick-stat-label">Confirmed</div>
+        </div>
+        <div class="quick-stat">
+          <div class="quick-stat-value quick-stat-value-dismissed">${dismissPct}%</div>
+          <div class="quick-stat-label">Dismissed</div>
+        </div>
+        <div class="quick-stat">
+          <div class="quick-stat-value quick-stat-value-unreviewed">${unreviewedPct}%</div>
+          <div class="quick-stat-label">Unreviewed</div>
+        </div>
+      </div>
+
       ${totalFindings === 0 ? `
         <div class="card" style="text-align:center;padding:var(--space-8) var(--space-6)">
           <div style="margin-bottom:var(--space-4);color:var(--accent)">${icon("check", 48)}</div>
@@ -159,15 +196,18 @@ export async function renderReview(container, params) {
         ${Object.keys(bySeverity).length > 0 ? `
           <div class="card mb-4">
             <div class="font-medium mb-4">Findings by Severity</div>
-            ${Object.entries(bySeverity).map(([sev, count]) => `
+            ${Object.entries(bySeverity).map(([sev, count]) => {
+              const pct = totalFindings > 0 ? Math.round(count / totalFindings * 100) : 0;
+              return `
               <div class="severity-bar-row">
                 <span class="badge severity-${sev} severity-bar-label">${SEVERITY_LABELS[sev] || sev}</span>
                 <div class="severity-bar-track">
                   <div class="severity-bar-fill" style="width:${(count / maxSevCount) * 100}%;background:${SEVERITY_COLORS[sev] || "var(--info)"}"></div>
                 </div>
                 <span class="severity-bar-count">${count}</span>
-              </div>
-            `).join("")}
+                <span class="severity-bar-pct">${pct}%</span>
+              </div>`;
+            }).join("")}
           </div>
         ` : ""}
 
@@ -186,9 +226,13 @@ export async function renderReview(container, params) {
             return critical.map(t => {
               const taskIdx = tasks.indexOf(t);
               const highSevCount = (t.review?.findings || []).filter(f => f.severity === "critical" || f.severity === "high" || f.severity === "major").length;
+              const highSevs = ["critical", "high", "major"];
+              const highestSev = (t.review?.findings || [])
+                .filter(f => highSevs.includes(f.severity))
+                .sort((a, b) => highSevs.indexOf(a.severity) - highSevs.indexOf(b.severity))[0]?.severity || "critical";
               return `
               <div class="flex items-center justify-between py-2 border-b needs-attention-item" style="border-color:var(--border);cursor:pointer" data-task-idx="${taskIdx}" role="link" tabindex="0" aria-label="${escapeHtml(t.name || t.file)}, ${highSevCount} high-severity findings">
-                <span class="text-sm font-mono truncate">${escapeHtml(t.name || t.file)}</span>
+                <span class="flex items-center gap-2 text-sm font-mono truncate">${getSeverityIcon(highestSev)}${escapeHtml(t.name || t.file)}</span>
                 <span class="text-sm text-danger font-medium">${highSevCount} high-severity</span>
               </div>`;
             }).join("");

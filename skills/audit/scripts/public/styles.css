@@ -849,6 +849,13 @@ code {
 .finding-card.severity-medium { border-left-color: var(--warning); }
 .finding-card.severity-info,
 .finding-card.severity-low { border-left-color: var(--info); }
+.finding-card.severity-critical { background: linear-gradient(135deg, var(--danger-dim), var(--bg-surface)); }
+.finding-card.severity-major,
+.finding-card.severity-high { background: linear-gradient(135deg, var(--danger-dim), var(--bg-surface)); }
+.finding-card.severity-minor,
+.finding-card.severity-medium { background: linear-gradient(135deg, var(--warning-dim), var(--bg-surface)); }
+.finding-card.severity-info,
+.finding-card.severity-low { background: linear-gradient(135deg, var(--info-dim), var(--bg-surface)); }
 .finding-card.confirmed { background: linear-gradient(135deg, var(--success-dim), var(--bg-surface)); }
 .finding-card.dismissed { opacity: 0.6; }
 .finding-card .btn-sm {

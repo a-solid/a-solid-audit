@@ -139,6 +139,7 @@ export async function renderWizard(container, params) {
   let scopeTreeInstance = null;
   let previewGeneration = 0;
   let pendingExpandIndex = -1;
+  let defaultProjectDir = "";
 
   // For "new" wizard, skip session restore — no session exists yet
   if (!isNew) {
@@ -301,8 +302,9 @@ export async function renderWizard(container, params) {
         nextBtn.disabled = true;
         nextBtn.innerHTML = '<span class="spinner spinner-sm"></span> Creating...';
         try {
-          const { id } = await api.createSession({ type: reviewType });
+          const { id, projectDir } = await api.createSession({ type: reviewType });
           sessionId = id;
+          defaultProjectDir = projectDir || "";
           location.hash = `#/wizard/${id}`;
         } catch (e) {
           showToast("Failed to create session: " + e.message);
@@ -364,8 +366,10 @@ export async function renderWizard(container, params) {
 
     api.getSession(sessionId).then(session => {
       const dirInput = document.getElementById("project-dir");
-      if (dirInput && session.projectDir) dirInput.value = session.projectDir;
-      renderCodegraphStatus("codegraph-status", session.projectDir || "");
+      if (dirInput) {
+        dirInput.value = session.projectDir || defaultProjectDir || "";
+      }
+      renderCodegraphStatus("codegraph-status", session.projectDir || defaultProjectDir || "");
     }).catch(() => {});
 
     api.getReviewContext(sessionId).then(data => {

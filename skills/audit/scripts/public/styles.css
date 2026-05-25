@@ -983,6 +983,42 @@ code {
   background: var(--accent-dim); color: var(--accent);
 }
 
+/* ─── Unified Collapse ─── */
+.collapse {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  transition: border-color var(--duration-fast) var(--ease-spring);
+}
+.collapse:hover { border-color: var(--border-hover); }
+.collapse.open { border-color: var(--border-accent); }
+.collapse-header {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  background: var(--bg-surface);
+  transition: background var(--duration-fast) var(--ease-spring);
+  user-select: none;
+}
+.collapse-header:hover { background: var(--bg-elevated); }
+.collapse-body {
+  max-height: 0;
+  overflow: hidden;
+  border-top: 1px solid transparent;
+  background: var(--bg-base);
+  transition: max-height var(--duration-base) var(--ease-spring);
+}
+.collapse.open .collapse-body {
+  border-top-color: var(--border);
+  overflow-y: auto;
+}
+.collapse-icon {
+  color: var(--text-muted);
+  transition: transform var(--duration-fast) var(--ease-spring);
+  flex-shrink: 0;
+}
+.collapse.open .collapse-icon { transform: rotate(180deg); }
+
 /* ─── Sidebar Layout ─── */
 .sidebar-layout {
   display: grid; grid-template-columns: 300px 1fr;

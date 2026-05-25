@@ -253,6 +253,22 @@ img, svg { display: block; }
   color: var(--text-primary); font-weight: 500;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.breadcrumb a {
+  position: relative;
+}
+.breadcrumb a::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: var(--accent);
+  transition: width var(--duration-fast) var(--ease-spring);
+}
+.breadcrumb a:hover::after {
+  width: 100%;
+}
 
 /* ─── Main Layout ─── */
 .app-main {

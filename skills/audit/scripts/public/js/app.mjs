@@ -119,6 +119,24 @@ export function showToast(message, type = "error") {
   setTimeout(dismiss, 4000);
 }
 
+// ─── Active Session Polling ───
+
+let activePollTimer = null;
+
+async function checkActiveSessions() {
+  try {
+    const sessions = await api.listSessions();
+    const hasActive = sessions.some(s => s.status === "reviewing");
+    const dot = document.getElementById("active-dot");
+    if (dot) dot.style.display = hasActive ? "block" : "none";
+  } catch { /* ignore */ }
+}
+
+function startActivePolling() {
+  checkActiveSessions();
+  activePollTimer = setInterval(checkActiveSessions, 30000);
+}
+
 // ─── Router ───
 
 const routes = {
@@ -141,6 +159,10 @@ async function navigate() {
   if (currentCleanup) {
     currentCleanup();
     currentCleanup = null;
+  }
+  if (activePollTimer) {
+    clearInterval(activePollTimer);
+    activePollTimer = null;
   }
 
   const { view, params } = parseHash();
@@ -181,6 +203,8 @@ async function navigate() {
     }
     setTimeout(() => container.classList.remove("fade-in"), 200);
   }
+
+  startActivePolling();
 }
 
 function handleError(e) {

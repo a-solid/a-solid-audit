@@ -1300,18 +1300,10 @@ export async function renderWizard(container, params) {
             <div class="text-xs text-muted mt-1">This context is passed to AI reviewers as additional guidance.</div>
           </div>
         </div>
-
-        <div class="mt-4 info-banner info-banner-amber">
-          ${icon("zap", 16)}
-          <span>Click "Start AI Review" below, then go back to the AI terminal and type <strong>start review</strong> to begin.</span>
-        </div>
       </div>
-      <div class="flex justify-between">
+      <div id="step4-terminal"></div>
+      <div class="flex justify-between mt-4">
         <button id="step4-back" class="btn btn-ghost" aria-label="Go back">${icon("arrowLeft", 14)} Back</button>
-        <button id="start-review-btn" class="btn btn-primary btn-start-review">
-          ${icon("zap", 14)}
-          Start AI Review
-        </button>
       </div>`;
 
     // Load existing context (extract only User Context section)
@@ -1342,45 +1334,21 @@ export async function renderWizard(container, params) {
         contextSaveTimer = setTimeout(async () => {
           try {
             await api.setReviewContext(sessionId, contextInput.value);
-            setDirty(true);
-          } catch (e) { /* silent fail — context is optional */ }
+          } catch { /* silent fail — context is optional */ }
         }, 300);
       });
     }
 
-    // Also save context right before starting review
     document.getElementById("step4-back").addEventListener("click", () => {
       goBack(reviewType === "code" ? 2 : 3, "step4-back");
     });
-    document.getElementById("start-review-btn").addEventListener("click", async () => {
-      const btn = document.getElementById("start-review-btn");
-      const originalHTML = btn.innerHTML;
-      // Save context before starting
-      if (contextInput) {
-        try { await api.setReviewContext(sessionId, contextInput.value); } catch (e) {}
-      }
-      try {
-        btn.disabled = true;
-        btn.innerHTML = `<span class="spinner spinner-sm"></span> Preparing...`;
-        setDirty(false);
-        localStorage.removeItem(`audit-wizard-${sessionId}`);
-        // Show confirmation instead of navigating away
-        const content = document.getElementById("wizard-content");
-        content.innerHTML = `
-          <div class="card" style="text-align:center;padding:var(--space-8) var(--space-6)">
-            <div style="margin-bottom:var(--space-4);color:var(--accent)">${icon("check", 48)}</div>
-            <h2 class="text-xl mb-3">Audit Ready</h2>
-            <p class="text-secondary mb-4">Session is prepared. Go back to the AI terminal and type:</p>
-            <code style="font-size:var(--text-lg);background:var(--bg-elevated);padding:var(--space-2) var(--space-4);border-radius:var(--radius-md);display:inline-block">start review</code>
-            <div class="mt-4">
-              <a href="#/progress/${sessionId}" class="btn btn-ghost">View Progress ${icon("chevronRight", 14)}</a>
-            </div>
-          </div>`;
-      } catch (e) {
-        showToast("Failed to start review: " + e.message);
-        const btn2 = document.getElementById("start-review-btn");
-        if (btn2) { btn2.disabled = false; btn2.innerHTML = originalHTML; }
-      }
+
+    setDirty(false);
+    localStorage.removeItem(`audit-wizard-${sessionId}`);
+
+    const termEl = document.getElementById("step4-terminal");
+    renderTerminalCard(termEl, "start review", {
+      viewProgressHref: `#/progress/${sessionId}`,
     });
   }
 

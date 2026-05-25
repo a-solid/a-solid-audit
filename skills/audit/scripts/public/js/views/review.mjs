@@ -11,6 +11,7 @@ export async function renderReview(container, params) {
   let currentTab = "overview";
   let currentTaskIdx = 0;
   let preserveDetailScroll = false;
+  let batchMode = false;
 
   const shortId = sessionId ? sessionId.slice(0, 7) : "";
   setBreadcrumb([
@@ -354,6 +355,7 @@ export async function renderReview(container, params) {
       const newIdx = parseInt(item.dataset.idx);
       if (newIdx !== currentTaskIdx) {
         currentTaskIdx = newIdx;
+        batchMode = false;
       }
       renderContent();
     }
@@ -370,14 +372,15 @@ export async function renderReview(container, params) {
 
     // Mobile task nav
     el.querySelector(".mobile-task-prev")?.addEventListener("click", () => {
-      if (currentTaskIdx > 0) { currentTaskIdx--; renderContent(); }
+      if (currentTaskIdx > 0) { currentTaskIdx--; batchMode = false; renderContent(); }
     });
     el.querySelector(".mobile-task-next")?.addEventListener("click", () => {
-      if (currentTaskIdx < tasks.length - 1) { currentTaskIdx++; renderContent(); }
+      if (currentTaskIdx < tasks.length - 1) { currentTaskIdx++; batchMode = false; renderContent(); }
     });
 
     const detailPanel = document.getElementById("task-detail-panel");
-    detailPanel.innerHTML = renderTaskDetail(tasks[currentTaskIdx], notes);
+    detailPanel.innerHTML = renderTaskDetail(tasks[currentTaskIdx], notes, batchMode);
+    if (batchMode) detailPanel.classList.add("batch-mode");
     await renderMermaidDiagrams(detailPanel);
 
     // Restore detail panel scroll (only if not task switch)
@@ -453,6 +456,103 @@ export async function renderReview(container, params) {
         }
       });
     });
+
+    // Batch mode: toggle, action bar, select all/deselect all
+    const batchSelectBtn = detailPanel.querySelector("#batch-select-btn");
+    const batchCancelBtn = detailPanel.querySelector("#batch-cancel-btn");
+
+    if (batchSelectBtn) {
+      batchSelectBtn.addEventListener("click", () => {
+        batchMode = true;
+        preserveDetailScroll = true;
+        requestAnimationFrame(() => requestAnimationFrame(() => renderContent()));
+      });
+    }
+
+    if (batchCancelBtn) {
+      batchCancelBtn.addEventListener("click", () => {
+        batchMode = false;
+        preserveDetailScroll = true;
+        requestAnimationFrame(() => requestAnimationFrame(() => renderContent()));
+      });
+    }
+
+    // Render batch action bar if in batch mode
+    if (batchMode) {
+      const HIGH_SEVS = ["critical", "major", "high"];
+      const bar = document.createElement("div");
+      bar.className = "batch-action-bar";
+      bar.id = "batch-action-bar";
+      bar.innerHTML = `
+        <div class="batch-action-bar-left">
+          <button class="btn btn-sm btn-ghost" id="batch-select-all-btn">Select All</button>
+          <button class="btn btn-sm btn-ghost" id="batch-deselect-all-btn">Deselect All</button>
+        </div>
+        <div class="flex items-center gap-2">
+          <button class="btn btn-sm batch-confirm-btn" id="batch-confirm-btn" disabled>${icon("check", 14)} Confirm 0 selected</button>
+        </div>
+      `;
+      detailPanel.appendChild(bar);
+
+      function updateBatchBar() {
+        const checked = detailPanel.querySelectorAll(".finding-checkbox:not(:disabled):checked");
+        const count = checked.length;
+        const confirmBtn = document.getElementById("batch-confirm-btn");
+        if (!confirmBtn) return;
+        confirmBtn.disabled = count === 0;
+
+        const highCount = Array.from(checked).filter(cb =>
+          HIGH_SEVS.includes(cb.dataset.severity)
+        ).length;
+        const highNote = highCount > 0
+          ? `<span class="batch-high-sev-note">${icon("alertTriangle", 12)} ${highCount} high-severity</span>`
+          : "";
+        confirmBtn.innerHTML = `${icon("check", 14)} Confirm ${count} selected ${highNote}`;
+      }
+
+      // Wire checkbox changes
+      detailPanel.querySelectorAll(".finding-checkbox").forEach(cb => {
+        cb.addEventListener("change", updateBatchBar);
+      });
+
+      // Select All / Deselect All
+      document.getElementById("batch-select-all-btn")?.addEventListener("click", () => {
+        detailPanel.querySelectorAll(".finding-checkbox:not(:disabled)").forEach(cb => {
+          cb.checked = true;
+        });
+        updateBatchBar();
+      });
+      document.getElementById("batch-deselect-all-btn")?.addEventListener("click", () => {
+        detailPanel.querySelectorAll(".finding-checkbox:not(:disabled)").forEach(cb => {
+          cb.checked = false;
+        });
+        updateBatchBar();
+      });
+
+      // Batch confirm execute
+      document.getElementById("batch-confirm-btn")?.addEventListener("click", async () => {
+        const confirmBtn = document.getElementById("batch-confirm-btn");
+        const checkedIndices = Array.from(detailPanel.querySelectorAll(".finding-checkbox:not(:disabled):checked"))
+          .map(cb => parseInt(cb.dataset.findingIdx));
+        if (checkedIndices.length === 0) return;
+
+        confirmBtn.disabled = true;
+        confirmBtn.innerHTML = `<span class="spinner spinner-sm"></span> Confirming...`;
+
+        const count = await confirmSelectedFindings(tasks[currentTaskIdx], checkedIndices);
+        batchMode = false;
+        if (count > 0) {
+          showToast(`${count} finding(s) confirmed`, "success");
+        } else {
+          showToast("No findings were confirmed", "info");
+        }
+        preserveDetailScroll = true;
+        requestAnimationFrame(() => requestAnimationFrame(() => renderContent()));
+      });
+
+      // Initial bar state
+      updateBatchBar();
+    }
   }
 
   // Tab switching — click + keyboard

@@ -5,6 +5,7 @@ import {
   listSessions, getSession, createSession, updateSessionStatus, updateSession, sessionId, sanitizePath,
 } from "../../lib/session.mjs";
 import { jsonResponse, readBody, errorResponse } from "../index.mjs";
+import { resolveProjectDir } from "../../lib/paths.mjs";
 
 const CONTEXT_FILE = "review-context.md";
 
@@ -42,7 +43,7 @@ export function registerSessionRoutes(router, reportsDir) {
       };
     } catch { /* use defaults */ }
     const result = createSession(reportsDir, sid, options);
-    jsonResponse(res, { id: result.id }, 201);
+    jsonResponse(res, { id: result.id, projectDir: resolveProjectDir() }, 201);
   });
 
   // GET /api/sessions/:id — single session detail

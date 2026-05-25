@@ -270,6 +270,20 @@ img, svg { display: block; }
 .wizard-content-enter {
   animation: fadeIn 200ms var(--ease-spring) forwards;
 }
+.wizard-step-enter {
+  animation: stepSlideIn 250ms var(--ease-spring) forwards;
+}
+@keyframes stepSlideIn {
+  from { opacity: 0; transform: translateX(30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.wizard-step-enter-back {
+  animation: stepSlideInBack 250ms var(--ease-spring) forwards;
+}
+@keyframes stepSlideInBack {
+  from { opacity: 0; transform: translateX(-30px); }
+  to { opacity: 1; transform: translateX(0); }
+}
 
 /* ─── Cards ─── */
 .card {

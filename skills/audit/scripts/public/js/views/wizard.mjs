@@ -129,6 +129,7 @@ export async function renderWizard(container, params) {
   let sessionId = params[0];
   const isNew = !sessionId || sessionId === "new";
   let step = 1;
+  let prevStep = 0;
   let reviewType = "code";
   let scopeMethod = "uncommitted";
   let scopeRef = "";
@@ -224,6 +225,9 @@ export async function renderWizard(container, params) {
         ? ["Review Type", "Configure", "Group", "Ready"]
         : ["Review Type", "Scope", "Ready"];
 
+    const goingForward = step > prevStep;
+    prevStep = step;
+
     container.innerHTML = `
       <h1 class="text-2xl mb-6">New Audit</h1>
       <div class="steps">
@@ -243,7 +247,7 @@ export async function renderWizard(container, params) {
           `;
         }).join("")}
       </div>
-      <div id="wizard-content" class="wizard-content-enter"></div>
+      <div id="wizard-content" class="${goingForward ? 'wizard-step-enter' : 'wizard-step-enter-back'}"></div>
     `;
 
     if (step === 1) renderStep1();

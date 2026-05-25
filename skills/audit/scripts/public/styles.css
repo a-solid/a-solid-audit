@@ -1096,7 +1096,7 @@ code {
 .confirm-all-list {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: var(--space-px, 1px);
 }
 .confirm-all-row {
   display: flex;
@@ -1116,7 +1116,7 @@ code {
 }
 .confirm-all-row[data-high-sev="major"],
 .confirm-all-row[data-high-sev="high"] {
-  background: rgba(239, 68, 68, 0.06);
+  background: var(--danger-dim);
 }
 .confirm-all-row-sev {
   font-weight: 600;

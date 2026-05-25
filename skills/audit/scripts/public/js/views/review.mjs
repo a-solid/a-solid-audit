@@ -93,11 +93,12 @@ export async function renderReview(container, params) {
     if (taskFindings.length === 0 || selectedIndices.length === 0) return 0;
     const noteTask = notes?.tasks?.find(t => t.file === task.file);
     const existingFindings = noteTask?.findings || [];
+    const selectedSet = new Set(selectedIndices);
     let changed = false;
     const saveFindings = taskFindings.map((_, i) => {
       const existing = existingFindings[i];
       if (existing) return existing;
-      if (selectedIndices.includes(i)) {
+      if (selectedSet.has(i)) {
         changed = true;
         return { status: "confirmed", reason: "" };
       }
@@ -400,7 +401,7 @@ export async function renderReview(container, params) {
       }
     }
 
-    function renderConfirmAllPanel(slot, task, findings, noteTask, indices) {
+    function renderConfirmAllPanel(slot, task, findings, _noteTask, indices) {
       const HIGH_SEVS = ["critical", "major", "high"];
       // Build severity summary
       const sevCounts = {};
@@ -433,7 +434,7 @@ export async function renderReview(container, params) {
       }).join("");
 
       const hasHighSev = indices.some(i => HIGH_SEVS.includes(findings[i]?.severity));
-      const highSevTotal = indices.filter(i => HIGH_SEVS.includes(findings[i]?.severity)).length;
+      const highSevTotal = (sevCounts.critical || 0) + (sevCounts.major || 0) + (sevCounts.high || 0);
 
       slot.innerHTML = `
         <div class="confirm-all-panel">
@@ -500,7 +501,7 @@ export async function renderReview(container, params) {
         if (count > 0) {
           showToast(`${count} finding(s) confirmed`, "success");
         } else {
-          showToast("No findings were confirmed");
+          showToast("No findings were confirmed", "info");
         }
         preserveDetailScroll = true;
         requestAnimationFrame(() => requestAnimationFrame(() => renderContent()));

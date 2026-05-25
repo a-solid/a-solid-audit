@@ -433,9 +433,43 @@ export async function renderReview(container, params) {
     location.hash = `#/summary/${sessionId}`;
   });
 
+  // Keyboard shortcuts overlay
+  function toggleKbOverlay() {
+    const existing = document.getElementById("kb-overlay");
+    if (existing) { existing.remove(); return; }
+    const overlay = document.createElement("div");
+    overlay.id = "kb-overlay";
+    overlay.className = "kb-overlay";
+    overlay.innerHTML = `
+      <div class="kb-overlay-card">
+        <div class="kb-overlay-title">Keyboard Shortcuts</div>
+        <div class="kb-row"><span>j / ↓</span><span class="kb-key">Next task</span></div>
+        <div class="kb-row"><span>k / ↑</span><span class="kb-key">Previous task</span></div>
+        <div class="kb-row"><span>o</span><span class="kb-key">Overview tab</span></div>
+        <div class="kb-row"><span>s</span><span class="kb-key">Tasks tab</span></div>
+        <div class="kb-row"><span>?</span><span class="kb-key">Show shortcuts</span></div>
+        <div class="kb-row"><span>Esc</span><span class="kb-key">Close panel</span></div>
+      </div>
+    `;
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) overlay.remove();
+    });
+    document.body.appendChild(overlay);
+  }
+
   // Keyboard shortcuts — register with cleanup
   function shortcutHandler(e) {
     if (e.target.matches("input, textarea, [contenteditable]")) return;
+    if (e.key === "?") {
+      e.preventDefault();
+      toggleKbOverlay();
+      return;
+    }
+    if (e.key === "Escape") {
+      const overlay = document.getElementById("kb-overlay");
+      if (overlay) overlay.remove();
+      return;
+    }
     if (currentTab !== "tasks") {
       if (e.key === "o") { currentTab = "overview"; renderContent(); updateTabUI(); }
       else if (e.key === "s") { currentTab = "tasks"; renderContent(); updateTabUI(); }
@@ -475,7 +509,15 @@ export async function renderReview(container, params) {
   document.addEventListener("keydown", shortcutHandler);
   onNavigateCleanup(() => {
     document.removeEventListener("keydown", shortcutHandler);
+    document.getElementById("kb-overlay")?.remove();
   });
 
   renderContent();
+
+  // Keyboard shortcut hint button
+  const hint = document.createElement("div");
+  hint.className = "kb-hint";
+  hint.innerHTML = `<button class="kb-hint-btn" title="Keyboard shortcuts">?</button>`;
+  hint.querySelector("button").addEventListener("click", toggleKbOverlay);
+  container.appendChild(hint);
 }

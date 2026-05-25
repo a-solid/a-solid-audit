@@ -185,7 +185,11 @@ export async function renderWizard(container, params) {
           save();
         } else if (session?.type === "project") {
           reviewType = "project";
-          step = 2;
+          if (["scanned", "grouping", "ready"].includes(session.status)) {
+            step = 3;
+          } else {
+            step = 2;
+          }
           save();
         } else if (session?.type && session.status === "created") {
           // New session from type selection — skip to step 2

@@ -17,10 +17,9 @@ let currentCleanup = null;
 
 // ─── Shared Utilities ───
 
+const ESCAPE_MAP = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 export function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = String(str ?? "");
-  return div.innerHTML;
+  return String(str ?? "").replace(/[&<>"']/g, c => ESCAPE_MAP[c]);
 }
 
 const ICONS = {
@@ -48,6 +47,13 @@ const ICONS = {
   chevronDown: '<polyline points="6 9 12 15 18 9"/>',
   inbox: '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
   folder: '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
+  code: '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>',
+  "book-open": '<path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>',
+  "folder-search": '<path d="M2 6a2 2 0 0 1 2-2h5l2 2h9a2 2 0 0 1 2 2v4"/><path d="M14.5 19l-2.5-2.5"/><circle cx="19" cy="17" r="3"/>',
+  "shield-alert": '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
+  "alert-triangle": '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+  "minus-circle": '<circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/>',
+  help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
 };
 
 export function icon(name, size = 16) {
@@ -141,7 +147,16 @@ async function navigate() {
   notesPanel.updateSession(getSessionIdFromHash());
   window.scrollTo({ top: 0 });
   const render = routes[view];
-  if (!render) { location.hash = "#/home"; return; }
+  if (!render) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-icon">${icon("alertTriangle", 56)}</div>
+        <h2>Page Not Found</h2>
+        <p>The page you requested does not exist.</p>
+        <a href="#/home" class="btn btn-primary">${icon("arrowLeft", 14)} Back to Home</a>
+      </div>`;
+    return;
+  }
 
   // View transition
   const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -179,6 +194,27 @@ function handleError(e) {
 // Allow views to register cleanup functions
 export function onNavigateCleanup(fn) {
   currentCleanup = fn;
+}
+
+// Shared tab keyboard navigation (arrow keys + enter/space)
+export function initTabKeyboard(tabContainer) {
+  tabContainer.querySelectorAll(".tab").forEach(tab => {
+    tab.addEventListener("keydown", (e) => {
+      const tabList = Array.from(tabContainer.querySelectorAll(".tab"));
+      const idx = tabList.indexOf(tab);
+      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        e.preventDefault();
+        const next = e.key === "ArrowRight"
+          ? tabList[(idx + 1) % tabList.length]
+          : tabList[(idx - 1 + tabList.length) % tabList.length];
+        next.focus();
+        next.click();
+      } else if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        tab.click();
+      }
+    });
+  });
 }
 
 window.addEventListener("hashchange", navigate);

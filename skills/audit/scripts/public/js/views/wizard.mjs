@@ -644,23 +644,25 @@ export async function renderWizard(container, params) {
               `).join("")}
               ${moreCount > 0 ? `<div class="text-xs text-muted mt-1">... ${moreCount} more</div>` : ""}
             </div>` : ""}
-            <div class="info-banner info-banner-amber">
-              ${icon("terminal", 16)}
-              <span>Go to your AI terminal and type: <code>group ${escapeHtml(sessionId)}</code></span>
-            </div>
+            <div id="group-terminal-card"></div>
             <div class="flex items-center gap-2 text-sm text-muted">
               <span class="spinner spinner-sm"></span> Waiting for grouping...
             </div>
           </div>`;
+
+        const termEl = document.getElementById("group-terminal-card");
+        renderTerminalCard(termEl, `group ${escapeHtml(sessionId)}`);
       }).catch(() => {
         el.innerHTML = `
-          <div class="info-banner info-banner-amber">
-            ${icon("terminal", 16)}
-            <span>Go to your AI terminal and type: <code>group ${escapeHtml(sessionId)}</code></span>
-          </div>
-          <div class="flex items-center gap-2 text-sm text-muted mt-3">
-            <span class="spinner spinner-sm"></span> Waiting for grouping...
+          <div class="space-y-4">
+            <div id="group-terminal-card-fallback"></div>
+            <div class="flex items-center gap-2 text-sm text-muted">
+              <span class="spinner spinner-sm"></span> Waiting for grouping...
+            </div>
           </div>`;
+
+        const termEl = document.getElementById("group-terminal-card-fallback");
+        renderTerminalCard(termEl, `group ${escapeHtml(sessionId)}`);
       });
 
       schedulePoll(pollForGroups, 3000);

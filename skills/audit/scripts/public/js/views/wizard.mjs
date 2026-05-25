@@ -545,7 +545,7 @@ export async function renderWizard(container, params) {
         es.onerror = () => { es?.close(); es = null; };
       } catch {}
 
-      onNavigateCleanup(() => { es?.close(); clearPoll(); });
+      onNavigateCleanup(() => { window.onbeforeunload = null; es?.close(); clearPoll(); });
     }
 
     function pollScanStatus() {
@@ -746,7 +746,7 @@ export async function renderWizard(container, params) {
       });
     });
 
-    onNavigateCleanup(() => clearPoll());
+    onNavigateCleanup(() => { window.onbeforeunload = null; clearPoll(); });
   }
 
   function renderProjectReady() {
@@ -1372,6 +1372,8 @@ export async function renderWizard(container, params) {
         if (btn2) { btn2.disabled = false; btn2.innerHTML = originalHTML; }
       }
     });
+  }
+
   }
 
   render();

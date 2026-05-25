@@ -168,7 +168,7 @@ export async function renderProgress(container, params) {
 
       const cancelBtn = document.getElementById("cancel-scan-btn");
       if (cancelBtn) {
-        const showCancel = session.status === "reviewing" || session.status === "scoped";
+        const showCancel = session.status === "scoped";
         cancelBtn.classList.toggle("hidden", !showCancel);
       }
 
@@ -177,6 +177,7 @@ export async function renderProgress(container, params) {
         document.getElementById("task-list").innerHTML = `<div class="text-sm text-muted" style="padding:var(--space-4)">Failed to load tasks. Retrying...</div>`;
       }
 
+      if (tasks.length > 0) {
       const total = tasks.length;
       const reviewed = tasks.filter(t => t.status === "reviewed").length;
       const pct = total ? Math.round((reviewed / total) * 100) : 0;
@@ -239,6 +240,7 @@ export async function renderProgress(container, params) {
       } else {
         pollInterval = 3000;
       }
+      } // end tasks.length > 0
 
     } catch (e) {
       pollFailures++;

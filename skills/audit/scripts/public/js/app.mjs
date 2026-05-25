@@ -254,5 +254,53 @@ export function initTabKeyboard(tabContainer) {
   });
 }
 
+// ─── Terminal Card Component ───
+
+export function renderTerminalCard(container, command, options = {}) {
+  const instruction = options.instruction || "Go to your AI terminal and type:";
+  const viewProgressHref = options.viewProgressHref || null;
+
+  container.innerHTML = `
+    <div class="terminal-card" role="region" aria-label="AI Terminal Instruction">
+      <div class="terminal-card-titlebar">
+        <div class="terminal-card-dots"><span></span><span></span><span></span></div>
+        <span class="terminal-card-title">AI Terminal</span>
+      </div>
+      <div class="terminal-card-body">
+        <div class="terminal-card-instruction">${escapeHtml(instruction)}</div>
+        <div class="terminal-card-cmd">
+          <span class="terminal-card-cmd-text" role="textbox" aria-readonly="true">${escapeHtml(command)}</span>
+          <button class="terminal-card-copy" aria-label="Copy command" data-cmd="${escapeHtml(command)}">${icon("clipboard", 12)} Copy</button>
+        </div>
+        ${viewProgressHref ? `<div style="margin-top:var(--space-5);text-align:center"><a href="${viewProgressHref}" class="btn btn-ghost">${icon("barChart", 14)} View Progress ${icon("chevronRight", 14)}</a></div>` : ""}
+      </div>
+    </div>`;
+
+  const copyBtn = container.querySelector(".terminal-card-copy");
+  if (copyBtn) {
+    copyBtn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(copyBtn.dataset.cmd);
+        copyBtn.classList.add("copied");
+        copyBtn.innerHTML = `${icon("check", 12)} Copied!`;
+        setTimeout(() => {
+          copyBtn.classList.remove("copied");
+          copyBtn.innerHTML = `${icon("clipboard", 12)} Copy`;
+        }, 2000);
+      } catch {
+        // Fallback: select text
+        const cmdText = container.querySelector(".terminal-card-cmd-text");
+        if (cmdText) {
+          const range = document.createRange();
+          range.selectNodeContents(cmdText);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+        }
+      }
+    });
+  }
+}
+
 window.addEventListener("hashchange", navigate);
 window.addEventListener("load", navigate);

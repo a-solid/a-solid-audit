@@ -444,9 +444,9 @@ export async function renderWizard(container, params) {
     const content = document.getElementById("wizard-content");
     content.innerHTML = `
       <div class="card mb-4">
-        <h2 class="font-semibold mb-4">Group Files</h2>
+        <h2 class="font-semibold mb-4">Scan &amp; Group Files</h2>
         <div id="group-step-content">
-          <div class="text-sm text-secondary"><span class="spinner spinner-sm"></span> Loading scan data...</div>
+          <div class="text-sm text-secondary"><span class="spinner spinner-sm"></span> Checking scan status...</div>
         </div>
       </div>
       <div class="flex justify-between">
@@ -454,10 +454,100 @@ export async function renderWizard(container, params) {
         <button id="group-confirm-btn" class="btn btn-primary" disabled>Confirm Groups ${icon("check", 14)}</button>
       </div>`;
 
-    document.getElementById("group-back").addEventListener("click", () => { if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; } step = 2; save(); render(); });
+    document.getElementById("group-back").addEventListener("click", () => { clearPoll(); step = 2; save(); render(); });
 
     let groups = null;
     let pollTimer = null;
+
+    function clearPoll() {
+      if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+    }
+
+    function schedulePoll(fn, ms) {
+      clearPoll();
+      pollTimer = setTimeout(fn, ms);
+    }
+
+    function renderScanning() {
+      const el = document.getElementById("group-step-content");
+      el.innerHTML = `
+        <div class="space-y-4">
+          <div class="flex items-center gap-2 text-sm text-secondary">
+            <span class="spinner spinner-sm"></span> Scanning project files...
+          </div>
+          <div class="scan-log-section">
+            <button id="scan-log-toggle" class="scan-log-toggle">
+              <span class="toggle-icon">${icon("chevronRight", 10)}</span> Scan Log
+            </button>
+            <div id="scan-log-panel" class="scan-log-panel"></div>
+          </div>
+        </div>`;
+
+      const logPanel = document.getElementById("scan-log-panel");
+      const logToggle = document.getElementById("scan-log-toggle");
+      if (logToggle) {
+        logToggle.addEventListener("click", () => {
+          logPanel?.classList.toggle("open");
+          logToggle.classList.toggle("open");
+        });
+      }
+
+      let es = null;
+      try {
+        es = new EventSource(`/api/sessions/${sessionId}/scan/logs`);
+        es.onmessage = (e) => {
+          try {
+            const entry = JSON.parse(e.data);
+            if (!logPanel) return;
+            const div = document.createElement("div");
+            div.className = "scan-log-entry";
+            div.innerHTML = `<span class="log-time">${escapeHtml(entry.timestamp)}</span>${escapeHtml(entry.message)}`;
+            logPanel.appendChild(div);
+            logPanel.scrollTop = logPanel.scrollHeight;
+            if (!logPanel.classList.contains("open")) {
+              logPanel.classList.add("open");
+              if (logToggle) logToggle.classList.add("open");
+            }
+          } catch {}
+        };
+        es.onerror = () => { es?.close(); es = null; };
+      } catch {}
+
+      onNavigateCleanup(() => { es?.close(); clearPoll(); });
+    }
+
+    function pollScanStatus() {
+      api.getScanStatus(sessionId).then(data => {
+        if (data.status === "scanned") {
+          renderPending();
+        } else if (data.status === "done") {
+          step = 4;
+          save();
+          render();
+        } else if (data.status === "scanning") {
+          schedulePoll(pollScanStatus, 2000);
+        } else {
+          triggerScan();
+        }
+      }).catch(() => {
+        schedulePoll(pollScanStatus, 3000);
+      });
+    }
+
+    function triggerScan() {
+      renderScanning();
+      api.startScan(sessionId).then(() => {
+        schedulePoll(pollScanStatus, 2000);
+      }).catch(e => {
+        const el = document.getElementById("group-step-content");
+        el.innerHTML = `
+          <div class="space-y-4">
+            <div class="text-sm text-danger">${icon("alertTriangle", 14)} Scan failed: ${escapeHtml(e.message)}</div>
+            <button id="retry-scan-btn" class="btn btn-sm">Retry Scan</button>
+          </div>`;
+        document.getElementById("retry-scan-btn")?.addEventListener("click", () => triggerScan());
+      });
+    }
 
     function pollForGroups() {
       api.getGroups(sessionId).then(data => {
@@ -471,6 +561,7 @@ export async function renderWizard(container, params) {
     }
 
     function renderPending() {
+      clearPoll();
       const el = document.getElementById("group-step-content");
       api.getGraphData(sessionId).then(graphData => {
         const entryList = (graphData.entryFiles || []).slice(0, 8);
@@ -510,12 +601,11 @@ export async function renderWizard(container, params) {
           </div>`;
       });
 
-      // Poll every 3 seconds
-      pollTimer = setTimeout(pollForGroups, 3000);
+      schedulePoll(pollForGroups, 3000);
     }
 
     function renderGroupsLoaded() {
-      if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+      clearPoll();
       const el = document.getElementById("group-step-content");
       const confirmBtn = document.getElementById("group-confirm-btn");
 
@@ -555,7 +645,6 @@ export async function renderWizard(container, params) {
 
       confirmBtn.disabled = false;
 
-      // Wire up card expand/collapse
       el.querySelectorAll(".group-card-header").forEach(header => {
         header.addEventListener("click", () => {
           const idx = header.dataset.index;
@@ -567,7 +656,6 @@ export async function renderWizard(container, params) {
         });
       });
 
-      // Wire up confirm button
       confirmBtn.addEventListener("click", async () => {
         confirmBtn.disabled = true;
         confirmBtn.innerHTML = '<span class="spinner spinner-sm"></span> Confirming...';
@@ -584,11 +672,22 @@ export async function renderWizard(container, params) {
       });
     }
 
-    // Start by polling
-    pollForGroups();
+    // Entry point: check scan status and decide what to show
+    api.getScanStatus(sessionId).then(data => {
+      if (data.status === "scanned") {
+        pollForGroups();
+      } else if (data.status === "done") {
+        step = 4;
+        save();
+        render();
+      } else {
+        triggerScan();
+      }
+    }).catch(() => {
+      triggerScan();
+    });
 
-    // Cleanup poll timer on navigation
-    onNavigateCleanup(() => { if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; } });
+    onNavigateCleanup(() => clearPoll());
   }
 
   function renderProjectReady() {

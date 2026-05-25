@@ -1396,8 +1396,6 @@ export async function renderWizard(container, params) {
     });
   }
 
-  }
-
   render();
 
   onNavigateCleanup(() => {

@@ -1,7 +1,7 @@
 // skills/audit/scripts/public/js/views/review.mjs
 import { api } from "../api.mjs";
 import { renderTaskDetail, renderMermaidDiagrams } from "../components/task-detail.mjs";
-import { showToast, setBreadcrumb, icon, escapeHtml, onNavigateCleanup } from "../app.mjs";
+import { showToast, setBreadcrumb, icon, escapeHtml, onNavigateCleanup, initTabKeyboard } from "../app.mjs";
 import { SEVERITY_LABELS, SEVERITY_COLORS } from "../constants.mjs";
 
 export async function renderReview(container, params) {
@@ -88,7 +88,7 @@ export async function renderReview(container, params) {
 
   async function autoConfirmFindings(task) {
     const taskFindings = task.review?.findings || [];
-    if (taskFindings.length === 0) return;
+    if (taskFindings.length === 0) return 0;
     const noteTask = notes?.tasks?.find(t => t.file === task.file);
     const existingFindings = noteTask?.findings || [];
     let changed = false;
@@ -98,7 +98,7 @@ export async function renderReview(container, params) {
       changed = true;
       return { status: "confirmed", reason: "" };
     });
-    if (!changed) return;
+    if (!changed) return 0;
     try {
       await api.updateTaskNote(sessionId, task.file, { findings: noteFindings });
       if (!noteTask) {
@@ -108,7 +108,8 @@ export async function renderReview(container, params) {
       } else {
         noteTask.findings = noteFindings;
       }
-    } catch (e) { /* best effort */ }
+      return noteFindings.filter((f, i) => !existingFindings[i] && f).length;
+    } catch (e) { return 0; }
   }
 
   function renderContent() {
@@ -236,10 +237,21 @@ export async function renderReview(container, params) {
       </div>`;
 
     const sidebar = document.getElementById("task-sidebar");
-    sidebar.innerHTML = tasks.map((t, i) => {
+    const reviewed = [];
+    const pending = [];
+    tasks.forEach((t, i) => {
+      if (t.status === "reviewed") reviewed.push({ t, i });
+      else pending.push({ t, i });
+    });
+    const sorted = [...reviewed, ...pending];
+    sidebar.innerHTML = sorted.map(({ t, i }, sortedIdx) => {
       const score = t.review?.score;
       const dotClass = score >= 7 ? "score-dot-green" : score >= 4 ? "score-dot-amber" : "score-dot-red";
-      return `
+      const reviewedCount = (t.review?.findings || []).filter(f => f.status === "confirmed" || f.status === "deferred").length;
+      const totalCount = (t.review?.findings || []).length;
+      const progressPct = totalCount > 0 ? (reviewedCount / totalCount * 100) : 0;
+      const separator = sortedIdx === reviewed.length ? `<div class="task-sidebar-separator">Pending</div>` : "";
+      return `${separator}
         <div class="task-nav-item ${i === currentTaskIdx ? "active" : ""}" data-idx="${i}" tabindex="0" role="button" aria-label="${escapeHtml(t.name || t.file)}, score ${score ?? '-'}">
           <div class="score-dot ${score ? dotClass : ""}" style="${!score ? "background:var(--text-muted)" : ""}"></div>
           <div style="min-width:0;flex:1">
@@ -248,6 +260,7 @@ export async function renderReview(container, params) {
               <span class="badge badge-${t.status === "reviewing" ? "reviewing-task" : t.status}">${t.status}</span>
               <span class="text-xs text-muted">${score ?? "-"}/10</span>
             </div>
+            <div class="task-nav-progress"><div class="task-nav-progress-fill" style="width:${progressPct}%"></div></div>
           </div>
         </div>`;
     }).join("");
@@ -260,7 +273,10 @@ export async function renderReview(container, params) {
       const newIdx = parseInt(item.dataset.idx);
       if (newIdx !== currentTaskIdx) {
         currentTaskIdx = newIdx;
-        await autoConfirmFindings(tasks[currentTaskIdx]);
+        const confirmedCount = await autoConfirmFindings(tasks[currentTaskIdx]);
+        if (confirmedCount > 0) {
+          showToast(`${confirmedCount} finding(s) auto-confirmed`, "success");
+        }
       }
       renderContent();
     }
@@ -362,22 +378,8 @@ export async function renderReview(container, params) {
       updateTabUI();
       renderContent();
     });
-    tab.addEventListener("keydown", (e) => {
-      const tabList = Array.from(tabsEl.querySelectorAll(".tab"));
-      const idx = tabList.indexOf(tab);
-      if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
-        e.preventDefault();
-        const next = e.key === "ArrowRight"
-          ? tabList[(idx + 1) % tabList.length]
-          : tabList[(idx - 1 + tabList.length) % tabList.length];
-        next.focus();
-        next.click();
-      } else if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        tab.click();
-      }
-    });
   });
+  initTabKeyboard(tabsEl);
 
   // Navigation buttons
   document.getElementById("review-home-btn").addEventListener("click", () => {
@@ -399,10 +401,18 @@ export async function renderReview(container, params) {
       e.preventDefault();
       currentTaskIdx = Math.min(currentTaskIdx + 1, tasks.length - 1);
       renderContent();
+      requestAnimationFrame(() => {
+        const activeItem = document.querySelector("#task-sidebar .task-nav-item.active");
+        if (activeItem) activeItem.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      });
     } else if (e.key === "k" || e.key === "ArrowUp") {
       e.preventDefault();
       currentTaskIdx = Math.max(currentTaskIdx - 1, 0);
       renderContent();
+      requestAnimationFrame(() => {
+        const activeItem = document.querySelector("#task-sidebar .task-nav-item.active");
+        if (activeItem) activeItem.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      });
     } else if (e.key === "o") { currentTab = "overview"; renderContent(); updateTabUI(); }
     else if (e.key === "s") { currentTab = "tasks"; renderContent(); updateTabUI(); }
   }

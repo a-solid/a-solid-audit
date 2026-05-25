@@ -737,6 +737,28 @@ img, svg { display: block; }
 .score-dot-green { background: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
 .score-dot-amber { background: var(--warning); }
 .score-dot-red { background: var(--danger); }
+.task-nav-progress {
+  height: 2px;
+  background: var(--bg-active);
+  border-radius: 1px;
+  margin-top: var(--space-1);
+  overflow: hidden;
+}
+.task-nav-progress-fill {
+  height: 100%;
+  border-radius: 1px;
+  background: var(--accent);
+  transition: width var(--duration-base) var(--ease-spring);
+}
+.task-sidebar-separator {
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  background: var(--bg-muted);
+}
 
 /* ─── Form Elements ─── */
 input, select, textarea {

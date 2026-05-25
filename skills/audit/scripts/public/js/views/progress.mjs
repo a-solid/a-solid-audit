@@ -13,9 +13,11 @@ export async function renderProgress(container, params) {
   let scanStarted = false;
   let logEventSource = null;
 
+  const shortId = sessionId ? sessionId.slice(0, 7) : "";
   setBreadcrumb([
     { label: "Sessions", href: "#/home" },
-    { label: "In Progress" },
+    ...(shortId ? [{ label: shortId, href: `#/progress/${sessionId}` }] : []),
+    { label: "Progress" },
   ]);
 
   container.innerHTML = `
@@ -28,6 +30,7 @@ export async function renderProgress(container, params) {
         <div id="session-badge"></div>
         <button id="view-findings-btn" class="btn btn-ghost btn-sm hidden" aria-label="View findings">${icon("eye", 14)} Findings</button>
         <button id="view-summary-btn" class="btn btn-ghost btn-sm hidden" aria-label="View summary">${icon("barChart", 14)} Summary</button>
+        <button id="cancel-scan-btn" class="btn btn-ghost btn-sm hidden" style="color:var(--danger);border-color:rgba(239,68,68,0.3)" aria-label="Cancel scan">${icon("x", 14)} Cancel</button>
       </div>
     </div>
 
@@ -163,7 +166,16 @@ export async function renderProgress(container, params) {
 
       updateHeading(session.type === "project", "reviewing");
 
-      const tasks = await api.getTasks(sessionId);
+      const cancelBtn = document.getElementById("cancel-scan-btn");
+      if (cancelBtn) {
+        const showCancel = session.status === "reviewing" || session.status === "scoped";
+        cancelBtn.classList.toggle("hidden", !showCancel);
+      }
+
+      let tasks = [];
+      try { tasks = await api.getTasks(sessionId); } catch (e) {
+        document.getElementById("task-list").innerHTML = `<div class="text-sm text-muted" style="padding:var(--space-4)">Failed to load tasks. Retrying...</div>`;
+      }
 
       const total = tasks.length;
       const reviewed = tasks.filter(t => t.status === "reviewed").length;
@@ -205,6 +217,8 @@ export async function renderProgress(container, params) {
       }).join("");
 
       if (reviewed === total && total > 0 && session.status === "completed") {
+        const cancelBtn2 = document.getElementById("cancel-scan-btn");
+        if (cancelBtn2) cancelBtn2.classList.add("hidden");
         location.hash = `#/review/${sessionId}`;
         return; // Stop polling
       }
@@ -276,6 +290,28 @@ export async function renderProgress(container, params) {
   document.getElementById("view-summary-btn").addEventListener("click", () => {
     if (pollTimer) clearTimeout(pollTimer);
     location.hash = `#/summary/${sessionId}`;
+  });
+  document.getElementById("cancel-scan-btn").addEventListener("click", async () => {
+    const cancelBtn = document.getElementById("cancel-scan-btn");
+    if (cancelBtn.dataset.confirmPending === "true") {
+      cancelBtn.dataset.confirmPending = "";
+      try {
+        await api.patchSession(sessionId, { status: "created" });
+        if (pollTimer) clearTimeout(pollTimer);
+        showToast("Scan cancelled", "success");
+        location.hash = `#/wizard/${sessionId}`;
+      } catch (e) {
+        showToast("Failed to cancel: " + e.message);
+        cancelBtn.innerHTML = `${icon("x", 14)} Cancel`;
+      }
+    } else {
+      cancelBtn.dataset.confirmPending = "true";
+      cancelBtn.innerHTML = `${icon("x", 14)} Sure?`;
+      setTimeout(() => {
+        cancelBtn.dataset.confirmPending = "";
+        cancelBtn.innerHTML = `${icon("x", 14)} Cancel`;
+      }, 3000);
+    }
   });
 
   await poll();

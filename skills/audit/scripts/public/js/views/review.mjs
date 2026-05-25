@@ -12,9 +12,11 @@ export async function renderReview(container, params) {
   let currentTaskIdx = 0;
   let preserveDetailScroll = false;
 
+  const shortId = sessionId ? sessionId.slice(0, 7) : "";
   setBreadcrumb([
     { label: "Sessions", href: "#/home" },
-    { label: "Review Findings" },
+    ...(shortId ? [{ label: shortId, href: `#/review/${sessionId}` }] : []),
+    { label: "Review" },
   ]);
 
   container.innerHTML = `
@@ -35,15 +37,15 @@ export async function renderReview(container, params) {
   `;
 
   let reviewContext = "";
-  try {
-    const session = await api.getSession(sessionId);
-    tasks = await api.getTasks(sessionId);
-    notes = await api.getNotes(sessionId);
-    try { const ctx = await api.getReviewContext(sessionId); reviewContext = ctx.context || ""; } catch (e) { /* no context file */ }
-  } catch (e) {
-    showToast("Failed to load review data: " + e.message);
+  try { tasks = await api.getTasks(sessionId); } catch (e) {
+    showToast("Failed to load tasks: " + e.message);
     return;
   }
+  try { notes = await api.getNotes(sessionId); } catch (e) {
+    showToast("Notes unavailable — finding statuses may not display", "warning");
+  }
+  try { await api.getSession(sessionId); } catch (e) { /* session info optional */ }
+  try { const ctx = await api.getReviewContext(sessionId); reviewContext = ctx.context || ""; } catch (e) { /* no context file */ }
 
   async function updateFindingStatus(sid, task, findingIdx, status, reason) {
     const findingsCount = (task.review?.findings || []).length;
@@ -146,13 +148,24 @@ export async function renderReview(container, params) {
 
     const maxSevCount = Math.max(...Object.values(bySeverity), 1);
 
-    const allFindings = tasks.flatMap(t => t.review?.findings || []);
-    const confirmed = allFindings.filter(f => f.status === "confirmed").length;
-    const dismissed = allFindings.filter(f => f.status === "deferred").length;
-    const unreviewedCount = allFindings.length - confirmed - dismissed;
-    const findingsTotal = allFindings.length || 1;
+    let confirmed = 0;
+    let deferred = 0;
+    let totalFindingsFromAll = 0;
+    const noteTasks = notes?.tasks || [];
+    tasks.forEach(t => {
+      const taskFindings = t.review?.findings || [];
+      totalFindingsFromAll += taskFindings.length;
+      const noteTask = noteTasks.find(nt => nt.file === t.file);
+      (noteTask?.findings || []).forEach(f => {
+        if (!f) return;
+        if (f.status === "confirmed") confirmed++;
+        else if (f.status === "deferred") deferred++;
+      });
+    });
+    const unreviewedCount = totalFindingsFromAll - confirmed - deferred;
+    const findingsTotal = totalFindingsFromAll || 1;
     const confirmPct = Math.round(confirmed / findingsTotal * 100);
-    const dismissPct = Math.round(dismissed / findingsTotal * 100);
+    const dismissPct = Math.round(deferred / findingsTotal * 100);
     const unreviewedPct = 100 - confirmPct - dismissPct;
 
     el.innerHTML = `
@@ -274,7 +287,17 @@ export async function renderReview(container, params) {
       ? (document.getElementById("task-detail-panel")?.scrollTop || 0)
       : 0;
 
+    const currentTask = tasks[currentTaskIdx];
+    const currentScore = currentTask?.review?.score;
     el.innerHTML = `
+      <div class="mobile-task-nav" aria-label="Task navigation">
+        <button class="btn btn-ghost btn-sm mobile-task-prev" aria-label="Previous task" ${currentTaskIdx <= 0 ? "disabled" : ""}>${icon("chevronLeft", 14)}</button>
+        <div class="mobile-task-info">
+          <span class="font-mono text-sm truncate">${escapeHtml(currentTask?.name || currentTask?.file || "Select task")}</span>
+          <span class="text-xs text-muted">${currentScore ?? "-"}/10</span>
+        </div>
+        <button class="btn btn-ghost btn-sm mobile-task-next" aria-label="Next task" ${currentTaskIdx >= tasks.length - 1 ? "disabled" : ""}>${icon("chevronRight", 14)}</button>
+      </div>
       <div class="sidebar-layout">
         <div class="sidebar-panel" id="task-sidebar"></div>
         <div class="detail-panel" id="task-detail-panel"></div>
@@ -317,10 +340,6 @@ export async function renderReview(container, params) {
       const newIdx = parseInt(item.dataset.idx);
       if (newIdx !== currentTaskIdx) {
         currentTaskIdx = newIdx;
-        const confirmedCount = await autoConfirmFindings(tasks[currentTaskIdx]);
-        if (confirmedCount > 0) {
-          showToast(`${confirmedCount} finding(s) auto-confirmed`, "success");
-        }
       }
       renderContent();
     }
@@ -335,9 +354,37 @@ export async function renderReview(container, params) {
       });
     });
 
+    // Mobile task nav
+    el.querySelector(".mobile-task-prev")?.addEventListener("click", () => {
+      if (currentTaskIdx > 0) { currentTaskIdx--; renderContent(); }
+    });
+    el.querySelector(".mobile-task-next")?.addEventListener("click", () => {
+      if (currentTaskIdx < tasks.length - 1) { currentTaskIdx++; renderContent(); }
+    });
+
     const detailPanel = document.getElementById("task-detail-panel");
     detailPanel.innerHTML = renderTaskDetail(tasks[currentTaskIdx], notes);
     await renderMermaidDiagrams(detailPanel);
+
+    // Add "Confirm All" button if there are unreviewed findings
+    const currentTask = tasks[currentTaskIdx];
+    const currentFindings = currentTask?.review?.findings || [];
+    const currentNoteTask = notes?.tasks?.find(t => t.file === currentTask?.file);
+    const unreviewedCount = currentFindings.filter((f, i) => !currentNoteTask?.findings?.[i]?.status).length;
+    if (unreviewedCount > 0) {
+      const slot = detailPanel.querySelector("#confirm-all-slot");
+      if (slot) {
+        slot.innerHTML = `<button class="btn btn-sm" style="color:var(--accent);border-color:var(--accent);background:var(--accent-dim);width:100%" id="confirm-all-findings-btn">${icon("check", 14)} Confirm All ${unreviewedCount} Findings</button>`;
+        document.getElementById("confirm-all-findings-btn")?.addEventListener("click", async () => {
+          const count = await autoConfirmFindings(currentTask);
+          if (count > 0) {
+            showToast(`${count} finding(s) confirmed`, "success");
+            preserveDetailScroll = true;
+            requestAnimationFrame(() => requestAnimationFrame(() => renderContent()));
+          }
+        });
+      }
+    }
 
     // Restore detail panel scroll (only if not task switch)
     detailPanel.scrollTop = preserveDetailScroll ? savedDetailScroll : 0;

@@ -108,6 +108,7 @@ export async function renderHome(container) {
               ` : ""}
               ${progressLabel ? `<span class="session-progress-label">${progressLabel}</span>` : ''}
               <span class="badge ${cfg.badge}">${s.status}</span>
+              ${s.status === "completed" ? `<a href="#/review/${s.id}" class="session-findings-link" onclick="event.stopPropagation()">${icon("eye", 12)} Findings</a>` : ""}
             </div>
           </div>
         </div>`;
@@ -118,7 +119,7 @@ export async function renderHome(container) {
       card.addEventListener("click", () => {
         const id = card.dataset.id;
         const status = card.dataset.status;
-        if (status === "completed") location.hash = `#/review/${id}`;
+        if (status === "completed") location.hash = `#/summary/${id}`;
         else if (status === "created" || status === "scoped") location.hash = `#/wizard/${id}`;
         else location.hash = `#/progress/${id}`;
       });

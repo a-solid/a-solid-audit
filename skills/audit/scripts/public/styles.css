@@ -882,6 +882,17 @@ img, svg { display: block; }
   color: var(--text-secondary);
   margin-left: var(--space-2);
 }
+.session-findings-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+  transition: color var(--duration-fast);
+  cursor: pointer;
+}
+.session-findings-link:hover { color: var(--accent); }
 .badge-reviewing {
   animation: reviewPulse 2s ease-in-out infinite;
 }
@@ -1269,6 +1280,31 @@ code {
   padding-bottom: 72px;
   overflow-y: auto;
   background: var(--bg-base);
+}
+
+/* ─── Mobile Task Nav ─── */
+.mobile-task-nav {
+  display: none;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-3);
+}
+.mobile-task-info {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+@media (max-width: 768px) {
+  .mobile-task-nav { display: flex; }
+  .sidebar-panel { max-height: 200px; }
 }
 
 /* ─── Print Task Detail ─── */
@@ -1939,6 +1975,7 @@ code {
 
 /* Responsive grid */
 @media (min-width: 640px) {
+  .sm\:grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
   .sm\:grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
 }
 @media (min-width: 768px) {

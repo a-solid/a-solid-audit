@@ -8,9 +8,10 @@ export async function renderSummary(container, params) {
   let tasks = [];
   let notes = null;
 
+  const shortId = sessionId ? sessionId.slice(0, 7) : "";
   setBreadcrumb([
     { label: "Sessions", href: "#/home" },
-    { label: "Review", href: `#/review/${sessionId}` },
+    ...(shortId ? [{ label: shortId, href: `#/review/${sessionId}` }] : []),
     { label: "Summary" },
   ]);
 
@@ -25,12 +26,12 @@ export async function renderSummary(container, params) {
     <div id="summary-content"></div>
   `;
 
-  try {
-    tasks = await api.getTasks(sessionId);
-    notes = await api.getNotes(sessionId);
-  } catch (e) {
-    showToast("Failed to load summary data: " + e.message);
+  try { tasks = await api.getTasks(sessionId); } catch (e) {
+    showToast("Failed to load tasks: " + e.message);
     return;
+  }
+  try { notes = await api.getNotes(sessionId); } catch (e) {
+    showToast("Notes unavailable — sign-off section may not display", "warning");
   }
 
   const totalFindings = tasks.reduce((sum, t) => sum + (t.review?.findings?.length || 0), 0);

@@ -44,7 +44,7 @@ export async function renderSettings(container) {
 
     <div class="card mb-4">
       <h2 class="font-semibold mb-4">Database</h2>
-      <div class="grid grid-cols-5 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
         <div>
           <label for="db-host">Host</label>
           <input id="db-host" class="mt-1" placeholder="localhost"

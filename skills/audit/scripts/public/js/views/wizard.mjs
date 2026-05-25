@@ -143,6 +143,7 @@ export async function renderWizard(container, params) {
   let previewGeneration = 0;
   let pendingExpandIndex = -1;
   let defaultProjectDir = "";
+  let dirty = false;
 
   // For "new" wizard, skip session restore — no session exists yet
   if (!isNew) {
@@ -214,10 +215,21 @@ export async function renderWizard(container, params) {
     }));
   }
 
+  function setDirty(value) {
+    dirty = value;
+    if (dirty && step > 1) {
+      window.onbeforeunload = () => true;
+    } else {
+      window.onbeforeunload = null;
+    }
+  }
+
   function render() {
+    const shortId = sessionId && !isNew ? sessionId.slice(0, 7) : "";
     setBreadcrumb([
       { label: "Sessions", href: "#/home" },
-      { label: isNew ? "New Audit" : "Configure Audit" },
+      ...(shortId ? [{ label: shortId, href: `#/wizard/${sessionId}` }] : []),
+      { label: isNew ? "New Audit" : "Configure" },
     ]);
 
     const totalSteps = reviewType === "all" ? 4 : (reviewType === "project" ? 4 : 3);
@@ -271,7 +283,7 @@ export async function renderWizard(container, params) {
     content.innerHTML = `
       <div class="card mb-4">
         <h2 class="font-semibold mb-4">Choose Review Type</h2>
-        <div class="grid grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
           <div class="card card-clickable ${reviewType === "code" ? "selected" : ""}" data-type="code">
             <div class="flex items-center gap-3 mb-3">
               ${icon("eye", 20)}
@@ -306,6 +318,7 @@ export async function renderWizard(container, params) {
         const newType = card.dataset.type;
         reviewType = newType;
         save();
+        setDirty(true);
         render();
       });
       card.addEventListener("keydown", (e) => {
@@ -771,6 +784,7 @@ export async function renderWizard(container, params) {
       const btn = document.getElementById("start-project-scan-btn");
       try {
         btn.disabled = true;
+        setDirty(false);
         localStorage.removeItem(`audit-wizard-${sessionId}`);
         content.innerHTML = `
           <div style="text-align:center;padding:var(--space-8)">
@@ -813,6 +827,7 @@ export async function renderWizard(container, params) {
         scopeRef = "";
         excludedFiles = [];
         save();
+        setDirty(true);
         render();
       });
     });
@@ -879,6 +894,7 @@ export async function renderWizard(container, params) {
         function updateCommitRef() {
           scopeRef = document.getElementById("commit-from").value + " " + document.getElementById("commit-to").value;
           save();
+          setDirty(true);
           loadFilePreview();
         }
         updateCommitRef();
@@ -908,6 +924,7 @@ export async function renderWizard(container, params) {
         function updateBranchRef() {
           scopeRef = document.getElementById("branch-base").value + "..." + document.getElementById("branch-compare").value;
           save();
+          setDirty(true);
           loadFilePreview();
         }
         updateBranchRef();
@@ -934,6 +951,7 @@ export async function renderWizard(container, params) {
         if (scopeTreeInstance) {
           excludedFiles = scopeTreeInstance.getExcludedFiles();
           save();
+          setDirty(true);
         }
       });
     }
@@ -1002,6 +1020,7 @@ export async function renderWizard(container, params) {
         stories.push({ name, description, acceptance });
         pendingExpandIndex = stories.length - 1;
         save();
+        setDirty(true);
         render();
         requestAnimationFrame(() => {
           document.getElementById("file-mapping-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1311,6 +1330,7 @@ export async function renderWizard(container, params) {
         contextSaveTimer = setTimeout(async () => {
           try {
             await api.setReviewContext(sessionId, contextInput.value);
+            setDirty(true);
           } catch (e) { /* silent fail — context is optional */ }
         }, 300);
       });
@@ -1332,6 +1352,7 @@ export async function renderWizard(container, params) {
       try {
         btn.disabled = true;
         btn.innerHTML = `<span class="spinner spinner-sm"></span> Preparing...`;
+        setDirty(false);
         localStorage.removeItem(`audit-wizard-${sessionId}`);
         // Show confirmation instead of navigating away
         const content = document.getElementById("wizard-content");
@@ -1354,4 +1375,8 @@ export async function renderWizard(container, params) {
   }
 
   render();
+
+  onNavigateCleanup(() => {
+    window.onbeforeunload = null;
+  });
 }

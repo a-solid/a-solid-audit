@@ -96,6 +96,8 @@ export function setBreadcrumb(items) {
 
 // ─── Toast ───
 
+const TOAST_DURATIONS = { error: 6000, warning: 5000, success: 3000 };
+
 export function showToast(message, type = "error") {
   const toastContainer = document.getElementById("toast-container");
   const el = document.createElement("div");
@@ -105,17 +107,29 @@ export function showToast(message, type = "error") {
   toastContainer.appendChild(el);
 
   let dismissed = false;
+  let timer = null;
+
   function dismiss() {
     if (dismissed) return;
     dismissed = true;
+    clearTimeout(timer);
     el.style.opacity = "0";
     el.style.transform = "translateX(16px)";
     el.style.transition = "all 200ms ease";
     setTimeout(() => el.remove(), 200);
   }
 
+  function startTimer() {
+    clearTimeout(timer);
+    timer = setTimeout(dismiss, TOAST_DURATIONS[type] || 4000);
+  }
+
   el.addEventListener("click", dismiss);
-  setTimeout(dismiss, 4000);
+  el.addEventListener("mouseenter", () => clearTimeout(timer));
+  el.addEventListener("mouseleave", () => {
+    if (!dismissed) startTimer();
+  });
+  startTimer();
 }
 
 // ─── Active Session Polling ───

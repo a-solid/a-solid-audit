@@ -24,7 +24,7 @@ function renderCodegraphStatus(containerId, projectDir) {
     el.innerHTML = `
       <div class="codegraph-status-card codegraph-unavail">
         <div class="codegraph-info">
-          <div class="codegraph-title">${icon("info", 16)} CodeGraph</div>
+          <div class="codegraph-title">${icon("info", 14)} CodeGraph</div>
           <div class="codegraph-detail">Enter a project directory to check CodeGraph status.</div>
         </div>
       </div>`;
@@ -43,7 +43,7 @@ function renderCodegraphStatus(containerId, projectDir) {
       el.innerHTML = `
         <div class="codegraph-status-card codegraph-ready">
           <div class="codegraph-info">
-            <div class="codegraph-title">${icon("check", 16)} CodeGraph — Ready</div>
+            <div class="codegraph-title">${icon("check", 14)} CodeGraph Available</div>
             <div class="codegraph-detail">${status.fileCount || 0} files, ${status.symbolCount || 0} symbols indexed</div>
           </div>
           <button id="codegraph-reindex-btn" class="btn btn-sm">Re-index</button>
@@ -65,7 +65,7 @@ function renderCodegraphStatus(containerId, projectDir) {
       el.innerHTML = `
         <div class="codegraph-status-card codegraph-uninit">
           <div class="codegraph-info">
-            <div class="codegraph-title">${icon("alertTriangle", 16)} CodeGraph — Not Initialized</div>
+            <div class="codegraph-title">${icon("alertTriangle", 14)} Not Initialized</div>
             <div class="codegraph-detail">CLI detected but no index found.</div>
           </div>
           <button id="codegraph-init-btn" class="btn btn-primary btn-sm">Initialize & Index</button>
@@ -87,7 +87,7 @@ function renderCodegraphStatus(containerId, projectDir) {
       el.innerHTML = `
         <div class="codegraph-status-card codegraph-uninit">
           <div class="codegraph-info">
-            <div class="codegraph-title">${icon("alertTriangle", 16)} CodeGraph — Needs Indexing</div>
+            <div class="codegraph-title">${icon("alertTriangle", 14)} Needs Indexing</div>
             <div class="codegraph-detail">Initialized but not yet indexed.</div>
           </div>
           <button id="codegraph-index-btn" class="btn btn-primary btn-sm">Run Index</button>
@@ -109,7 +109,7 @@ function renderCodegraphStatus(containerId, projectDir) {
       el.innerHTML = `
         <div class="codegraph-status-card codegraph-unavail">
           <div class="codegraph-info">
-            <div class="codegraph-title">${icon("x", 16)} CodeGraph — Not Available</div>
+            <div class="codegraph-title">${icon("x", 14)} Unavailable</div>
             <div class="codegraph-detail">CLI not found. Will use basic file scan.</div>
           </div>
         </div>`;
@@ -118,7 +118,7 @@ function renderCodegraphStatus(containerId, projectDir) {
     el.innerHTML = `
       <div class="codegraph-status-card codegraph-unavail">
         <div class="codegraph-info">
-          <div class="codegraph-title">${icon("x", 16)} CodeGraph — Error</div>
+          <div class="codegraph-title">${icon("x", 14)} Error</div>
           <div class="codegraph-detail">Failed to check status.</div>
         </div>
       </div>`;
@@ -348,7 +348,10 @@ export async function renderWizard(container, params) {
         <div class="space-y-4">
           <div>
             <label for="project-dir">Project Directory</label>
-            <input id="project-dir" class="mt-1" placeholder="/path/to/project">
+            <div style="position:relative">
+              <span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-muted);pointer-events:none">${icon("folder", 16)}</span>
+              <input id="project-dir" class="mt-1" placeholder="/path/to/project" style="padding-left:40px;">
+            </div>
             <div class="text-xs text-muted mt-1">Leave empty to scan the current project.</div>
           </div>
           <div id="codegraph-status"></div>

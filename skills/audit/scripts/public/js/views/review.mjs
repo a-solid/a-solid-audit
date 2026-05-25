@@ -135,6 +135,16 @@ export async function renderReview(container, params) {
   }
 
   function renderOverview(el) {
+    if (tasks.length === 0) {
+      el.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-state-icon">${icon("search", 56)}</div>
+          <h2>No tasks yet</h2>
+          <p>Tasks will appear here once the AI review begins.</p>
+          <a href="#/progress/${sessionId}" class="btn btn-ghost">${icon("arrowLeft", 14)} Back to Progress</a>
+        </div>`;
+      return;
+    }
     const totalFindings = tasks.reduce((sum, t) => sum + (t.review?.findings?.length || 0), 0);
     const bySeverity = {};
     tasks.forEach(t => {

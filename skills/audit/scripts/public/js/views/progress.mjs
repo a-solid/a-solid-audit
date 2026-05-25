@@ -250,9 +250,26 @@ export async function renderProgress(container, params) {
       }
     }
 
-    // Schedule next poll
-    pollTimer = setTimeout(poll, pollInterval);
+    // Schedule next poll (skip if tab is hidden)
+    if (!document.hidden) {
+      pollTimer = setTimeout(poll, pollInterval);
+    }
   }
+
+  // Resume polling when tab becomes visible
+  document.addEventListener("visibilitychange", function onVisChange() {
+    if (!document.hidden && !pollTimer) {
+      pollFailures = 0;
+      pollInterval = 3000;
+      poll();
+    }
+    if (document.hidden) {
+      if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+    }
+  });
+  onNavigateCleanup(() => {
+    document.removeEventListener("visibilitychange", onVisChange);
+  });
 
   document.getElementById("start-scan-btn").addEventListener("click", async () => {
     if (scanStarted) return;

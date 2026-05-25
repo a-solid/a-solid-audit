@@ -224,6 +224,30 @@ export async function renderWizard(container, params) {
     }
   }
 
+  function goBack(targetStep, btnId) {
+    if (!dirty) { step = targetStep; save(); render(); return; }
+    const btn = document.getElementById(btnId);
+    if (btn?.dataset.confirmPending === "true") {
+      btn.dataset.confirmPending = "";
+      setDirty(false);
+      step = targetStep;
+      save();
+      render();
+    } else if (btn) {
+      btn.dataset.confirmPending = "true";
+      const origHTML = btn.innerHTML;
+      btn.innerHTML = `${icon("alertTriangle", 14)} Discard?`;
+      btn.style.color = "var(--warning)";
+      btn.style.borderColor = "var(--warning)";
+      setTimeout(() => {
+        btn.dataset.confirmPending = "";
+        btn.innerHTML = origHTML;
+        btn.style.color = "";
+        btn.style.borderColor = "";
+      }, 3000);
+    }
+  }
+
   function render() {
     const shortId = sessionId && !isNew ? sessionId.slice(0, 7) : "";
     setBreadcrumb([
@@ -444,7 +468,7 @@ export async function renderWizard(container, params) {
       });
     }
 
-    document.getElementById("project-back").addEventListener("click", () => { step = 1; save(); render(); });
+    document.getElementById("project-back").addEventListener("click", () => { goBack(1, "project-back"); });
     document.getElementById("project-next").addEventListener("click", async () => {
       const btn = document.getElementById("project-next");
       const originalHTML = btn.innerHTML;
@@ -484,7 +508,7 @@ export async function renderWizard(container, params) {
         <button id="group-confirm-btn" class="btn btn-primary" disabled>Confirm Groups ${icon("check", 14)}</button>
       </div>`;
 
-    document.getElementById("group-back").addEventListener("click", () => { clearPoll(); step = 2; save(); render(); });
+    document.getElementById("group-back").addEventListener("click", () => { clearPoll(); goBack(2, "group-back"); });
 
     let groups = null;
     let pollTimer = null;
@@ -833,7 +857,7 @@ export async function renderWizard(container, params) {
     });
     initTabKeyboard(scopeTabs);
 
-    document.getElementById("step2-back").addEventListener("click", () => { step = 1; save(); render(); });
+    document.getElementById("step2-back").addEventListener("click", () => { goBack(1, "step2-back"); });
     document.getElementById("step2-confirm").addEventListener("click", async () => {
       const btn = document.getElementById("step2-confirm");
       const originalHTML = btn.innerHTML;
@@ -1085,7 +1109,7 @@ export async function renderWizard(container, params) {
       }
     });
 
-    document.getElementById("step3-back").addEventListener("click", () => { step = 2; save(); render(); });
+    document.getElementById("step3-back").addEventListener("click", () => { goBack(2, "step3-back"); });
     document.getElementById("step3-next").addEventListener("click", () => { step = 4; save(); render(); });
 
     if (stories.length > 0) loadAccordionFileTree(sessionId);
@@ -1338,9 +1362,7 @@ export async function renderWizard(container, params) {
 
     // Also save context right before starting review
     document.getElementById("step4-back").addEventListener("click", () => {
-      step = reviewType === "code" ? 2 : 3;
-      save();
-      render();
+      goBack(reviewType === "code" ? 2 : 3, "step4-back");
     });
     document.getElementById("start-review-btn").addEventListener("click", async () => {
       const btn = document.getElementById("start-review-btn");

@@ -23,7 +23,7 @@ export function renderTaskDetail(task, notes) {
   const positives = task.review?.positives || [];
   const gaps = task.review?.gaps || [];
   const circumference = 2 * Math.PI * 42;
-  const clampedScore = score != null ? Math.max(score, 0.3) : 0;
+  const clampedScore = score != null ? score : 0;
   const offset = circumference * (1 - clampedScore / 10);
 
   const noteTask = notes?.tasks?.find(t => t.file === task.file);
@@ -194,7 +194,7 @@ export async function renderMermaidDiagrams(container) {
       if (result.bindFunctions) result.bindFunctions(el);
     } catch (e) {
       console.error("[mermaid] render failed:", e);
-      el.innerHTML = `<pre class="text-xs text-muted">${escapeHtml(decodeURIComponent(el.dataset.mermaidSource))}</pre>`;
+      el.innerHTML = `<div style="padding:var(--space-3);background:var(--warning-dim);border:1px solid var(--warning);border-radius:var(--radius-md);color:var(--warning);font-size:var(--text-xs)">Diagram rendering failed. Showing source:</div><pre class="text-xs text-muted" style="margin-top:var(--space-2)">${escapeHtml(decodeURIComponent(el.dataset.mermaidSource))}</pre>`;
     }
   }
 }

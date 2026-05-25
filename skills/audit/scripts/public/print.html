@@ -156,12 +156,20 @@ async function init() {
 
   let session, tasks, notes;
   try {
-    const [s, t, n] = await Promise.all([
-      fetch(`/api/sessions/${sessionId}`).then(r => r.json()),
+    const sessionRes = await fetch(`/api/sessions/${sessionId}`);
+    if (!sessionRes.ok) {
+      app.innerHTML = `<div class="error">Session not found. ${esc(sessionId)} does not exist.</div>`;
+      return;
+    }
+    session = await sessionRes.json();
+    if (session.status !== "completed" && session.status !== "reviewing") {
+      app.innerHTML = `<div class="error">Session is not ready for export (status: ${esc(session.status)}). Complete the review first.</div>`;
+      return;
+    }
+    const [t, n] = await Promise.all([
       fetch(`/api/sessions/${sessionId}/tasks`).then(r => r.json()),
       fetch(`/api/sessions/${sessionId}/notes`).then(r => r.json()),
     ]);
-    session = s;
     tasks = t;
     notes = n;
   } catch (e) {

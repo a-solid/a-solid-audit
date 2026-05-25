@@ -88,29 +88,32 @@ export async function renderReview(container, params) {
     }
   }
 
-  async function autoConfirmFindings(task) {
+  async function confirmSelectedFindings(task, selectedIndices) {
     const taskFindings = task.review?.findings || [];
-    if (taskFindings.length === 0) return 0;
+    if (taskFindings.length === 0 || selectedIndices.length === 0) return 0;
     const noteTask = notes?.tasks?.find(t => t.file === task.file);
     const existingFindings = noteTask?.findings || [];
     let changed = false;
-    const noteFindings = taskFindings.map((_, i) => {
+    const saveFindings = taskFindings.map((_, i) => {
       const existing = existingFindings[i];
       if (existing) return existing;
-      changed = true;
-      return { status: "confirmed", reason: "" };
+      if (selectedIndices.includes(i)) {
+        changed = true;
+        return { status: "confirmed", reason: "" };
+      }
+      return null;
     });
     if (!changed) return 0;
     try {
-      await api.updateTaskNote(sessionId, task.file, { findings: noteFindings });
+      await api.updateTaskNote(sessionId, task.file, { findings: saveFindings });
       if (!noteTask) {
         if (!notes) notes = { tasks: [] };
-        const nt = { file: task.file, findings: noteFindings };
+        const nt = { file: task.file, findings: saveFindings };
         notes.tasks.push(nt);
       } else {
-        noteTask.findings = noteFindings;
+        noteTask.findings = saveFindings;
       }
-      return noteFindings.filter((f, i) => !existingFindings[i] && f).length;
+      return selectedIndices.filter(i => !existingFindings[i]).length;
     } catch (e) { return 0; }
   }
 
@@ -377,16 +380,18 @@ export async function renderReview(container, params) {
     await renderMermaidDiagrams(detailPanel);
 
     // Add "Confirm All" button if there are unreviewed findings
-    const currentTask = tasks[currentTaskIdx];
-    const currentFindings = currentTask?.review?.findings || [];
-    const currentNoteTask = notes?.tasks?.find(t => t.file === currentTask?.file);
+    const detailTask = tasks[currentTaskIdx];
+    const currentFindings = detailTask?.review?.findings || [];
+    const currentNoteTask = notes?.tasks?.find(t => t.file === detailTask?.file);
     const unreviewedCount = currentFindings.filter((f, i) => !currentNoteTask?.findings?.[i]?.status).length;
     if (unreviewedCount > 0) {
       const slot = detailPanel.querySelector("#confirm-all-slot");
       if (slot) {
         slot.innerHTML = `<button class="btn btn-sm" style="color:var(--accent);border-color:var(--accent);background:var(--accent-dim);width:100%" id="confirm-all-findings-btn">${icon("check", 14)} Confirm All ${unreviewedCount} Findings</button>`;
         document.getElementById("confirm-all-findings-btn")?.addEventListener("click", async () => {
-          const count = await autoConfirmFindings(currentTask);
+          const allIndices = (detailTask.review?.findings || []).map((_, i) => i)
+            .filter(i => !notes?.tasks?.find(t => t.file === detailTask.file)?.findings?.[i]?.status);
+          const count = await confirmSelectedFindings(detailTask, allIndices);
           if (count > 0) {
             showToast(`${count} finding(s) confirmed`, "success");
             preserveDetailScroll = true;

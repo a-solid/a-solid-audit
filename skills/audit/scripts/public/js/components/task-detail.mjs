@@ -15,7 +15,7 @@ function getSeverityIcon(severity) {
   return icons[severity] || '';
 }
 
-export function renderTaskDetail(task, notes) {
+export function renderTaskDetail(task, notes, batchMode = false) {
   if (!task) return `<div class="text-muted text-sm flex items-center gap-2">${icon("chevronRight", 16)} Select a task to view details.</div>`;
 
   const score = task.review?.score;
@@ -78,7 +78,16 @@ export function renderTaskDetail(task, notes) {
 
       ${findings.length > 0 ? `
         <div>
-          <div class="text-xs text-muted font-semibold mb-3">FINDINGS (${findings.length})</div>
+          <div class="flex items-center justify-between mb-3">
+            <div class="text-xs text-muted font-semibold">FINDINGS (${findings.length})</div>
+            ${(() => {
+              const unreviewed = findings.some((_, i) => !(noteTask?.findings?.[i]?.status));
+              if (!unreviewed) return "";
+              return batchMode
+                ? `<button class="btn btn-sm btn-ghost" id="batch-cancel-btn">${icon("x", 12)} Cancel</button>`
+                : `<button class="btn btn-sm btn-ghost" id="batch-select-btn">${icon("checkSquare", 12)} Batch Select</button>`;
+            })()}
+          </div>
           <div class="space-y-3">
             ${findings.map((f, i) => {
               const status = noteTask?.findings?.[i]?.status || null;
@@ -86,9 +95,19 @@ export function renderTaskDetail(task, notes) {
               const isDismissed = status === "deferred";
               const isUnreviewed = !status;
               const reason = noteTask?.findings?.[i]?.reason || "";
+              const LOW_SEVS = ["minor", "medium", "info", "low"];
+              const preChecked = !isConfirmed && !isDismissed && LOW_SEVS.includes(f.severity);
 
               return `
-              <div class="finding-card severity-${f.severity}${isConfirmed ? " confirmed" : ""}${isDismissed ? " dismissed" : ""}" data-finding="${i}">
+              <div class="finding-card severity-${f.severity}${isConfirmed ? " confirmed" : ""}${isDismissed ? " dismissed" : ""}${(isConfirmed || isDismissed) ? " disabled-checkbox" : ""}" data-finding="${i}">
+                <input type="checkbox" class="finding-checkbox"
+                  data-finding-idx="${i}"
+                  data-severity="${f.severity}"
+                  ${isConfirmed ? "checked disabled" : ""}
+                  ${isDismissed ? "disabled" : ""}
+                  ${preChecked ? "checked" : ""}
+                  aria-label="Select finding ${i + 1}">
+                <div class="finding-card-body">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center gap-2">
                     <span class="badge severity-${f.severity}">${getSeverityIcon(f.severity)} ${f.severity}</span>
@@ -145,6 +164,7 @@ export function renderTaskDetail(task, notes) {
                     <span class="font-mono truncate" title="${escapeHtml(f.file)}${f.line ? ":" + f.line : ""}">${escapeHtml(f.file)}${f.line ? ":" + f.line : ""}</span>
                   </div>
                 ` : ""}
+                </div>
               </div>`;
             }).join("")}
           </div>

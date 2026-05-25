@@ -707,70 +707,48 @@ export async function renderWizard(container, params) {
   function renderProjectReady() {
     const content = document.getElementById("wizard-content");
     content.innerHTML = `
-      <div class="card mb-4">
-        <h2 class="font-semibold mb-4">Ready to Review</h2>
-        <div class="space-y-3">
-          <div class="flex items-center gap-3">
-            <span style="color:var(--text-muted)">${icon("search", 18)}</span>
-            <div>
-              <div class="text-xs text-muted">Review Type</div>
-              <div class="text-sm font-medium">Project Scan</div>
-            </div>
-          </div>
-          <div id="project-ready-summary"></div>
-        </div>
-
-        <div class="mt-4 info-banner info-banner-amber">
-          ${icon("zap", 16)}
-          <span>Click "Start Review" below, then go back to the AI terminal and type <strong>start review</strong> to begin.</span>
-        </div>
-      </div>
-      <div class="flex justify-between">
-        <button id="project-ready-back" class="btn btn-ghost">${icon("arrowLeft", 14)} Back</button>
-        <button id="start-project-scan-btn" class="btn btn-primary">
-          ${icon("zap", 14)}
-          Start Review
-        </button>
-      </div>`;
+      <h2 style="margin-bottom:var(--space-6)">Review Ready</h2>
+      <div id="project-ready-summary"></div>
+      <button id="start-project-scan-btn" class="btn btn-primary btn-start-review">
+        ${icon("zap", 18)} Start AI Review
+      </button>`;
 
     // Load group summary
     api.getTasks(sessionId).then(tasks => {
       const summary = document.getElementById("project-ready-summary");
-      if (summary && tasks.length > 0) {
+      if (summary) {
+        const groupCount = tasks.length;
+        const fileCount = tasks.reduce((sum, t) => sum + (t.files ? t.files.length : 0), 0);
         summary.innerHTML = `
-          <div class="flex items-center gap-3">
-            <span style="color:var(--text-muted)">${icon("package", 18)}</span>
-            <div>
-              <div class="text-xs text-muted">Groups</div>
-              <div class="text-sm font-medium">${tasks.length} review groups configured</div>
+          <div class="ready-summary-grid">
+            <div class="ready-summary-card">
+              <div class="summary-icon">${icon("folder-search", 20)}</div>
+              <div class="summary-label">Type</div>
+              <div class="summary-value">Project Scan</div>
+            </div>
+            <div class="ready-summary-card">
+              <div class="summary-icon">${icon("file", 20)}</div>
+              <div class="summary-label">Scope</div>
+              <div class="summary-value">${groupCount} groups, ${fileCount} files</div>
             </div>
           </div>`;
       }
     }).catch(() => {});
 
-    document.getElementById("project-ready-back").addEventListener("click", () => { step = 3; save(); render(); });
     document.getElementById("start-project-scan-btn").addEventListener("click", async () => {
       const btn = document.getElementById("start-project-scan-btn");
-      const originalHTML = btn.innerHTML;
       try {
         btn.disabled = true;
-        btn.innerHTML = '<span class="spinner spinner-sm"></span> Preparing...';
         localStorage.removeItem(`audit-wizard-${sessionId}`);
-        const wizardContent = document.getElementById("wizard-content");
-        wizardContent.innerHTML = `
-          <div class="card" style="text-align:center;padding:var(--space-8) var(--space-6)">
-            <div style="margin-bottom:var(--space-4);color:var(--accent)">${icon("check", 48)}</div>
-            <h2 class="text-xl mb-3">Audit Ready</h2>
-            <p class="text-secondary mb-4">Session is prepared. Go back to the AI terminal and type:</p>
-            <code style="font-size:var(--text-lg);background:var(--bg-elevated);padding:var(--space-2) var(--space-4);border-radius:var(--radius-md);display:inline-block">start review</code>
-            <div class="mt-4">
-              <a href="#/progress/${sessionId}" class="btn btn-ghost">View Progress ${icon("chevronRight", 14)}</a>
-            </div>
+        content.innerHTML = `
+          <div style="text-align:center;padding:var(--space-8)">
+            <div class="confirm-success-check">${icon("check", 24)}</div>
+            <h3 style="margin-top:var(--space-4);color:var(--text-primary)">Session Prepared</h3>
+            <p style="color:var(--text-secondary);margin-top:var(--space-2)">Go to the <a href="#/progress/${sessionId}">Progress page</a> or type <code>start review</code> in the AI terminal.</p>
           </div>`;
       } catch (e) {
         showToast("Failed: " + e.message);
         btn.disabled = false;
-        btn.innerHTML = originalHTML;
       }
     });
   }
@@ -1225,28 +1203,22 @@ export async function renderWizard(container, params) {
     content.innerHTML = `
       <div class="card mb-4">
         <h2 class="font-semibold mb-4">Ready to Start</h2>
-        <div class="space-y-3">
-          <div class="flex items-center gap-3">
-            <span style="color:var(--text-muted)">${icon("eye", 18)}</span>
-            <div>
-              <div class="text-xs text-muted">Review Type</div>
-              <div class="text-sm font-medium">${reviewType === "code" ? "Code Review Only" : "Code + Story Alignment"}</div>
-            </div>
+        <div class="ready-summary-grid">
+          <div class="ready-summary-card">
+            <div class="summary-icon">${icon("eye", 20)}</div>
+            <div class="summary-label">Type</div>
+            <div class="summary-value">${reviewType === "code" ? "Code Review" : "Code + Story"}</div>
           </div>
-          <div class="flex items-center gap-3">
-            <span style="color:var(--text-muted)">${icon("gitCommit", 18)}</span>
-            <div>
-              <div class="text-xs text-muted">Scope</div>
-              <div class="text-sm font-medium">${formatScopeDisplay(scopeMethod, scopeRef)}</div>
-            </div>
+          <div class="ready-summary-card">
+            <div class="summary-icon">${icon("gitCommit", 20)}</div>
+            <div class="summary-label">Scope</div>
+            <div class="summary-value">${formatScopeDisplay(scopeMethod, scopeRef)}</div>
           </div>
           ${reviewType === "all" ? `
-          <div class="flex items-center gap-3">
-            <span style="color:var(--text-muted)">${icon("clipboard", 18)}</span>
-            <div>
-              <div class="text-xs text-muted">Stories</div>
-              <div class="text-sm font-medium">${stories.length} story(s)</div>
-            </div>
+          <div class="ready-summary-card">
+            <div class="summary-icon">${icon("clipboard", 20)}</div>
+            <div class="summary-label">Stories</div>
+            <div class="summary-value">${stories.length} stories</div>
           </div>` : ""}
         </div>
 
@@ -1270,7 +1242,7 @@ export async function renderWizard(container, params) {
       </div>
       <div class="flex justify-between">
         <button id="step4-back" class="btn btn-ghost" aria-label="Go back">${icon("arrowLeft", 14)} Back</button>
-        <button id="start-review-btn" class="btn btn-primary">
+        <button id="start-review-btn" class="btn btn-primary btn-start-review">
           ${icon("zap", 14)}
           Start AI Review
         </button>

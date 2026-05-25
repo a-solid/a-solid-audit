@@ -383,22 +383,128 @@ export async function renderReview(container, params) {
     const detailTask = tasks[currentTaskIdx];
     const currentFindings = detailTask?.review?.findings || [];
     const currentNoteTask = notes?.tasks?.find(t => t.file === detailTask?.file);
-    const unreviewedCount = currentFindings.filter((f, i) => !currentNoteTask?.findings?.[i]?.status).length;
+    const unreviewedIndices = [];
+    currentFindings.forEach((f, i) => {
+      if (!currentNoteTask?.findings?.[i]?.status) unreviewedIndices.push(i);
+    });
+    const unreviewedCount = unreviewedIndices.length;
+
     if (unreviewedCount > 0) {
       const slot = detailPanel.querySelector("#confirm-all-slot");
       if (slot) {
         slot.innerHTML = `<button class="btn btn-sm" style="color:var(--accent);border-color:var(--accent);background:var(--accent-dim);width:100%" id="confirm-all-findings-btn">${icon("check", 14)} Confirm All ${unreviewedCount} Findings</button>`;
-        document.getElementById("confirm-all-findings-btn")?.addEventListener("click", async () => {
-          const allIndices = (detailTask.review?.findings || []).map((_, i) => i)
-            .filter(i => !notes?.tasks?.find(t => t.file === detailTask.file)?.findings?.[i]?.status);
-          const count = await confirmSelectedFindings(detailTask, allIndices);
-          if (count > 0) {
-            showToast(`${count} finding(s) confirmed`, "success");
-            preserveDetailScroll = true;
-            requestAnimationFrame(() => requestAnimationFrame(() => renderContent()));
-          }
+
+        document.getElementById("confirm-all-findings-btn")?.addEventListener("click", () => {
+          renderConfirmAllPanel(slot, detailTask, currentFindings, currentNoteTask, unreviewedIndices);
         });
       }
+    }
+
+    function renderConfirmAllPanel(slot, task, findings, noteTask, indices) {
+      const HIGH_SEVS = ["critical", "major", "high"];
+      // Build severity summary
+      const sevCounts = {};
+      indices.forEach(i => {
+        const sev = findings[i]?.severity || "info";
+        sevCounts[sev] = (sevCounts[sev] || 0) + 1;
+      });
+      const sevOrder = ["critical", "major", "high", "minor", "medium", "info", "low"];
+      const colors = {
+        critical: "var(--danger)", major: "var(--danger)", high: "var(--danger)",
+        minor: "var(--warning)", medium: "var(--warning)",
+        info: "var(--info)", low: "var(--info)"
+      };
+      const pillsHtml = sevOrder
+        .filter(s => sevCounts[s])
+        .map(s => `<span class="confirm-all-sev-pill" style="background:${colors[s]}20;color:${colors[s]}">${sevCounts[s]} ${s}</span>`)
+        .join("");
+
+      // Build finding rows
+      const rowsHtml = indices.map(i => {
+        const f = findings[i];
+        const sev = f.severity || "info";
+        const isHigh = HIGH_SEVS.includes(sev);
+        const sevClass = `sev-${sev}`;
+        return `<label class="confirm-all-row"${isHigh ? ` data-high-sev="${sev}"` : ""}>
+          <input type="checkbox" checked data-confirm-idx="${i}" class="confirm-all-checkbox">
+          <span class="confirm-all-row-sev ${sevClass}">${sev}</span>
+          <span class="confirm-all-row-text">${escapeHtml(f.description || "")}</span>
+        </label>`;
+      }).join("");
+
+      const hasHighSev = indices.some(i => HIGH_SEVS.includes(findings[i]?.severity));
+      const highSevTotal = indices.filter(i => HIGH_SEVS.includes(findings[i]?.severity)).length;
+
+      slot.innerHTML = `
+        <div class="confirm-all-panel">
+          <div class="confirm-all-panel-header">
+            <span class="confirm-all-panel-title">Select findings to confirm</span>
+            <div class="confirm-all-sev-pills">${pillsHtml}</div>
+          </div>
+          ${hasHighSev ? `<div class="confirm-all-warning" id="confirm-all-high-sev-warning">
+            <span class="confirm-all-warning-icon">${icon("alertTriangle", 14)}</span>
+            <span id="confirm-all-warning-text">${highSevTotal} high-severity findings selected — critical and major items usually need individual review</span>
+          </div>` : ""}
+          <div class="confirm-all-list">${rowsHtml}</div>
+          <div class="confirm-all-actions">
+            <button class="btn btn-sm btn-confirm-selected" style="color:var(--accent);border-color:var(--accent);background:var(--accent-dim)" id="confirm-all-execute-btn">${icon("check", 14)} Confirm ${indices.length} selected</button>
+            <button class="btn btn-sm btn-ghost" id="confirm-all-cancel-btn">Cancel</button>
+          </div>
+        </div>`;
+
+      // Wire up checkbox changes
+      const checkboxes = slot.querySelectorAll(".confirm-all-checkbox");
+      const executeBtn = document.getElementById("confirm-all-execute-btn");
+      const warningEl = document.getElementById("confirm-all-high-sev-warning");
+      const warningText = document.getElementById("confirm-all-warning-text");
+
+      function updateState() {
+        const checked = slot.querySelectorAll(".confirm-all-checkbox:checked");
+        const count = checked.length;
+        executeBtn.disabled = count === 0;
+        executeBtn.innerHTML = `${icon("check", 14)} Confirm ${count} selected`;
+
+        if (warningEl) {
+          const highChecked = Array.from(checked).filter(cb =>
+            HIGH_SEVS.includes(findings[parseInt(cb.dataset.confirmIdx)]?.severity)
+          ).length;
+          if (highChecked === 0) {
+            warningEl.style.display = "none";
+          } else {
+            warningEl.style.display = "flex";
+            warningText.textContent = `${highChecked} high-severity findings selected — critical and major items usually need individual review`;
+          }
+        }
+      }
+
+      checkboxes.forEach(cb => cb.addEventListener("change", updateState));
+
+      // Cancel — collapse back to button
+      document.getElementById("confirm-all-cancel-btn")?.addEventListener("click", () => {
+        slot.innerHTML = `<button class="btn btn-sm" style="color:var(--accent);border-color:var(--accent);background:var(--accent-dim);width:100%" id="confirm-all-findings-btn">${icon("check", 14)} Confirm All ${indices.length} Findings</button>`;
+        document.getElementById("confirm-all-findings-btn")?.addEventListener("click", () => {
+          renderConfirmAllPanel(slot, task, findings, noteTask, indices);
+        });
+      });
+
+      // Execute
+      executeBtn?.addEventListener("click", async () => {
+        const checkedIndices = Array.from(slot.querySelectorAll(".confirm-all-checkbox:checked"))
+          .map(cb => parseInt(cb.dataset.confirmIdx));
+        if (checkedIndices.length === 0) return;
+
+        executeBtn.disabled = true;
+        executeBtn.innerHTML = `<span class="spinner spinner-sm"></span> Confirming...`;
+
+        const count = await confirmSelectedFindings(task, checkedIndices);
+        if (count > 0) {
+          showToast(`${count} finding(s) confirmed`, "success");
+        } else {
+          showToast("No findings were confirmed");
+        }
+        preserveDetailScroll = true;
+        requestAnimationFrame(() => requestAnimationFrame(() => renderContent()));
+      });
     }
 
     // Restore detail panel scroll (only if not task switch)

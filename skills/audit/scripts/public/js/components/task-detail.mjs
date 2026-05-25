@@ -47,7 +47,6 @@ export function renderTaskDetail(task, notes) {
         <div style="min-width:0;flex:1">
           <div class="font-mono text-sm truncate" title="${escapeHtml(task.name || task.file)}">${escapeHtml(task.name || task.file)}</div>
           <div class="text-xs text-muted mt-1">${score ?? "-"}/10 &middot; ${findings.length} findings</div>
-          <div id="confirm-all-slot" class="mt-2"></div>
         </div>
       </div>
 

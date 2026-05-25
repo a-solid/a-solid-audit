@@ -1,6 +1,6 @@
 // skills/audit/scripts/public/js/views/wizard.mjs
 import { api } from "../api.mjs";
-import { showToast, setBreadcrumb, icon, escapeHtml, initTabKeyboard, onNavigateCleanup } from "../app.mjs";
+import { showToast, setBreadcrumb, icon, escapeHtml, initTabKeyboard, onNavigateCleanup, renderTerminalCard } from "../app.mjs";
 import { renderFileTree } from "../components/file-tree.mjs";
 import { renderScopeFileTree } from "../components/scope-file-tree.mjs";
 
@@ -778,9 +778,7 @@ export async function renderWizard(container, params) {
     content.innerHTML = `
       <h2 style="margin-bottom:var(--space-6)">Review Ready</h2>
       <div id="project-ready-summary"></div>
-      <button id="start-project-scan-btn" class="btn btn-primary btn-start-review">
-        ${icon("zap", 18)} Start AI Review
-      </button>`;
+      <div id="project-ready-terminal"></div>`;
 
     // Load group summary
     api.getTasks(sessionId).then(tasks => {
@@ -804,22 +802,12 @@ export async function renderWizard(container, params) {
       }
     }).catch(() => {});
 
-    document.getElementById("start-project-scan-btn").addEventListener("click", async () => {
-      const btn = document.getElementById("start-project-scan-btn");
-      try {
-        btn.disabled = true;
-        setDirty(false);
-        localStorage.removeItem(`audit-wizard-${sessionId}`);
-        content.innerHTML = `
-          <div style="text-align:center;padding:var(--space-8)">
-            <div class="confirm-success-check">${icon("check", 24)}</div>
-            <h3 style="margin-top:var(--space-4);color:var(--text-primary)">Session Prepared</h3>
-            <p style="color:var(--text-secondary);margin-top:var(--space-2)">Go to the <a href="#/progress/${sessionId}">Progress page</a> or type <code>start review</code> in the AI terminal.</p>
-          </div>`;
-      } catch (e) {
-        showToast("Failed: " + e.message);
-        btn.disabled = false;
-      }
+    setDirty(false);
+    localStorage.removeItem(`audit-wizard-${sessionId}`);
+
+    const termEl = document.getElementById("project-ready-terminal");
+    renderTerminalCard(termEl, "start review", {
+      viewProgressHref: `#/progress/${sessionId}`,
     });
   }
 

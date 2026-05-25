@@ -128,6 +128,8 @@ function renderCodegraphStatus(containerId, projectDir) {
 export async function renderWizard(container, params) {
   let sessionId = params[0];
   const isNew = !sessionId || sessionId === "new";
+  const urlParams = new URLSearchParams(window.location.hash.split("?")[1] || "");
+  const preselectType = urlParams.get("type");
   let step = 1;
   let prevStep = 0;
   let reviewType = "code";
@@ -262,6 +264,9 @@ export async function renderWizard(container, params) {
   }
 
   function renderStep1() {
+    if (preselectType && isNew) {
+      reviewType = preselectType;
+    }
     const content = document.getElementById("wizard-content");
     content.innerHTML = `
       <div class="card mb-4">

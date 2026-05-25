@@ -2,6 +2,20 @@
 import { api } from "../api.mjs";
 import { showToast, setBreadcrumb, icon, escapeHtml } from "../app.mjs";
 
+function relativeTime(dateStr) {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diff = now - then;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(dateStr).toLocaleDateString();
+}
+
 const STATUS_CONFIG = {
   created:    { color: "text-muted",   accent: "",                    badge: "badge-created" },
   scoped:     { color: "text-info",    accent: "card-accent-info",    badge: "badge-scoped" },
@@ -43,18 +57,21 @@ export async function renderHome(container) {
       listEl.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-icon">
-            ${icon("inbox", 56)}
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              <line x1="8" y1="11" x2="14" y2="11"/>
+              <line x1="8" y1="14" x2="14" y2="14"/>
+              <line x1="8" y1="8" x2="12" y2="8"/>
+            </svg>
           </div>
-          <h2>Start your first audit</h2>
-          <p>Create a new audit session to review code changes for quality, security, and best practices.</p>
-          <button id="empty-cta" class="btn btn-primary">
-            ${icon("plus", 16)}
-            New Audit
-          </button>
-        </div>`;
-      document.getElementById("empty-cta")?.addEventListener("click", () => {
-        location.hash = "#/wizard/new";
-      });
+          <h2>No audit sessions yet</h2>
+          <p>Start by auditing specific code changes, or scan an entire project for comprehensive analysis.</p>
+          <div class="empty-state-cta-row">
+            <a href="#/wizard/new?type=code" class="btn btn-primary">${icon("code", 16)} Code Review</a>
+            <a href="#/wizard/new?type=project" class="btn btn-ghost" style="border-color:var(--border)">${icon("folder-search", 16)} Project Scan</a>
+          </div>
+        </div>
+      `;
       return;
     }
 
@@ -63,17 +80,20 @@ export async function renderHome(container) {
       const cfg = STATUS_CONFIG[s.status] || STATUS_CONFIG.created;
       const pct = s.progress?.percentage ?? 0;
       const isProject = s.type === "project";
-      const sessionIcon = isProject ? icon("search", 18) : icon("file", 18);
+      const typeIcon = s.type === "code" ? icon("code", 18)
+        : s.type === "all" ? icon("book-open", 18)
+        : icon("folder-search", 18);
       const typeLabel = isProject ? "Project Scan" : s.type === "all" ? "Code + Story" : "Code Review";
+      const progressLabel = s.totalTasks ? `${s.reviewedTasks || 0}/${s.totalTasks}` : '';
       return `
-        <div class="card card-clickable ${cfg.accent}" data-id="${s.id}" data-status="${s.status}" data-type="${s.type}">
+        <div class="session-card card card-clickable ${cfg.accent}" data-id="${s.id}" data-status="${s.status}" data-type="${s.type}">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-3" style="min-width:0">
-              <div style="color:${isProject ? "var(--info)" : "var(--text-muted)"};flex-shrink:0">${sessionIcon}</div>
+              <div class="session-card-type-icon">${typeIcon}</div>
               <div style="min-width:0">
                 <div class="font-mono text-sm truncate">${escapeHtml(s.id)}</div>
                 <div class="text-xs text-muted mt-1">
-                  ${typeLabel} &middot; ${new Date(s.created).toLocaleDateString()}
+                  ${typeLabel} &middot; <span class="session-time" title="${new Date(s.created).toLocaleString()}">${relativeTime(s.created)}</span>
                 </div>
               </div>
             </div>
@@ -86,6 +106,7 @@ export async function renderHome(container) {
                   <div class="text-xs text-muted mt-1 text-right">${s.progress.reviewed}/${s.progress.total}</div>
                 </div>
               ` : ""}
+              ${progressLabel ? `<span class="session-progress-label">${progressLabel}</span>` : ''}
               <span class="badge ${cfg.badge}">${s.status}</span>
             </div>
           </div>

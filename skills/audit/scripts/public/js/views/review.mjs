@@ -65,17 +65,17 @@ export async function renderReview(container, params) {
       noteTask.findings = noteFindings;
       const desc = task.review?.findings?.[findingIdx]?.description || "";
       const snippet = desc.length > 60 ? desc.slice(0, 60) + "..." : desc;
-      showToast(
-        status === "acknowledged"
-          ? `Acknowledged: ${snippet}`
-          : `Deferred: ${snippet}`,
-        "success"
-      );
+      const statusLabel = status === "acknowledged"
+        ? "Acknowledged"
+        : status === "deferred"
+        ? "Deferred"
+        : "Reverted";
+      showToast(`${statusLabel}: ${snippet}`, "success");
       // Brief visual transition before re-render
       const findingCard = document.querySelector(`[data-finding="${findingIdx}"]`);
       if (findingCard) {
-        findingCard.style.transition = "opacity 150ms ease";
-        findingCard.style.opacity = status === "acknowledged" ? "0.6" : "0.3";
+        findingCard.style.transition = "opacity 200ms ease-out";
+        findingCard.style.opacity = status === "acknowledged" ? "0.6" : status === "deferred" ? "0.3" : "0.6";
       }
       preserveDetailScroll = true;
       requestAnimationFrame(() => {
@@ -200,18 +200,35 @@ export async function renderReview(container, params) {
         </div>
       </div>
 
-      <div class="quick-stats-row">
-        <div class="quick-stat">
-          <div class="quick-stat-value quick-stat-value-confirmed">${confirmPct}%</div>
-          <div class="quick-stat-label">Acknowledged</div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+        <div class="stat-card">
+          <div class="stat-value">${totalFindingsFromAll}</div>
+          <div class="stat-label">Total</div>
         </div>
-        <div class="quick-stat">
-          <div class="quick-stat-value quick-stat-value-dismissed">${dismissPct}%</div>
-          <div class="quick-stat-label">Deferred</div>
+        <div class="stat-card">
+          <div class="stat-value stat-value-success">${confirmed}</div>
+          <div class="stat-label">Acknowledged</div>
         </div>
-        <div class="quick-stat">
-          <div class="quick-stat-value quick-stat-value-unreviewed">${unreviewedPct}%</div>
-          <div class="quick-stat-label">Pending</div>
+        <div class="stat-card">
+          <div class="stat-value stat-value-warning">${deferred}</div>
+          <div class="stat-label">Deferred</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" style="color:var(--text-muted)">${unreviewedCount}</div>
+          <div class="stat-label">Pending</div>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="font-medium mb-2">Review Progress</div>
+        <div class="review-progress-bar">
+          ${(confirmed > 0) ? `<div class="review-progress-seg seg-ack" style="width:${confirmPct}%"></div>` : ""}
+          ${(deferred > 0) ? `<div class="review-progress-seg seg-defer" style="width:${dismissPct}%"></div>` : ""}
+          <div class="review-progress-seg seg-pending" style="width:${unreviewedPct}%"></div>
+        </div>
+        <div class="review-progress-label">
+          <span>${confirmPct + dismissPct}% reviewed</span>
+          <span>${unreviewedCount} remaining</span>
         </div>
       </div>
 
@@ -302,6 +319,7 @@ export async function renderReview(container, params) {
     const savedDetailScroll = preserveDetailScroll
       ? (document.getElementById("task-detail-panel")?.scrollTop || 0)
       : 0;
+    const noteTasks = notes?.tasks || [];
 
     const currentTask = tasks[currentTaskIdx];
     await autoAcknowledgeLowSeverity(currentTask);
@@ -331,9 +349,16 @@ export async function renderReview(container, params) {
     sidebar.innerHTML = sorted.map(({ t, i }, sortedIdx) => {
       const score = t.review?.score;
       const dotClass = score >= 7 ? "score-dot-green" : score >= 4 ? "score-dot-amber" : "score-dot-red";
-      const reviewedCount = (t.review?.findings || []).filter(f => f.status === "acknowledged" || f.status === "deferred").length;
-      const totalCount = (t.review?.findings || []).length;
-      const progressPct = totalCount > 0 ? (reviewedCount / totalCount * 100) : 0;
+      const noteTaskForSidebar = noteTasks.find(nt => nt.file === t.file);
+      const ackCount = (t.review?.findings || []).filter((f, fi) => {
+        const nf = noteTaskForSidebar?.findings?.[fi];
+        return nf?.status === "acknowledged";
+      }).length;
+      const deferCount = (t.review?.findings || []).filter((f, fi) => {
+        const nf = noteTaskForSidebar?.findings?.[fi];
+        return nf?.status === "deferred";
+      }).length;
+      const pendingCount = (t.review?.findings || []).length - ackCount - deferCount;
       const separator = sortedIdx === reviewed.length ? `<div class="task-sidebar-separator">Pending</div>` : "";
       return `${separator}
         <div class="task-nav-item ${i === currentTaskIdx ? "active" : ""}" data-idx="${i}" tabindex="0" role="button" aria-label="${escapeHtml(t.name || t.file)}, score ${score ?? '-'}">
@@ -342,9 +367,18 @@ export async function renderReview(container, params) {
             <div class="text-sm font-mono truncate" title="${escapeHtml(t.name || t.file)}">${escapeHtml(t.name || t.file)}</div>
             <div class="flex items-center gap-2 mt-1">
               <span class="badge badge-${t.status === "reviewing" ? "reviewing-task" : t.status}">${t.status}</span>
-              <span class="text-xs text-muted">${score ?? "-"}/10</span>
+              <span class="text-xs text-muted">${score ?? "-"}/10 · ${ackCount + deferCount}/${ackCount + deferCount + pendingCount}</span>
             </div>
-            <div class="task-nav-progress"><div class="task-nav-progress-fill" style="width:${progressPct}%"></div></div>
+            <div class="task-nav-progress-segmented">
+                ${(ackCount > 0) ? `<div class="task-nav-progress-seg seg-ack" style="flex:${ackCount}"></div>` : ""}
+                ${(deferCount > 0) ? `<div class="task-nav-progress-seg seg-defer" style="flex:${deferCount}"></div>` : ""}
+                ${(pendingCount > 0) ? `<div class="task-nav-progress-seg seg-pending" style="flex:${pendingCount}"></div>` : ""}
+              </div>
+              <div class="task-nav-progress-legend">
+                ${ackCount > 0 ? `<span style="color:var(--accent)">${ackCount} ack</span>` : ""}
+                ${deferCount > 0 ? `<span style="color:var(--warning)">${deferCount} defer</span>` : ""}
+                ${pendingCount > 0 ? `<span>${pendingCount} pending</span>` : ""}
+              </div>
           </div>
         </div>`;
     }).join("");
@@ -387,28 +421,34 @@ export async function renderReview(container, params) {
     detailPanel.scrollTop = preserveDetailScroll ? savedDetailScroll : 0;
     preserveDetailScroll = false;
 
-    // Wire up confirm/dismiss buttons
-    detailPanel.querySelectorAll(".btn-confirm").forEach(btn => {
+    // Wire up acknowledge buttons
+    detailPanel.querySelectorAll(".btn-acknowledge").forEach(btn => {
       btn.addEventListener("click", async () => {
-        const idx = parseInt(btn.dataset.idx);
+        const idx = parseInt(btn.dataset.ack);
         await updateFindingStatus(sessionId, tasks[currentTaskIdx], idx, "acknowledged", "");
       });
     });
-    detailPanel.querySelectorAll(".btn-dismiss").forEach(btn => {
+    // Wire up defer buttons (toggle dismiss panel)
+    detailPanel.querySelectorAll(".btn-defer-action").forEach(btn => {
       btn.addEventListener("click", () => {
-        const idx = btn.dataset.idx;
-        // Close any other open dismiss panels
+        const idx = btn.dataset.defer;
         detailPanel.querySelectorAll(".dismiss-panel").forEach(p => {
           if (p.dataset.dismissPanel !== idx) p.classList.add("hidden");
         });
         const panel = detailPanel.querySelector(`[data-dismiss-panel="${idx}"]`);
         panel.classList.toggle("hidden");
-        // Auto-scroll dismiss panel into view
         if (!panel.classList.contains("hidden")) {
           requestAnimationFrame(() => {
             panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
           });
         }
+      });
+    });
+    // Wire up revert buttons
+    detailPanel.querySelectorAll(".btn-revert").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const idx = parseInt(btn.dataset.revert);
+        await updateFindingStatus(sessionId, tasks[currentTaskIdx], idx, null, "");
       });
     });
     // Dismiss reason buttons

@@ -67,16 +67,16 @@ export async function renderReview(container, params) {
       const desc = task.review?.findings?.[findingIdx]?.description || "";
       const snippet = desc.length > 60 ? desc.slice(0, 60) + "..." : desc;
       showToast(
-        status === "confirmed"
-          ? `Confirmed: ${snippet}`
-          : `Dismissed: ${snippet}`,
+        status === "acknowledged"
+          ? `Acknowledged: ${snippet}`
+          : `Deferred: ${snippet}`,
         "success"
       );
       // Brief visual transition before re-render
       const findingCard = document.querySelector(`[data-finding="${findingIdx}"]`);
       if (findingCard) {
         findingCard.style.transition = "opacity 150ms ease";
-        findingCard.style.opacity = status === "confirmed" ? "0.6" : "0.3";
+        findingCard.style.opacity = status === "acknowledged" ? "0.6" : "0.3";
       }
       preserveDetailScroll = true;
       requestAnimationFrame(() => {
@@ -101,7 +101,7 @@ export async function renderReview(container, params) {
       if (existing) return existing;
       if (selectedSet.has(i)) {
         changed = true;
-        return { status: "confirmed", reason: "" };
+        return { status: "acknowledged", reason: "" };
       }
       return null;
     });
@@ -117,6 +117,37 @@ export async function renderReview(container, params) {
       }
       return selectedIndices.filter(i => !existingFindings[i]).length;
     } catch (e) { return 0; }
+  }
+
+  async function autoAcknowledgeLowSeverity(task) {
+    const taskFindings = task.review?.findings || [];
+    if (taskFindings.length === 0) return;
+    const noteTask = notes?.tasks?.find(t => t.file === task.file);
+    const existingFindings = noteTask?.findings || [];
+    const LOW_SEVS = ["info", "low"];
+    let changed = false;
+    const saveFindings = taskFindings.map((f, i) => {
+      const existing = existingFindings[i];
+      if (existing) return existing;
+      if (LOW_SEVS.includes(f.severity)) {
+        changed = true;
+        return { status: "acknowledged", reason: "" };
+      }
+      return null;
+    });
+    if (!changed) return;
+    try {
+      await api.updateTaskNote(sessionId, task.file, { findings: saveFindings });
+      if (!noteTask) {
+        if (!notes) notes = { tasks: [] };
+        const nt = { file: task.file, findings: saveFindings };
+        notes.tasks.push(nt);
+      } else {
+        noteTask.findings = saveFindings;
+      }
+    } catch (e) {
+      // Silently fail — auto-ack is best-effort
+    }
   }
 
   async function renderContent() {
@@ -173,7 +204,7 @@ export async function renderReview(container, params) {
       const noteTask = noteTasks.find(nt => nt.file === t.file);
       (noteTask?.findings || []).forEach(f => {
         if (!f) return;
-        if (f.status === "confirmed") confirmed++;
+        if (f.status === "acknowledged") confirmed++;
         else if (f.status === "deferred") deferred++;
       });
     });
@@ -202,15 +233,15 @@ export async function renderReview(container, params) {
       <div class="quick-stats-row">
         <div class="quick-stat">
           <div class="quick-stat-value quick-stat-value-confirmed">${confirmPct}%</div>
-          <div class="quick-stat-label">Confirmed</div>
+          <div class="quick-stat-label">Acknowledged</div>
         </div>
         <div class="quick-stat">
           <div class="quick-stat-value quick-stat-value-dismissed">${dismissPct}%</div>
-          <div class="quick-stat-label">Dismissed</div>
+          <div class="quick-stat-label">Deferred</div>
         </div>
         <div class="quick-stat">
           <div class="quick-stat-value quick-stat-value-unreviewed">${unreviewedPct}%</div>
-          <div class="quick-stat-label">Unreviewed</div>
+          <div class="quick-stat-label">Pending</div>
         </div>
       </div>
 
@@ -303,6 +334,7 @@ export async function renderReview(container, params) {
       : 0;
 
     const currentTask = tasks[currentTaskIdx];
+    await autoAcknowledgeLowSeverity(currentTask);
     const currentScore = currentTask?.review?.score;
     el.innerHTML = `
       <div class="mobile-task-nav" aria-label="Task navigation">
@@ -329,7 +361,7 @@ export async function renderReview(container, params) {
     sidebar.innerHTML = sorted.map(({ t, i }, sortedIdx) => {
       const score = t.review?.score;
       const dotClass = score >= 7 ? "score-dot-green" : score >= 4 ? "score-dot-amber" : "score-dot-red";
-      const reviewedCount = (t.review?.findings || []).filter(f => f.status === "confirmed" || f.status === "deferred").length;
+      const reviewedCount = (t.review?.findings || []).filter(f => f.status === "acknowledged" || f.status === "deferred").length;
       const totalCount = (t.review?.findings || []).length;
       const progressPct = totalCount > 0 ? (reviewedCount / totalCount * 100) : 0;
       const separator = sortedIdx === reviewed.length ? `<div class="task-sidebar-separator">Pending</div>` : "";
@@ -391,7 +423,7 @@ export async function renderReview(container, params) {
     detailPanel.querySelectorAll(".btn-confirm").forEach(btn => {
       btn.addEventListener("click", async () => {
         const idx = parseInt(btn.dataset.idx);
-        await updateFindingStatus(sessionId, tasks[currentTaskIdx], idx, "confirmed", "");
+        await updateFindingStatus(sessionId, tasks[currentTaskIdx], idx, "acknowledged", "");
       });
     });
     detailPanel.querySelectorAll(".btn-dismiss").forEach(btn => {
@@ -489,7 +521,7 @@ export async function renderReview(container, params) {
           <button class="btn btn-sm btn-ghost" id="batch-deselect-all-btn">Deselect All</button>
         </div>
         <div class="flex items-center gap-2">
-          <button class="btn btn-sm batch-confirm-btn" id="batch-confirm-btn" disabled>${icon("check", 14)} Confirm 0 selected</button>
+          <button class="btn btn-sm batch-confirm-btn" id="batch-confirm-btn" disabled>${icon("check", 14)} Acknowledge 0 selected</button>
         </div>
       `;
       detailPanel.appendChild(bar);
@@ -507,7 +539,7 @@ export async function renderReview(container, params) {
         const highNote = highCount > 0
           ? `<span class="batch-high-sev-note">${icon("alertTriangle", 12)} ${highCount} high-severity</span>`
           : "";
-        confirmBtn.innerHTML = `${icon("check", 14)} Confirm ${count} selected ${highNote}`;
+        confirmBtn.innerHTML = `${icon("check", 14)} Acknowledge ${count} selected ${highNote}`;
       }
 
       // Wire checkbox changes
@@ -537,14 +569,14 @@ export async function renderReview(container, params) {
         if (checkedIndices.length === 0) return;
 
         confirmBtn.disabled = true;
-        confirmBtn.innerHTML = `<span class="spinner spinner-sm"></span> Confirming...`;
+        confirmBtn.innerHTML = `<span class="spinner spinner-sm"></span> Acknowledging...`;
 
         const count = await confirmSelectedFindings(tasks[currentTaskIdx], checkedIndices);
         batchMode = false;
         if (count > 0) {
-          showToast(`${count} finding(s) confirmed`, "success");
+          showToast(`${count} finding(s) acknowledged`, "success");
         } else {
-          showToast("No findings were confirmed", "info");
+          showToast("No findings were acknowledged", "info");
         }
         preserveDetailScroll = true;
         requestAnimationFrame(() => requestAnimationFrame(() => renderContent()));

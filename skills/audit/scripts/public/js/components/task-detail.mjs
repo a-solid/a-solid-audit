@@ -92,25 +92,13 @@ export function renderTaskDetail(task, notes) {
                 <div class="flex items-center justify-between">
                   <div class="flex items-center gap-2">
                     <span class="badge severity-${f.severity}">${getSeverityIcon(f.severity)} ${f.severity}</span>
-                    ${isConfirmed ? `<span class="badge" style="background:var(--success-dim);color:var(--accent)">${icon("check", 10)} Acknowledged</span>` : ""}
-                    ${isDismissed ? `<span class="badge dismiss-reason-badge"${reason ? ` title="${escapeHtml(reason)}"` : ""} style="background:var(--warning-dim);color:var(--warning)">${icon("x", 10)} Deferred${reason ? ": " + escapeHtml(reason.length > 20 ? reason.slice(0, 20) + "..." : reason) : ""}</span>` : ""}
+                    ${isConfirmed ? `<span class="badge" style="background:var(--accent-dim);color:var(--accent)">${icon("check", 10)} Acknowledged</span>` : ""}
+                    ${isDismissed ? `<span class="badge dismiss-reason-badge"${reason ? ` title="${escapeHtml(reason)}"` : ""} style="background:var(--warning-dim);color:var(--warning)">${icon("x", 10)} Deferred${reason ? ": " + escapeHtml(reason.length > 25 ? reason.slice(0, 25) + "..." : reason) : ""}</span>` : ""}
+                    ${isUnreviewed ? `<span class="badge" style="background:transparent;color:var(--text-muted);border:1px dashed var(--border)">Pending</span>` : ""}
                   </div>
-                  <div class="flex gap-1">
-                    <button class="btn btn-sm btn-icon ${isConfirmed ? "" : "btn-ghost"} btn-confirm" data-idx="${i}"
-                      title="Acknowledge" aria-label="Acknowledge finding"
-                      ${isConfirmed ? "disabled" : ""}
-                      style="${isConfirmed ? "color:var(--accent);border-color:var(--accent);background:var(--accent-dim);opacity:0.6" : isUnreviewed ? "color:var(--accent);border-color:var(--accent);background:var(--accent-dim)" : "color:var(--accent)"}">
-                      ${icon("check", 14)}
-                    </button>
-                    <button class="btn btn-sm btn-icon ${isDismissed ? "" : "btn-ghost"} btn-dismiss" data-idx="${i}"
-                      title="Defer" aria-label="Defer finding"
-                      ${isDismissed ? "disabled" : ""}
-                      style="${isDismissed ? "color:var(--warning);border-color:var(--warning);background:var(--warning-dim);opacity:0.6" : "color:var(--text-muted)"}">
-                      ${icon("x", 14)}
-                    </button>
-                  </div>
+                  ${(isConfirmed || isDismissed) ? `<button class="btn-revert" data-revert="${i}" title="Revert to pending">${icon("undo2", 12)} Revert</button>` : ""}
                 </div>
-                <div class="text-sm">${escapeHtml(f.description || "")}</div>
+                <div class="text-sm" style="margin-top:var(--space-2)">${escapeHtml(f.description || "")}</div>
                 <div class="dismiss-panel hidden" data-dismiss-panel="${i}">
                   <div class="dismiss-reasons">
                     ${["False positive", "Acceptable risk", "Out of scope", "Already addressed", "Intentional design"].map(r =>
@@ -122,6 +110,12 @@ export function renderTaskDetail(task, notes) {
                     <button class="btn btn-sm btn-primary dismiss-submit-btn" data-dismiss-submit="${i}">Submit</button>
                   </div>
                 </div>
+                ${isUnreviewed ? `
+                  <div class="finding-action-bar">
+                    <button class="btn-acknowledge" data-ack="${i}" title="Acknowledge finding">${icon("check", 14)} Acknowledge</button>
+                    <button class="btn-defer-action" data-defer="${i}" title="Defer finding">${icon("x", 14)} Defer</button>
+                  </div>
+                ` : ""}
                 ${(f.code || f.suggestion) ? `
                   <button class="finding-collapse-toggle mt-2" data-collapse-toggle="${i}">
                     <span class="toggle-icon">${icon("chevronRight", 12)}</span>

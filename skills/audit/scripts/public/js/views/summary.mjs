@@ -50,7 +50,7 @@ export async function renderSummary(container, params) {
   noteTasks.forEach(t => {
     (t.findings || []).forEach(f => {
       if (!f) return;
-      if (f.status === "confirmed") confirmed++;
+      if (f.status === "acknowledged") confirmed++;
       else if (f.status === "deferred") deferred++;
     });
   });
@@ -61,7 +61,7 @@ export async function renderSummary(container, params) {
     const noteFindings = noteTask?.findings || [];
     taskFindings.forEach((f, i) => {
       const noteF = noteFindings[i];
-      if (noteF?.status === "confirmed" && (f.severity === "critical" || f.severity === "major" || f.severity === "high")) {
+      if (noteF?.status === "acknowledged" && (f.severity === "critical" || f.severity === "major" || f.severity === "high")) {
         actionRequired++;
       }
     });
@@ -259,7 +259,7 @@ export async function renderSummary(container, params) {
             });
 
             const noteTask = noteTasks.find(t => t.file === task.file);
-            const reviewedCount = (noteTask?.findings || []).filter(f => f && (f.status === "confirmed" || f.status === "deferred")).length;
+            const reviewedCount = (noteTask?.findings || []).filter(f => f && (f.status === "acknowledged" || f.status === "deferred")).length;
             let reviewStatus = "none";
             if (totalFindings > 0) {
               if (reviewedCount === 0) reviewStatus = "unreviewed";

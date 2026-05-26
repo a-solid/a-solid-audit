@@ -46,7 +46,7 @@ export function registerNoteRoutes(router, reportsDir) {
       if (!body || typeof body.file !== "string" || !body.file) {
         return errorResponse(res, "Missing required field: file", "VALIDATION_ERROR", 400);
       }
-      if (body.status !== undefined && !["acknowledged", "action-required", "deferred", "pending", ""].includes(body.status)) {
+      if (body.status !== undefined && !["acknowledged", "deferred", "pending", ""].includes(body.status)) {
         return errorResponse(res, "Invalid status value", "VALIDATION_ERROR", 400);
       }
       if (body.findings !== undefined && !Array.isArray(body.findings)) {

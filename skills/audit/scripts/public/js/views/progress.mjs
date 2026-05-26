@@ -188,7 +188,7 @@ export async function renderProgress(container, params) {
         const scanStatusEl = document.getElementById("scan-status");
         scanStatusEl.classList.remove("hidden");
         scanStatusEl.innerHTML = "";
-        const cmd = session.status === "scanned" ? `group ${escapeHtml(sessionId)}` : "start review";
+        const cmd = session.status === "scanned" ? `group ${escapeHtml(sessionId)}` : `start review ${escapeHtml(sessionId)}`;
         renderTerminalCard(scanStatusEl, cmd);
         pollTimer = setTimeout(poll, 5000);
         return;
@@ -258,6 +258,20 @@ export async function renderProgress(container, params) {
 
       if (session.status === "scoped") {
         document.getElementById("progress-text").textContent = "Waiting for AI review to begin...";
+      }
+
+      // Show terminal card when session is ready but review hasn't started
+      if (session.status === "ready" && session.type !== "project") {
+        const existingCard = document.getElementById("ready-terminal-card");
+        if (!existingCard) {
+          const cardDiv = document.createElement("div");
+          cardDiv.id = "ready-terminal-card";
+          cardDiv.className = "card";
+          cardDiv.style.cssText = "text-align:center;padding:var(--space-8) var(--space-6);margin-top:var(--space-4)";
+          renderTerminalCard(cardDiv, `start review ${escapeHtml(sessionId)}`);
+          const taskList = document.getElementById("task-list");
+          if (taskList) taskList.before(cardDiv);
+        }
       }
 
       // Adaptive backoff: increase interval when progress is stable

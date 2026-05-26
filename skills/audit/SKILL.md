@@ -17,43 +17,45 @@ All commands run via `node scripts/cli.mjs <command>`. Scripts are located in th
 ### 1. Startup
 
 1. Start the server: `node scripts/cli.mjs server` (background process)
-2. Tell the user: "A-Solid Audit server running at http://localhost:3456 — open this URL in your browser. When you finish configuring scope and stories, come back here and type `start review`."
+2. Tell the user: "A-Solid Audit server running at http://localhost:3456 — open this URL in your browser. When you finish configuring scope and stories, come back here and type `start review <session-id>`."
 3. **Stop and wait.** Do NOT poll.
 
-### 2. Begin Review (triggered by user saying `start review`)
+### 2. Begin Review (triggered by user saying `start review <session-id>`)
 
-1. `GET /api/sessions` — pick the session with status `ready` (or `reviewing` for resume).
-2. If none found, tell user to finish configuring in the browser first.
-3. `PUT /api/sessions/:id/status` with `{ status: "reviewing" }`
-4. `GET /api/sessions/:id/tasks` — get the task list.
+1. Parse `<session-id>` from the user's message.
+2. `GET /api/sessions/:id` — confirm the session exists and has status `ready` (or `reviewing` for resume).
+3. If not found or wrong status, tell user to finish configuring in the browser first.
+4. `PUT /api/sessions/:id/status` with `{ status: "reviewing" }`
+5. `GET /api/sessions/:id/tasks` — get the task list.
 
 ### 3. Code Review Loop
 
-For each task with `type === "code"` and status `pending` (sequentially):
+For each task with `type === "code"` and status `pending`, dispatch up to **3 sub-agents in parallel**:
 
-1. `POST /api/sessions/:id/tasks/:file/review` with `{"status":"reviewing"}` — sets task to reviewing
-2. Dispatch a sub-agent with `prompts/code-review.md` as its prompt, passing `session-id` and `task-file` as context. The session directory is `.audit/<session-id>/` (contains `review-context.md`).
+1. Set the next N pending tasks to `reviewing`: `POST /api/sessions/:id/tasks/:file/review` with `{"status":"reviewing"}`
+2. Dispatch each as a sub-agent with `prompts/code-review.md` as its prompt, passing `session-id` and `task-file` as context
 3. Sub-agent reads the task YAML, performs the review, and POSTs results via the review endpoint
-4. Sub-agent appends cross-file observations to `review-context.md`
+4. Sub-agent appends cross-file observations via `POST /api/sessions/:id/review-notes` (atomic append)
+5. As each sub-agent completes, dispatch the next pending task (maintaining up to 3 in flight)
 
 ### 4. Story Review Loop (if `type === "all"` session)
 
-For each story task with status `pending` (sequentially):
+For each story task with status `pending`, same parallel pattern (up to 3):
 
-1. `POST /api/sessions/:id/tasks/:file/review` with `{"status":"reviewing"}` — sets task to reviewing
-2. Dispatch a sub-agent with `prompts/story-review.md`, passing `session-id` and `task-file` as context.
-3. Sub-agent reads the story task YAML, reads referenced code task YAMLs for diffs, performs the review, and POSTs results via the review endpoint
-4. Sub-agent appends cross-file observations to `review-context.md`
+1. `POST /api/sessions/:id/tasks/:file/review` with `{"status":"reviewing"}`
+2. Dispatch sub-agent with `prompts/story-review.md`, passing `session-id` and `task-file` as context
+3. Sub-agent reads the story task YAML, reads referenced code task YAMLs for diffs, performs the review, and POSTs results
+4. Sub-agent appends cross-file observations via `POST /api/sessions/:id/review-notes`
 
 ### 5. Project Scan Loop (if `type === "project"` session)
 
-For each project task with status `pending` (sequentially):
+For each project task with status `pending`, same parallel pattern (up to 3):
 
-1. `POST /api/sessions/:id/tasks/:file/review` with `{"status":"reviewing"}` — sets task to reviewing
-2. Dispatch a sub-agent with `prompts/project-review.md`, passing `session-id` and `task-file` as context.
-3. Sub-agent reads the task YAML (contains `files[]`, `type`, `entry`), reads source files from the project directory, performs security and quality review, and POSTs results via the review endpoint
+1. `POST /api/sessions/:id/tasks/:file/review` with `{"status":"reviewing"}`
+2. Dispatch sub-agent with `prompts/project-review.md`, passing `session-id` and `task-file` as context
+3. Sub-agent reads the task YAML (contains `files[]`, `type`, `entry`), reads source files from the project directory, performs security and quality review, and POSTs results
 4. Sub-agent generates an `overview` with a Mermaid diagram of the call chain and a description of execution flow
-5. Sub-agent appends cross-file observations to `review-context.md`
+5. Sub-agent appends cross-file observations via `POST /api/sessions/:id/review-notes`
 
 ### 4.5. Project Grouping (if type === "project" and status === "scanned")
 

@@ -125,4 +125,42 @@ export function registerSessionRoutes(router, reportsDir) {
       throw e;
     }
   });
+
+  // POST /api/sessions/:id/review-notes — atomically append to Review Notes section
+  router.post("/api/sessions/:id/review-notes", async (req, res, params) => {
+    try {
+      const safeSid = sanitizePath(params.id);
+      const sessionDir = path.join(reportsDir, safeSid);
+      if (!fs.existsSync(path.join(sessionDir, "index.yaml"))) {
+        return errorResponse(res, "Session not found", "NOT_FOUND", 404);
+      }
+      const body = JSON.parse(await readBody(req));
+      if (!body || typeof body.notes !== "string") {
+        return errorResponse(res, "Missing required field: notes", "VALIDATION_ERROR", 400);
+      }
+
+      const contextPath = path.join(sessionDir, CONTEXT_FILE);
+      let existing = "";
+      if (fs.existsSync(contextPath)) {
+        existing = fs.readFileSync(contextPath, "utf-8");
+      }
+
+      // Extract User Context and Review Notes sections
+      const userMatch = existing.match(/## User Context\n([\s\S]*?)(?=\n## Review Notes)/);
+      const notesMatch = existing.match(/## Review Notes\n([\s\S]*)/);
+      const userContext = userMatch ? userMatch[1].trimEnd() : "";
+      const existingNotes = notesMatch ? notesMatch[1].trim() : "";
+
+      const newNotes = existingNotes === "" || existingNotes.startsWith("<!--")
+        ? body.notes.trim()
+        : existingNotes + "\n" + body.notes.trim();
+
+      const content = `## User Context\n${userContext}\n\n## Review Notes\n${newNotes}\n`;
+      fs.writeFileSync(contextPath, content, "utf-8");
+      jsonResponse(res, { ok: true });
+    } catch (e) {
+      if (e.message.includes("Invalid path")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
+      throw e;
+    }
+  });
 }

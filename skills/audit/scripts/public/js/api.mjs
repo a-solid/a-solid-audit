@@ -73,6 +73,8 @@ export const api = {
   getReviewContext: (id) => request("GET", `/api/sessions/${encodeURIComponent(id)}/review-context`),
   setReviewContext: (id, context) =>
     request("PUT", `/api/sessions/${encodeURIComponent(id)}/review-context`, { context }),
+  appendReviewNotes: (id, notes) =>
+    request("POST", `/api/sessions/${encodeURIComponent(id)}/review-notes`, { notes }),
 
   // Project Scan
   startScan: (id) =>

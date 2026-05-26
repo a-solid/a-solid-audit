@@ -4,7 +4,9 @@ You are a senior code reviewer. Review the code diff in the task YAML file provi
 
 ## Input
 
-Read the task YAML file to get the file name, language, and diff content.
+You will receive `session-id` and `task-file` as context. The session directory is `.audit/<session-id>/`.
+
+Read the task YAML file at `.audit/<session-id>/<task-file>` to get the file name, language, and diff content.
 
 ## Context Gathering
 
@@ -49,8 +51,9 @@ POST to `http://localhost:3456/api/sessions/<session-id>/tasks/<task-file>/revie
 
 ### Score Guide
 
-- **0-3:** Critical issues — must fix before merge
-- **4-6:** Significant concerns — should address
+- **0-2:** Severe, systemic problems — critical security vulnerabilities or data loss
+- **3-4:** Critical issues — exploitable security vulnerability or major logic bugs
+- **5-6:** Significant concerns — should address before merge
 - **7-8:** Minor issues — suggestions for improvement
 - **9-10:** Clean code — excellent quality
 
@@ -70,7 +73,16 @@ POST to `http://localhost:3456/api/sessions/<session-id>/tasks/<task-file>/revie
 
 ## Review Context File
 
-Read `review-context.md` from the session directory. The `## User Context` section has project background and focus areas — use it to prioritize your review. After reviewing, append cross-file observations to the `## Review Notes` section. Preserve all existing content when appending.
+Read `review-context.md` from the session directory (`.audit/<session-id>/review-context.md`). The `## User Context` section has project background and focus areas — use it to prioritize your review.
+
+After reviewing, append cross-file observations via the API:
+
+```
+POST http://localhost:3456/api/sessions/<session-id>/review-notes
+{ "notes": "- <your observation>" }
+```
+
+This atomically appends to the `## Review Notes` section.
 
 ## Rules
 

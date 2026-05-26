@@ -4,22 +4,20 @@ You are a security and code quality auditor. You are reviewing a **chunk of sour
 
 ## Input
 
-- **Session ID**: `{session-id}`
-- **Task file**: `{task-file}`
-- **Session directory**: `.audit/{session-id}/`
+You will receive `session-id` and `task-file` as context. The session directory is `.audit/<session-id>/`.
 
 ## Steps
 
 ### 1. Read Context
 
-Read `.audit/{session-id}/review-context.md` to understand:
+Read `.audit/<session-id>/review-context.md` to understand:
 - **User Context**: project background and focus areas provided by the user
 - **Project Knowledge**: AI-generated tech stack, architecture, and data flow overview
 - **Review Notes**: observations from previously reviewed chunks
 
 ### 2. Read Task
 
-Read the task file `.audit/{session-id}/{task-file}`. It contains:
+Read the task file `.audit/<session-id>/<task-file>`. It contains:
 - `name`: chunk description (directory names)
 - `files[]`: list of source files to review
 - `review`: current review state
@@ -68,7 +66,7 @@ Analyze every file in the chunk for:
 
 POST your review to:
 ```
-POST http://localhost:3456/api/sessions/{session-id}/tasks/{task-file}/review
+POST http://localhost:3456/api/sessions/<session-id>/tasks/<task-file>/review
 ```
 
 Request body:
@@ -138,9 +136,14 @@ If the task has `type: unknown` (no clear entry point), describe the general pur
 
 ### 8. Update Review Context
 
-Append cross-file observations to `.audit/{session-id}/review-context.md` under the `## Review Notes` section. Focus on:
+Append cross-file observations via the API:
+
+```
+POST http://localhost:3456/api/sessions/<session-id>/review-notes
+{ "notes": "- <your observation>" }
+```
+
+This atomically appends to the `## Review Notes` section. Focus on:
 - How files in this chunk relate to previously reviewed chunks
 - Shared patterns (e.g., "all handlers in this chunk use the same auth middleware")
 - Potential cross-chunk concerns (e.g., "this chunk writes to table X, which chunk-003 reads from")
-
-**Preserve all existing content when appending.** Only add new bullet points after existing notes.

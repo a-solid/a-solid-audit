@@ -43,55 +43,41 @@ export async function renderSummary(container, params) {
   });
 
   const noteTasks = notes?.tasks || [];
-  // Count from per-finding statuses (what the UI actually writes)
-  let confirmed = 0;
-  let actionRequired = 0;
+  let acknowledged = 0;
   let deferred = 0;
-  noteTasks.forEach(t => {
-    (t.findings || []).forEach(f => {
-      if (!f) return;
-      if (f.status === "acknowledged") confirmed++;
-      else if (f.status === "deferred") deferred++;
-    });
-  });
-  // Any confirmed critical/major finding = action required
+  let pending = 0;
   tasks.forEach(t => {
-    const noteTask = noteTasks.find(nt => nt.file === t.file);
     const taskFindings = t.review?.findings || [];
-    const noteFindings = noteTask?.findings || [];
+    const noteTask = noteTasks.find(nt => nt.file === t.file);
     taskFindings.forEach((f, i) => {
-      const noteF = noteFindings[i];
-      if (noteF?.status === "acknowledged" && (f.severity === "critical" || f.severity === "major" || f.severity === "high")) {
-        actionRequired++;
-      }
+      const noteF = noteTask?.findings?.[i];
+      const status = noteF?.status;
+      if (status === "acknowledged") acknowledged++;
+      else if (status === "deferred") deferred++;
+      else pending++;
     });
   });
-  const unreviewed = totalFindings - confirmed - deferred;
 
   const maxSevCount = Math.max(...Object.values(bySeverity), 1);
 
   const content = document.getElementById("summary-content");
   content.innerHTML = `
-    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
       <div class="stat-card">
         <div class="stat-value">${totalFindings}</div>
         <div class="stat-label">Total Findings</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value stat-value-success">${confirmed}</div>
-        <div class="stat-label">Acknowledged</div>
+        <div class="stat-value" style="color:var(--text-muted)">${pending}</div>
+        <div class="stat-label">Pending</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value stat-value-danger">${actionRequired}</div>
-        <div class="stat-label">Action Required</div>
+        <div class="stat-value stat-value-success">${acknowledged}</div>
+        <div class="stat-label">Acknowledged</div>
       </div>
       <div class="stat-card">
         <div class="stat-value stat-value-warning">${deferred}</div>
         <div class="stat-label">Deferred</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" style="color:var(--text-muted)">${unreviewed}</div>
-        <div class="stat-label">Pending</div>
       </div>
     </div>
 

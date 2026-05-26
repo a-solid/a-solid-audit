@@ -79,7 +79,7 @@ export async function renderSummary(container, params) {
       </div>
       <div class="stat-card">
         <div class="stat-value stat-value-success">${confirmed}</div>
-        <div class="stat-label">Confirmed</div>
+        <div class="stat-label">Acknowledged</div>
       </div>
       <div class="stat-card">
         <div class="stat-value stat-value-danger">${actionRequired}</div>
@@ -91,7 +91,7 @@ export async function renderSummary(container, params) {
       </div>
       <div class="stat-card">
         <div class="stat-value" style="color:var(--text-muted)">${unreviewed}</div>
-        <div class="stat-label">Unreviewed</div>
+        <div class="stat-label">Pending</div>
       </div>
     </div>
 
@@ -277,7 +277,7 @@ export async function renderSummary(container, params) {
                 return `<td><span class="sev-count ${count > 0 ? "sev-count-" + s : "sev-count-zero"}">${count}</span></td>`;
               }).join("")}
               <td><span class="total-count">${totalFindings}</span></td>
-              <td>${reviewStatus === "none" ? '<span style="color:var(--text-muted)">—</span>' : `<span class="human-review-badge human-review-${reviewStatus}">${reviewStatus === "reviewed" ? "Reviewed" : reviewStatus === "partial" ? "Partial" : "Unreviewed"}</span>`}</td>
+              <td>${reviewStatus === "none" ? '<span style="color:var(--text-muted)">—</span>' : `<span class="human-review-badge human-review-${reviewStatus}">${reviewStatus === "reviewed" ? "Reviewed" : reviewStatus === "partial" ? "Partial" : "Pending"}</span>`}</td>
             </tr>`;
           }).join("")}
         </tbody>

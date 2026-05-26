@@ -62,14 +62,10 @@ export async function renderSummary(container, params) {
 
   const content = document.getElementById("summary-content");
   content.innerHTML = `
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
       <div class="stat-card">
         <div class="stat-value">${totalFindings}</div>
-        <div class="stat-label">Total Findings</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-value" style="color:var(--text-muted)">${pending}</div>
-        <div class="stat-label">Pending</div>
+        <div class="stat-label">Total</div>
       </div>
       <div class="stat-card">
         <div class="stat-value stat-value-success">${acknowledged}</div>
@@ -79,7 +75,30 @@ export async function renderSummary(container, params) {
         <div class="stat-value stat-value-warning">${deferred}</div>
         <div class="stat-label">Deferred</div>
       </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--text-muted)">${pending}</div>
+        <div class="stat-label">Pending</div>
+      </div>
     </div>
+
+    <div class="card mb-6">
+      <div class="font-medium mb-2">Review Progress</div>
+      <div class="review-progress-bar">
+        ${(acknowledged > 0) ? `<div class="review-progress-seg seg-ack" style="width:${Math.round(acknowledged / Math.max(totalFindings, 1) * 100)}%"></div>` : ""}
+        ${(deferred > 0) ? `<div class="review-progress-seg seg-defer" style="width:${Math.round(deferred / Math.max(totalFindings, 1) * 100)}%"></div>` : ""}
+        <div class="review-progress-seg seg-pending" style="width:${Math.round(pending / Math.max(totalFindings, 1) * 100)}%"></div>
+      </div>
+      <div class="review-progress-label">
+        <span>${Math.round((acknowledged + deferred) / Math.max(totalFindings, 1) * 100)}% reviewed</span>
+        <span>${pending} remaining</span>
+      </div>
+    </div>
+
+    ${pending > 0 ? `
+      <div class="review-progress-warning">
+        ${pending} finding${pending !== 1 ? "s" : ""} still pending review — complete all reviews before sign-off
+      </div>
+    ` : ""}
 
     ${Object.keys(bySeverity).length > 0 ? `
     <div class="card mb-6">

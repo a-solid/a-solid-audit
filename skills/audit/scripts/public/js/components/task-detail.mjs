@@ -91,7 +91,7 @@ export function renderTaskDetail(task, notes, batchMode = false) {
           <div class="space-y-3">
             ${findings.map((f, i) => {
               const status = noteTask?.findings?.[i]?.status || null;
-              const isConfirmed = status === "confirmed";
+              const isConfirmed = status === "acknowledged";
               const isDismissed = status === "deferred";
               const isUnreviewed = !status;
               const reason = noteTask?.findings?.[i]?.reason || "";
@@ -111,8 +111,8 @@ export function renderTaskDetail(task, notes, batchMode = false) {
                 <div class="flex items-center justify-between">
                   <div class="flex items-center gap-2">
                     <span class="badge severity-${f.severity}">${getSeverityIcon(f.severity)} ${f.severity}</span>
-                    ${isConfirmed ? `<span class="badge" style="background:var(--success-dim);color:var(--accent)">${icon("check", 10)} Confirmed</span>` : ""}
-                    ${isDismissed ? `<span class="badge dismiss-reason-badge"${reason ? ` title="${escapeHtml(reason)}"` : ""} style="background:var(--warning-dim);color:var(--warning)">${icon("x", 10)} Dismissed${reason ? ": " + escapeHtml(reason.length > 20 ? reason.slice(0, 20) + "..." : reason) : ""}</span>` : ""}
+                    ${isConfirmed ? `<span class="badge" style="background:var(--success-dim);color:var(--accent)">${icon("check", 10)} Acknowledged</span>` : ""}
+                    ${isDismissed ? `<span class="badge dismiss-reason-badge"${reason ? ` title="${escapeHtml(reason)}"` : ""} style="background:var(--warning-dim);color:var(--warning)">${icon("x", 10)} Deferred${reason ? ": " + escapeHtml(reason.length > 20 ? reason.slice(0, 20) + "..." : reason) : ""}</span>` : ""}
                   </div>
                   <div class="flex gap-1">
                     <button class="btn btn-sm btn-icon ${isConfirmed ? "" : "btn-ghost"} btn-confirm" data-idx="${i}"

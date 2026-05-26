@@ -768,6 +768,31 @@ img, svg { display: block; }
   letter-spacing: 0.5px;
   background: var(--bg-muted);
 }
+.task-nav-progress-segmented {
+  display: flex;
+  height: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: var(--bg-active);
+  gap: 1px;
+  margin-top: var(--space-1);
+}
+.task-nav-progress-seg {
+  height: 100%;
+  border-radius: 1px;
+  transition: flex var(--duration-base) var(--ease-spring);
+}
+.task-nav-progress-seg.seg-ack { background: var(--accent); }
+.task-nav-progress-seg.seg-defer { background: var(--warning); }
+.task-nav-progress-seg.seg-pending { background: var(--border); }
+.task-nav-progress-legend {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: 2px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+.task-nav-progress-legend span { white-space: nowrap; }
 
 /* ─── Quick Stats Row ─── */
 .quick-stats-row {
@@ -795,6 +820,37 @@ img, svg { display: block; }
   font-size: var(--text-xs);
   color: var(--text-muted);
   margin-top: var(--space-1);
+}
+/* ─── Review Progress Bar ─── */
+.review-progress-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--bg-active);
+}
+.review-progress-seg {
+  height: 100%;
+  transition: width var(--duration-base) var(--ease-spring);
+}
+.review-progress-seg.seg-ack { background: var(--accent); }
+.review-progress-seg.seg-defer { background: var(--warning); }
+.review-progress-seg.seg-pending { background: var(--border); }
+.review-progress-label {
+  display: flex;
+  justify-content: space-between;
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+.review-progress-warning {
+  margin-top: var(--space-4);
+  padding: var(--space-3);
+  background: var(--danger-dim);
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-md);
+  color: var(--danger);
+  font-size: var(--text-sm);
 }
 .kb-overlay {
   position: fixed; inset: 0;

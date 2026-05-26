@@ -46,7 +46,7 @@ export function registerNoteRoutes(router, reportsDir) {
       if (!body || typeof body.file !== "string" || !body.file) {
         return errorResponse(res, "Missing required field: file", "VALIDATION_ERROR", 400);
       }
-      if (body.status !== undefined && !["confirmed", "action-required", "deferred", ""].includes(body.status)) {
+      if (body.status !== undefined && !["acknowledged", "action-required", "deferred", "pending", ""].includes(body.status)) {
         return errorResponse(res, "Invalid status value", "VALIDATION_ERROR", 400);
       }
       if (body.findings !== undefined && !Array.isArray(body.findings)) {
@@ -60,7 +60,7 @@ export function registerNoteRoutes(router, reportsDir) {
         const taskPath = path.join(sessionDir, safeFile);
         const task = fs.existsSync(taskPath) ? readYaml(taskPath) : null;
         const findingCount = (task?.review?.findings || []).length;
-        const findings = Array.from({ length: findingCount }, () => ({ status: "confirmed", reason: "" }));
+        const findings = Array.from({ length: findingCount }, () => ({ status: "pending", reason: "" }));
         entry = { file: safeFile, status: "", notes: "", findings };
         notes.tasks.push(entry);
       }

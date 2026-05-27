@@ -60,19 +60,12 @@ export function listSessions(reportsDir) {
   });
   return entries.map(id => {
     const index = readYaml(path.join(reportsDir, id, "index.yaml"));
-    const sessionDir = path.join(reportsDir, id);
     const taskRefs = [
       ...(index.codeTasks || []),
       ...(index.storyTasks || []),
       ...(index.projectTasks || []),
     ];
-    let reviewed = 0;
-    for (const ref of taskRefs) {
-      const taskPath = path.join(sessionDir, ref.file);
-      if (fs.existsSync(taskPath) && readYaml(taskPath).status === "reviewed") {
-        reviewed++;
-      }
-    }
+    const reviewed = taskRefs.filter(t => t.status === "reviewed").length;
     return {
       id: index.session.id,
       type: index.session.type,
@@ -101,21 +94,17 @@ export function getSession(reportsDir, sid) {
   const counts = { reviewed: 0, reviewing: 0, pending: 0 };
 
   for (const ref of index.codeTasks || []) {
-    const taskPath = path.join(sessionDir, ref.file);
-    const status = fs.existsSync(taskPath) ? (readYaml(taskPath).status || "pending") : "pending";
+    const status = ref.status || "pending";
     counts[status] = (counts[status] || 0) + 1;
     codeTasks.push({ ...ref, status });
   }
   for (const ref of index.storyTasks || []) {
-    const taskPath = path.join(sessionDir, ref.file);
-    const status = fs.existsSync(taskPath) ? (readYaml(taskPath).status || "pending") : "pending";
+    const status = ref.status || "pending";
     counts[status] = (counts[status] || 0) + 1;
     storyTasks.push({ ...ref, status });
   }
   for (const ref of index.projectTasks || []) {
-    const taskPath = path.join(sessionDir, ref.file);
-    const taskData = fs.existsSync(taskPath) ? readYaml(taskPath) : {};
-    const status = taskData.status || "pending";
+    const status = ref.status || "pending";
     counts[status] = (counts[status] || 0) + 1;
     projectTasks.push({ ...ref, status });
   }

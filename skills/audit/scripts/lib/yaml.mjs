@@ -269,7 +269,6 @@ export function writeCodeTaskYaml(filePath, data) {
   writeYaml(filePath, {
     name: data.name,
     language: data.language || "unknown",
-    status: data.status || "pending",
     diff: data.diff || "",
     review: data.review || { score: 0, summary: "", findings: [], positives: [] },
   });
@@ -278,7 +277,6 @@ export function writeCodeTaskYaml(filePath, data) {
 export function writeStoryTaskYaml(filePath, data) {
   writeYaml(filePath, {
     name: data.name,
-    status: data.status || "pending",
     description: data.description || "",
     acceptance: data.acceptance || "",
     files: data.files || [],
@@ -289,7 +287,6 @@ export function writeStoryTaskYaml(filePath, data) {
 export function writeProjectTaskYaml(filePath, data) {
   writeYaml(filePath, {
     name: data.name,
-    status: data.status || "pending",
     type: data.type || "unknown",
     entry: data.entry || null,
     files: data.files || [],
@@ -308,10 +305,19 @@ export function writeIndexYaml(filePath, data) {
   if (data.session.projectDir) session.projectDir = data.session.projectDir;
   writeYaml(filePath, {
     session,
-    codeTasks: (data.codeTasks || data.tasks || []).map(t => ({ file: t.file })),
-    storyTasks: (data.storyTasks || []).map(t => ({ file: t.file })),
+    codeTasks: (data.codeTasks || data.tasks || []).map(t => {
+      const entry = { file: t.file };
+      if (t.status) entry.status = t.status;
+      return entry;
+    }),
+    storyTasks: (data.storyTasks || []).map(t => {
+      const entry = { file: t.file };
+      if (t.status) entry.status = t.status;
+      return entry;
+    }),
     projectTasks: (data.projectTasks || []).map(t => {
       const entry = { file: t.file };
+      if (t.status) entry.status = t.status;
       if (t.type) entry.type = t.type;
       if (t.entry) entry.entry = t.entry;
       return entry;

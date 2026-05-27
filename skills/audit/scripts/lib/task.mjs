@@ -65,27 +65,19 @@ export function getTasks(reportsDir, sid) {
   const index = readYaml(indexPath);
   const result = [];
 
-  for (const ref of index.codeTasks || []) {
-    const taskPath = path.join(sessionDir, ref.file);
-    if (fs.existsSync(taskPath)) {
-      const task = readYaml(taskPath);
-      result.push({ type: "code", file: ref.file, ...task });
-    }
-  }
+  const groups = [
+    { refs: index.codeTasks || [], type: "code" },
+    { refs: index.storyTasks || [], type: "story" },
+    { refs: index.projectTasks || [], type: "project" },
+  ];
 
-  for (const ref of index.storyTasks || []) {
-    const taskPath = path.join(sessionDir, ref.file);
-    if (fs.existsSync(taskPath)) {
-      const task = readYaml(taskPath);
-      result.push({ type: "story", file: ref.file, ...task });
-    }
-  }
-
-  for (const ref of index.projectTasks || []) {
-    const taskPath = path.join(sessionDir, ref.file);
-    if (fs.existsSync(taskPath)) {
-      const task = readYaml(taskPath);
-      result.push({ type: "project", file: ref.file, ...task });
+  for (const { refs, type } of groups) {
+    for (const ref of refs) {
+      const taskPath = path.join(sessionDir, ref.file);
+      if (fs.existsSync(taskPath)) {
+        const task = readYaml(taskPath);
+        result.push({ type, file: ref.file, status: ref.status || "pending", ...task });
+      }
     }
   }
 
@@ -100,7 +92,11 @@ export function getTask(reportsDir, sid, taskFile) {
   if (!fs.existsSync(indexPath)) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
 
   const index = readYaml(indexPath);
-  const allRefs = [...(index.codeTasks || []), ...(index.storyTasks || []), ...(index.projectTasks || [])];
+  const allRefs = [
+    ...(index.codeTasks || []).map(t => ({ ...t, type: "code" })),
+    ...(index.storyTasks || []).map(t => ({ ...t, type: "story" })),
+    ...(index.projectTasks || []).map(t => ({ ...t, type: "project" })),
+  ];
   const ref = allRefs.find(t => t.file === taskFile || decodeURIComponent(t.file) === taskFile);
   if (!ref) return null;
 
@@ -108,8 +104,5 @@ export function getTask(reportsDir, sid, taskFile) {
   if (!fs.existsSync(taskPath)) return null;
 
   const task = readYaml(taskPath);
-  const type = (index.codeTasks || []).some(t => t.file === ref.file) ? "code"
-    : (index.storyTasks || []).some(t => t.file === ref.file) ? "story"
-    : "project";
-  return { type, file: ref.file, ...task };
+  return { type: ref.type, file: ref.file, status: ref.status || "pending", ...task };
 }

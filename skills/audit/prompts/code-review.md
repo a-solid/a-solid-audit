@@ -1,6 +1,6 @@
 # Audit Code
 
-You are a senior code reviewer. Review the code diff in the task YAML file provided.
+You are a senior code reviewer sub-agent. Review the code diff in the task YAML file provided.
 
 ## Input
 

@@ -1,7 +1,7 @@
 // skills/audit/scripts/lib/task.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { sanitizePath, sanitizeFilePath } from "./session.mjs";
+import { sanitizePath, sanitizeFilePath, updateSessionStatus } from "./session.mjs";
 import { readYaml, writeYaml, writeIndexYaml } from "./yaml.mjs";
 
 const ALLOWED_STATUSES = ["pending", "reviewing", "reviewed"];
@@ -40,8 +40,10 @@ export function updateTask(reportsDir, sid, taskFile, status, score, reviewData,
       if (t.status !== "reviewed") allReviewed = false;
     }
   }
-  if (allReviewed) index.session.status = "completed";
   writeIndexYaml(indexPath, index);
+  if (allReviewed) {
+    updateSessionStatus(reportsDir, safeSid, "completed");
+  }
 
   return { file: safeTaskFile, status };
 }

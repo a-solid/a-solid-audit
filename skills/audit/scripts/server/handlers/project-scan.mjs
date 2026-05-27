@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { setProjectScope, getProjectMap, getScanLogs, generateTasksFromGroups } from "../../lib/project-scan.mjs";
 import { readYaml, writeIndexYaml } from "../../lib/yaml.mjs";
-import { sanitizePath } from "../../lib/session.mjs";
+import { sanitizePath, updateSessionStatus } from "../../lib/session.mjs";
 import { jsonResponse, errorResponse } from "../index.mjs";
 
 export function registerProjectScanRoutes(router, reportsDir, projectDir) {
@@ -28,9 +28,8 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
         return errorResponse(res, "No project directory configured", "VALIDATION_ERROR", 400);
       }
 
-      // Set scanning status
-      index.session.status = "scanning";
-      writeIndexYaml(indexPath, index);
+      // created → scanning
+      updateSessionStatus(reportsDir, safeSid, "scanning");
 
       let result;
       try {
@@ -43,10 +42,8 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
         throw e;
       }
 
-      // Update status to scanned (waiting for grouping)
-      const updated = readYaml(indexPath);
-      updated.session.status = "scanned";
-      writeIndexYaml(indexPath, updated);
+      // scanning → scanned
+      updateSessionStatus(reportsDir, safeSid, "scanned");
 
       jsonResponse(res, { ok: true, ...result });
     } catch (e) {
@@ -220,10 +217,8 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
 
       const result = generateTasksFromGroups(reportsDir, safeSid);
 
-      // Set status to ready
-      const index = readYaml(indexPath);
-      index.session.status = "ready";
-      writeIndexYaml(indexPath, index);
+      // grouping → ready
+      updateSessionStatus(reportsDir, safeSid, "ready");
 
       jsonResponse(res, { ok: true, ...result });
     } catch (e) {

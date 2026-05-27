@@ -1,7 +1,7 @@
 // skills/audit/scripts/lib/mapping.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { sanitizePath } from "./session.mjs";
+import { sanitizePath, updateSessionStatus } from "./session.mjs";
 import { taskFileName, runGitDiff, parseDiffByFile, detectLanguage } from "./git.mjs";
 import { readYaml, writeIndexYaml, writeCodeTaskYaml } from "./yaml.mjs";
 
@@ -39,17 +39,19 @@ export function setScope(projectDir, reportsDir, sid, scopeType, scopeRef, exclu
 
   const index = readYaml(indexPath);
   const existingType = index.session.type;
+  const sessionType = existingType === "all" ? "all" : "code";
   writeIndexYaml(indexPath, {
     session: {
       id: safeSid,
-      type: existingType === "all" ? "all" : "code",
-      status: "ready",
+      type: sessionType,
+      status: index.session.status,
       scope: { method: scopeType, ref: scopeRef || "" },
       created: index.session.created || new Date().toISOString(),
     },
     codeTasks: tasks,
     storyTasks: index.storyTasks || [],
   });
+  updateSessionStatus(reportsDir, safeSid, "ready");
 
   return { scope: { method: scopeType, ref: scopeRef }, taskCount: tasks.length };
 }

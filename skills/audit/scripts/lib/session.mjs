@@ -5,6 +5,30 @@ import { readYaml, writeIndexYaml, patchYaml } from "./yaml.mjs";
 
 const VALID_STATUSES = ["created", "scanned", "ready", "scanning", "grouping", "reviewing", "completed"];
 
+const TRANSITIONS = {
+  code: {
+    created: ["ready"],
+    ready: ["reviewing"],
+    reviewing: ["completed"],
+    completed: [],
+  },
+  all: {
+    created: ["ready"],
+    ready: ["reviewing"],
+    reviewing: ["completed"],
+    completed: [],
+  },
+  project: {
+    created: ["scanning"],
+    scanning: ["scanned"],
+    scanned: ["grouping"],
+    grouping: ["ready"],
+    ready: ["reviewing"],
+    reviewing: ["completed"],
+    completed: [],
+  },
+};
+
 export function sanitizePath(segment) {
   const s = String(segment);
   if (s.includes("..") || s.includes("/") || s.includes("\\") || s.includes("\0")) {
@@ -77,7 +101,7 @@ export function getSession(reportsDir, sid) {
   };
 }
 
-// Update session status with state machine validation
+// Update session status with type-aware state machine validation
 export function updateSessionStatus(reportsDir, sid, newStatus) {
   if (!VALID_STATUSES.includes(newStatus)) {
     throw new Error("Invalid status: " + newStatus);
@@ -87,20 +111,12 @@ export function updateSessionStatus(reportsDir, sid, newStatus) {
   if (!fs.existsSync(indexPath)) throw new Error("Session not found: " + safeSid);
   const index = readYaml(indexPath);
   const current = index.session.status || "created";
+  const type = index.session.type || "code";
 
-  // Valid transitions
-  const transitions = {
-    created: ["scanning", "ready"],
-    scanned: ["grouping", "ready"],
-    grouping: ["ready"],
-    scanning: ["ready", "scanned"],
-    ready: ["reviewing"],
-    reviewing: ["completed"],
-    completed: [],
-  };
+  const transitions = TRANSITIONS[type] || TRANSITIONS.code;
   const allowed = transitions[current] || [];
   if (!allowed.includes(newStatus)) {
-    throw new Error(`Cannot transition from "${current}" to "${newStatus}". Allowed: ${allowed.join(", ")}`);
+    throw new Error(`Cannot transition from "${current}" to "${newStatus}" (type: ${type}). Allowed: ${allowed.join(", ") || "none"}`);
   }
 
   index.session.status = newStatus;

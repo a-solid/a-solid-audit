@@ -34,7 +34,7 @@ export function setScope(projectDir, reportsDir, sid, scopeType, scopeRef, exclu
       diff: diffText, review: { score: 0, summary: "", findings: [], positives: [] },
     };
     writeCodeTaskYaml(path.join(tasksDir, tf), task);
-    tasks.push({ file: "code-tasks/" + tf });
+    tasks.push({ file: "code-tasks/" + tf, status: "pending" });
   }
 
   const index = readYaml(indexPath);

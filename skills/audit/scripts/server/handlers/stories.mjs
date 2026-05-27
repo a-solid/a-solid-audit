@@ -83,7 +83,6 @@ export function registerStoryRoutes(router, reportsDir) {
       fs.mkdirSync(path.join(sessionDir, "story-tasks"), { recursive: true });
       writeStoryTaskYaml(storyPath, {
         name: safeName,
-        status: "pending",
         description: body.description || "",
         acceptance: body.acceptance || "",
         files: body.files || [],

@@ -130,9 +130,12 @@ function parseBlock(lines, startIdx, baseIndent) {
           if (subLine.trim() === "") { i++; continue; }
           const subIndent = getIndent(subLine);
           if (subIndent <= itemIndent) break;
-          const kv = subLine.trim().match(/^(\S+): (.*)$/);
+          const trimmed = subLine.trim();
+          const colonIdx = trimmed.indexOf(": ");
+          const kv = colonIdx > 0;
           if (kv) {
-            const [, subKey, subValRaw] = kv;
+            const subKey = trimmed.slice(0, colonIdx);
+            const subValRaw = trimmed.slice(colonIdx + 2);
             if (subValRaw === "|" || subValRaw === ">" || subValRaw === "") {
               const folded = subValRaw === ">";
               i++;

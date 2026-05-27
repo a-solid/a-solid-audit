@@ -808,7 +808,7 @@ export async function renderWizard(container, params) {
     localStorage.removeItem(`audit-wizard-${sessionId}`);
 
     const termEl = document.getElementById("project-ready-terminal");
-    renderTerminalCard(termEl, "start review", {
+    renderTerminalCard(termEl, `start review ${sessionId}`, {
       viewProgressHref: `#/progress/${sessionId}`,
     });
   }
@@ -1349,7 +1349,7 @@ export async function renderWizard(container, params) {
     localStorage.removeItem(`audit-wizard-${sessionId}`);
 
     const termEl = document.getElementById("step4-terminal");
-    renderTerminalCard(termEl, "start review", {
+    renderTerminalCard(termEl, `start review ${sessionId}`, {
       viewProgressHref: `#/progress/${sessionId}`,
     });
   }

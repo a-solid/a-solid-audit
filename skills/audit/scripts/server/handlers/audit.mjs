@@ -1,5 +1,5 @@
 // skills/audit/scripts/server/handlers/audit.mjs
-import { getCommits, getBranches, runGitDiff, parseDiffByFile } from "../../lib/git.mjs";
+import { getCommits, getBranches, runGitDiff, parseDiffByFile, getUntrackedFiles } from "../../lib/git.mjs";
 import { setScope } from "../../lib/mapping.mjs";
 import { jsonResponse, readBody, errorResponse } from "../index.mjs";
 
@@ -41,10 +41,7 @@ export function registerAuditRoutes(router, projectDir, reportsDir) {
         return errorResponse(res, "Invalid ref format", "VALIDATION_ERROR", 400);
       }
       const diff = runGitDiff(body.method, body.ref || "", projectDir);
-      if (!diff.trim()) {
-        return jsonResponse(res, { files: [] });
-      }
-      const filesMap = parseDiffByFile(diff);
+      const filesMap = diff.trim() ? parseDiffByFile(diff) : {};
       const files = [];
       for (const [filePath, fileData] of Object.entries(filesMap)) {
         const hasChanges = fileData.diff.split("\n").some(
@@ -52,6 +49,15 @@ export function registerAuditRoutes(router, projectDir, reportsDir) {
         );
         if (!hasChanges) continue;
         files.push({ path: filePath, additions: fileData.additions, deletions: fileData.deletions });
+      }
+      // Include untracked files for uncommitted scope
+      if (body.method === "uncommitted") {
+        const untracked = getUntrackedFiles(projectDir);
+        const existing = new Set(files.map(f => f.path));
+        for (const filePath of untracked) {
+          if (existing.has(filePath)) continue;
+          files.push({ path: filePath, additions: 0, deletions: 0, isNew: true });
+        }
       }
       jsonResponse(res, { files });
     } catch (e) {

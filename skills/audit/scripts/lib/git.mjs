@@ -28,6 +28,12 @@ function runGit(args, projectDir) {
   }
 }
 
+export function getUntrackedFiles(projectDir) {
+  const output = runGit(["ls-files", "--others", "--exclude-standard"], projectDir);
+  if (!output.trim()) return [];
+  return output.trim().split("\n").filter(Boolean);
+}
+
 export function runGitDiff(scopeType, scopeRef, projectDir) {
   if (scopeType === "uncommitted") {
     return runGit(["diff"], projectDir) + runGit(["diff", "--cached"], projectDir);

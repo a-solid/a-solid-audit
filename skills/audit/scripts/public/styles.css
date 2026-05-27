@@ -819,9 +819,10 @@ img, svg { display: block; }
   font-weight: 700;
   font-family: var(--font-mono);
 }
-.quick-stat-value-confirmed { color: var(--accent); }
-.quick-stat-value-dismissed { color: var(--warning); }
-.quick-stat-value-unreviewed { color: var(--text-muted); }
+.quick-stat-value-need-fix { color: var(--danger); }
+.quick-stat-value-wont-fix { color: var(--warning); }
+.quick-stat-value-not-an-issue { color: var(--info); }
+.quick-stat-value-pending { color: var(--text-muted); }
 .quick-stat-label {
   font-size: var(--text-xs);
   color: var(--text-muted);
@@ -1565,13 +1566,16 @@ code {
 .print-finding-card.severity-border-low,
 .print-finding-card.severity-border-info { border-left-color: var(--info); }
 .print-finding-card + .print-finding-card { margin-top: var(--space-2); }
-.print-badge-confirmed {
-  background: var(--success-dim); color: var(--accent);
+.print-badge-need-fix {
+  background: var(--danger-dim); color: var(--danger);
 }
-.print-badge-dismissed {
+.print-badge-wont-fix {
   background: var(--warning-dim); color: var(--warning);
 }
-.print-badge-unreviewed {
+.print-badge-not-an-issue {
+  background: var(--info-dim); color: var(--info);
+}
+.print-badge-pending {
   background: var(--bg-surface); color: var(--text-muted);
 }
 
@@ -1857,7 +1861,7 @@ code {
   .print-badge-need-fix { color: #991b1b; border-color: #fca5a5; background: #fef2f2; }
   .print-badge-wont-fix { color: #92400e; border-color: #fcd34d; background: #fffbeb; }
   .print-badge-not-an-issue { color: #1e40af; border-color: #93c5fd; background: #eff6ff; }
-  .print-badge-unreviewed { color: #6b7280; border-color: #d1d5db; background: #f9fafb; }
+  .print-badge-pending { color: #6b7280; border-color: #d1d5db; background: #f9fafb; }
 
   /* Print/PDF utility overrides */
   .print-only { display: block; }

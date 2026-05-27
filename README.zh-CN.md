@@ -154,32 +154,41 @@ digraph project_scan_flow {
 每个发现项经过以下审查流程：
 
 ```
-未审查 → 已确认     (点击 Confirm，或进入任务时自动确认)
-未审查 → 已推迟     (点击 Dismiss + 选择原因)
+待处理 → Need Fix      (问题已确认，需要修复)
+待处理 → Won't Fix     (接受但不修复 — 需填写原因)
+待处理 → Not an Issue  (不是真正的问题 — 需填写原因)
 ```
 
-- **自动确认：** 进入任务详情时，所有未审查的发现项会自动设为已确认
-- **术语说明：** UI 按钮显示 "Dismiss"，后端存储值为 `"deferred"`，汇总页面显示 "Deferred"——三者指的是同一个操作
+- **自动标记低严重度：** 进入任务详情时，低严重度发现项自动标记为 Won't Fix，原因为 "Auto-marked: low severity"
+- 任何已审查的发现项都可以恢复为待处理状态
 
-### 驳回原因
+### Won't Fix 原因
 
 | 原因 | 使用场景 |
 |---|---|
-| False positive | AI 标记了代码中实际不存在的问题 |
-| Acceptable risk | 风险已知且当前可接受 |
-| Out of scope | 问题超出本次审查范围 |
-| Already addressed | 已在其他地方修复 |
 | Intentional design | 标记的模式是有意为之的设计决策 |
+| Acceptable risk | 风险已知且当前可接受 |
+| Low priority | 问题有效但优先级较低 |
+| Already addressed | 已在其他地方修复 |
+
+### Not an Issue 原因
+
+| 原因 | 使用场景 |
+|---|---|
+| AI misunderstood context | AI 误解了代码上下文 |
+| Not applicable | 发现项不适用于本代码库 |
+| Already handled elsewhere | 该问题已在其他地方处理 |
+| Feature, not a bug | 标记的行为是预期功能 |
 
 ### 汇总页面指标
 
 | 指标 | 含义 |
 |---|---|
 | Total Findings | 所有任务的发现项总数 |
-| Confirmed | 状态为 `confirmed` 的发现项数量 |
-| Action Required | 已确认且严重度为 critical、major 或 high 的发现项数量 |
-| Deferred | 状态为 `deferred` 的发现项数量（即被驳回的） |
-| Unreviewed | 尚无状态的发现项数量 |
+| Need Fix | 状态为 `need-fix` 的发现项数量 |
+| Won't Fix | 状态为 `wont-fix` 的发现项数量 |
+| Not an Issue | 状态为 `not-an-issue` 的发现项数量 |
+| Pending | 尚无状态的发现项数量 |
 
 ### 人工审查状态
 

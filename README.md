@@ -154,32 +154,41 @@ The report server auto-starts and provides a split-panel interface:
 Each finding goes through a review workflow:
 
 ```
-Unreviewed → Confirmed    (click Confirm, or auto-confirmed on task open)
-Unreviewed → Deferred     (click Dismiss + select reason)
+Pending → Need Fix      (problem confirmed, requires a fix)
+Pending → Won't Fix     (accepted, won't address — with reason)
+Pending → Not an Issue  (not a real issue — with reason)
 ```
 
-- **Auto-confirm:** navigating to a task automatically confirms all unreviewed findings
-- **Terminology:** the UI button says "Dismiss", the backend stores `"deferred"`, the summary page shows "Deferred" — these all refer to the same action
+- **Auto-mark low severity:** navigating to a task automatically marks low-severity findings as Won't Fix with reason "Auto-marked: low severity"
+- Any reviewed finding can be reverted to Pending
 
-### Dismiss Reasons
+### Won't Fix Reasons
 
 | Reason | When to use |
 |---|---|
-| False positive | AI flagged an issue that doesn't exist in the code |
-| Acceptable risk | The risk is known and acceptable for now |
-| Out of scope | Issue is outside the scope of this review |
-| Already addressed | Fix has already been applied elsewhere |
 | Intentional design | The flagged pattern is a deliberate design choice |
+| Acceptable risk | The risk is known and acceptable for now |
+| Low priority | Issue is valid but low priority |
+| Already addressed | Fix has already been applied elsewhere |
+
+### Not an Issue Reasons
+
+| Reason | When to use |
+|---|---|
+| AI misunderstood context | The AI misinterpreted the code context |
+| Not applicable | Finding does not apply to this codebase |
+| Already handled elsewhere | The concern is addressed in a different part of the code |
+| Feature, not a bug | The flagged behavior is intentional functionality |
 
 ### Summary Page Metrics
 
 | Metric | Meaning |
 |---|---|
 | Total Findings | Sum of all findings across all tasks |
-| Confirmed | Findings with status `confirmed` |
-| Action Required | Confirmed findings with severity critical, major, or high |
-| Deferred | Findings with status `deferred` (dismissed) |
-| Unreviewed | Findings with no status set |
+| Need Fix | Findings with status `need-fix` |
+| Won't Fix | Findings with status `wont-fix` |
+| Not an Issue | Findings with status `not-an-issue` |
+| Pending | Findings with no status set |
 
 ### Human Review Status
 

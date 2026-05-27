@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { sanitizePath, sanitizeFilePath, updateSessionStatus } from "./session.mjs";
-import { readYaml, writeYaml, writeIndexYaml } from "./yaml.mjs";
+import { readYaml, writeYaml } from "./yaml.mjs";
 import { AppError } from "./errors.mjs";
 
 const ALLOWED_STATUSES = ["pending", "reviewing", "reviewed"];
@@ -35,13 +35,15 @@ export function updateTask(reportsDir, sid, taskFile, status, score, reviewData,
   const index = readYaml(indexPath);
   let allReviewed = true;
   for (const taskGroup of ["codeTasks", "storyTasks", "projectTasks"]) {
-    const tasks = index[taskGroup] || [];
-    for (const t of tasks) {
-      if (t.file === safeTaskFile) t.status = status;
-      if (t.status !== "reviewed") allReviewed = false;
+    for (const ref of index[taskGroup] || []) {
+      const tp = path.join(sessionDir, ref.file);
+      if (!fs.existsSync(tp) || readYaml(tp).status !== "reviewed") {
+        allReviewed = false;
+        break;
+      }
     }
+    if (!allReviewed) break;
   }
-  writeIndexYaml(indexPath, index);
   if (allReviewed) {
     updateSessionStatus(reportsDir, safeSid, "completed");
   }

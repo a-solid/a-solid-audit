@@ -308,10 +308,10 @@ export function writeIndexYaml(filePath, data) {
   if (data.session.projectDir) session.projectDir = data.session.projectDir;
   writeYaml(filePath, {
     session,
-    codeTasks: (data.codeTasks || data.tasks || []).map(t => ({ file: t.file, status: t.status })),
-    storyTasks: (data.storyTasks || []).map(t => ({ file: t.file, status: t.status })),
+    codeTasks: (data.codeTasks || data.tasks || []).map(t => ({ file: t.file })),
+    storyTasks: (data.storyTasks || []).map(t => ({ file: t.file })),
     projectTasks: (data.projectTasks || []).map(t => {
-      const entry = { file: t.file, status: t.status };
+      const entry = { file: t.file };
       if (t.type) entry.type = t.type;
       if (t.entry) entry.entry = t.entry;
       return entry;

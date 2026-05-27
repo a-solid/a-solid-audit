@@ -1,7 +1,7 @@
 // skills/audit/scripts/lib/session.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { readYaml, writeIndexYaml, patchYaml } from "./yaml.mjs";
+import { readYaml, writeYaml, writeIndexYaml } from "./yaml.mjs";
 import { AppError } from "./errors.mjs";
 
 const VALID_STATUSES = ["created", "scanned", "ready", "scanning", "grouping", "reviewing", "completed"];
@@ -60,17 +60,28 @@ export function listSessions(reportsDir) {
   });
   return entries.map(id => {
     const index = readYaml(path.join(reportsDir, id, "index.yaml"));
-    const allTasks = [...(index.codeTasks || []), ...(index.storyTasks || []), ...(index.projectTasks || [])];
-    const reviewed = allTasks.filter(t => t.status === "reviewed").length;
+    const sessionDir = path.join(reportsDir, id);
+    const taskRefs = [
+      ...(index.codeTasks || []),
+      ...(index.storyTasks || []),
+      ...(index.projectTasks || []),
+    ];
+    let reviewed = 0;
+    for (const ref of taskRefs) {
+      const taskPath = path.join(sessionDir, ref.file);
+      if (fs.existsSync(taskPath) && readYaml(taskPath).status === "reviewed") {
+        reviewed++;
+      }
+    }
     return {
       id: index.session.id,
       type: index.session.type,
       status: index.session.status || "created",
       created: index.session.created,
       progress: {
-        total: allTasks.length,
+        total: taskRefs.length,
         reviewed,
-        percentage: allTasks.length ? Math.round((reviewed / allTasks.length) * 100) : 0,
+        percentage: taskRefs.length ? Math.round((reviewed / taskRefs.length) * 100) : 0,
       },
     };
   }).sort((a, b) => b.id.localeCompare(a.id));
@@ -83,17 +94,39 @@ export function getSession(reportsDir, sid) {
   const indexPath = path.join(sessionDir, "index.yaml");
   if (!fs.existsSync(indexPath)) return null;
   const index = readYaml(indexPath);
-  const allTasks = [...(index.codeTasks || []), ...(index.storyTasks || []), ...(index.projectTasks || [])];
+
+  const codeTasks = [];
+  const storyTasks = [];
+  const projectTasks = [];
   const counts = { reviewed: 0, reviewing: 0, pending: 0 };
-  for (const t of allTasks) {
-    counts[t.status] = (counts[t.status] || 0) + 1;
+
+  for (const ref of index.codeTasks || []) {
+    const taskPath = path.join(sessionDir, ref.file);
+    const status = fs.existsSync(taskPath) ? (readYaml(taskPath).status || "pending") : "pending";
+    counts[status] = (counts[status] || 0) + 1;
+    codeTasks.push({ ...ref, status });
   }
+  for (const ref of index.storyTasks || []) {
+    const taskPath = path.join(sessionDir, ref.file);
+    const status = fs.existsSync(taskPath) ? (readYaml(taskPath).status || "pending") : "pending";
+    counts[status] = (counts[status] || 0) + 1;
+    storyTasks.push({ ...ref, status });
+  }
+  for (const ref of index.projectTasks || []) {
+    const taskPath = path.join(sessionDir, ref.file);
+    const taskData = fs.existsSync(taskPath) ? readYaml(taskPath) : {};
+    const status = taskData.status || "pending";
+    counts[status] = (counts[status] || 0) + 1;
+    projectTasks.push({ ...ref, status });
+  }
+
+  const allTasks = [...codeTasks, ...storyTasks, ...projectTasks];
   return {
     ...index.session,
     status: index.session.status || "created",
-    codeTasks: index.codeTasks || [],
-    storyTasks: index.storyTasks || [],
-    projectTasks: index.projectTasks || [],
+    codeTasks,
+    storyTasks,
+    projectTasks,
     progress: {
       total: allTasks.length,
       ...counts,
@@ -184,23 +217,23 @@ export function resetReviewing(reportsDir, sid) {
   const indexPath = path.join(sessionDir, "index.yaml");
   if (!fs.existsSync(indexPath)) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
 
-  const index = readYaml(indexPath);
   let resetCount = 0;
 
   for (const taskGroup of ["codeTasks", "storyTasks", "projectTasks"]) {
+    const index = readYaml(indexPath);
     const tasks = index[taskGroup] || [];
-    for (let i = 0; i < tasks.length; i++) {
-      if (tasks[i].status === "reviewing") {
-        tasks[i].status = "pending";
-        resetCount++;
-        const taskPath = path.join(sessionDir, tasks[i].file);
-        if (fs.existsSync(taskPath)) {
-          patchYaml(taskPath, { status: "pending" });
+    for (const ref of tasks) {
+      const taskPath = path.join(sessionDir, ref.file);
+      if (fs.existsSync(taskPath)) {
+        const task = readYaml(taskPath);
+        if (task.status === "reviewing") {
+          task.status = "pending";
+          writeYaml(taskPath, task);
+          resetCount++;
         }
       }
     }
   }
 
-  writeIndexYaml(indexPath, index);
   return resetCount;
 }

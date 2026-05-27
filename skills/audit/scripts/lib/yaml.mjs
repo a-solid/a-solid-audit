@@ -230,11 +230,17 @@ function parseBlock(lines, startIdx, baseIndent) {
   return { value: result, nextIdx: i };
 }
 
+function parseFlowSequence(v) {
+  const inner = v.slice(1, -1);
+  return inner.split(", ").map(s => parseScalar(s.trim()));
+}
+
 function parseScalar(v) {
   if (v === "null") return null;
   if (v === "true") return true;
   if (v === "false") return false;
   if (v === "[]") return [];
+  if (v.startsWith("[") && v.endsWith("]")) return parseFlowSequence(v);
   if (/^-?\d+$/.test(v)) return parseInt(v, 10);
   if (/^-?\d+\.\d+$/.test(v)) return parseFloat(v);
   if (v.startsWith('"') && v.endsWith('"')) return v.slice(1, -1).replace(/\\"/g, '"');

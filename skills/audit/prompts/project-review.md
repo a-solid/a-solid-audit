@@ -66,12 +66,13 @@ Analyze every file in the chunk for:
 
 POST your review to:
 ```
-POST http://localhost:3456/api/sessions/<session-id>/tasks/<task-file>/review
+POST http://localhost:3456/api/sessions/<session-id>/tasks/review
 ```
 
 Request body:
 ```json
 {
+  "file": "<task-file>",
   "status": "reviewed",
   "score": <0-10>,
   "review": {

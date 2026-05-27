@@ -32,7 +32,7 @@ All commands run via `node scripts/cli.mjs <command>`. Scripts are located in th
 
 For each task with `type === "code"` and status `pending`, dispatch up to **3 sub-agents in parallel**:
 
-1. Set the next N pending tasks to `reviewing`: `POST /api/sessions/:id/tasks/:file/review` with `{"status":"reviewing"}`
+1. Set the next N pending tasks to `reviewing`: `POST /api/sessions/:id/tasks/review` with `{"file":"<task-file>","status":"reviewing"}`
 2. Dispatch each as a sub-agent with `prompts/code-review.md` as its prompt, passing `session-id` and `task-file` as context
 3. Sub-agent reads the task YAML, performs the review, and POSTs results via the review endpoint
 4. Sub-agent appends cross-file observations via `POST /api/sessions/:id/review-notes` (atomic append)
@@ -42,7 +42,7 @@ For each task with `type === "code"` and status `pending`, dispatch up to **3 su
 
 For each story task with status `pending`, same parallel pattern (up to 2):
 
-1. `POST /api/sessions/:id/tasks/:file/review` with `{"status":"reviewing"}`
+1. `POST /api/sessions/:id/tasks/review` with `{"file":"<task-file>","status":"reviewing"}`
 2. Dispatch sub-agent with `prompts/story-review.md`, passing `session-id` and `task-file` as context
 3. Sub-agent reads the story task YAML, reads referenced code task YAMLs for diffs, performs the review, and POSTs results
 4. Sub-agent appends cross-file observations via `POST /api/sessions/:id/review-notes`
@@ -51,7 +51,7 @@ For each story task with status `pending`, same parallel pattern (up to 2):
 
 For each project task with status `pending`, same parallel pattern (up to 2):
 
-1. `POST /api/sessions/:id/tasks/:file/review` with `{"status":"reviewing"}`
+1. `POST /api/sessions/:id/tasks/review` with `{"file":"<task-file>","status":"reviewing"}`
 2. Dispatch sub-agent with `prompts/project-review.md`, passing `session-id` and `task-file` as context
 3. Sub-agent reads the task YAML (contains `files[]`, `type`, `entry`), reads source files from the project directory, performs security and quality review, and POSTs results
 4. Sub-agent generates an `overview` with a Mermaid diagram of the call chain and a description of execution flow

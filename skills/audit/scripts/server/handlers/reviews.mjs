@@ -23,12 +23,15 @@ function validateTransition(currentStatus, newStatus) {
 }
 
 export function registerReviewRoutes(router, reportsDir) {
-  // POST /api/sessions/:id/tasks/:file/review
-  router.post("/api/sessions/:id/tasks/:file/review", async (req, res, params) => {
+  // POST /api/sessions/:id/tasks/review — body: { file, status, score?, review?, overview? }
+  router.post("/api/sessions/:id/tasks/review", async (req, res, params) => {
     try {
       const body = JSON.parse(await readBody(req));
       if (!body || !body.status) {
         return errorResponse(res, "Missing required field: status", "VALIDATION_ERROR", 400);
+      }
+      if (!body.file || typeof body.file !== "string") {
+        return errorResponse(res, "Missing required field: file", "VALIDATION_ERROR", 400);
       }
 
       const { status, score, review, overview } = body;
@@ -38,7 +41,7 @@ export function registerReviewRoutes(router, reportsDir) {
 
       const safeSid = sanitizePath(params.id);
       const sessionDir = path.join(reportsDir, safeSid);
-      const safeTaskFile = sanitizeFilePath(params.file);
+      const safeTaskFile = sanitizeFilePath(body.file);
       const taskPath = path.join(sessionDir, safeTaskFile);
 
       if (!fs.existsSync(path.join(sessionDir, "index.yaml"))) {

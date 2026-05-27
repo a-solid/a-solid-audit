@@ -28,10 +28,11 @@ Read the code task YAMLs via the `taskFile` paths to get diffs. Read the full ch
 
 Submit your review via the audit server API. You will receive `session-id` and `task-file` as context.
 
-POST to `http://localhost:3456/api/sessions/<session-id>/tasks/<task-file>/review` with JSON:
+POST to `http://localhost:3456/api/sessions/<session-id>/tasks/review` with JSON:
 
 ```json
 {
+  "file": "<task-file>",
   "status": "reviewed",
   "score": <0-10>,
   "review": {

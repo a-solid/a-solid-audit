@@ -60,7 +60,7 @@ export const api = {
   // Tasks
   getTasks: (id) => request("GET", `/api/sessions/${encodeURIComponent(id)}/tasks`),
   getTask: (id, file) =>
-    request("GET", `/api/sessions/${encodeURIComponent(id)}/tasks/${encodeURIComponent(file)}`),
+    request("GET", `/api/sessions/${encodeURIComponent(id)}/tasks?file=${encodeURIComponent(file)}`),
 
   // Notes
   getNotes: (id) => request("GET", `/api/sessions/${encodeURIComponent(id)}/notes`),

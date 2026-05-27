@@ -50,7 +50,7 @@ export function startServer(projectDir, port = 3456) {
     const match = router.resolve(req.method, url.pathname);
     if (match) {
       try {
-        return match.handler(req, res, match.params);
+        return match.handler(req, res, match.params, url.searchParams);
       } catch (e) {
         if (e instanceof SyntaxError) {
           return errorResponse(res, "Invalid JSON", "PARSE_ERROR", 400);

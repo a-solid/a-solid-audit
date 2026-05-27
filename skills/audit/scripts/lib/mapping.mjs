@@ -43,7 +43,7 @@ export function setScope(projectDir, reportsDir, sid, scopeType, scopeRef, exclu
     session: {
       id: safeSid,
       type: existingType === "all" ? "all" : "code",
-      status: "scoped",
+      status: "ready",
       scope: { method: scopeType, ref: scopeRef || "" },
       created: index.session.created || new Date().toISOString(),
     },

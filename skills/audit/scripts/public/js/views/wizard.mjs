@@ -161,18 +161,18 @@ export async function renderWizard(container, params) {
       excludedFiles = state.excludedFiles || [];
     }
 
-    // If no localStorage data, try to restore from server for scoped sessions
+    // If no localStorage data, try to restore from server for ready sessions
     if (!saved) {
       try {
         const session = await api.getSession(sessionId);
-        if (session?.status === "scoped") {
+        if (session?.status === "ready" && session.type !== "project") {
           reviewType = session.type || "code";
           if (session.scope) {
             scopeMethod = session.scope.method || "uncommitted";
             scopeRef = session.scope.ref || "";
           }
           // Jump to the appropriate step (past scope selection)
-          step = reviewType === "all" ? 3 : 2;
+          step = reviewType === "all" ? 3 : 3; // ready step (last step)
           // Load stories from server
           try {
             const serverStories = await api.getStories(sessionId);

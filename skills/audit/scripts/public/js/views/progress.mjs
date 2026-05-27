@@ -200,8 +200,7 @@ export async function renderProgress(container, params) {
 
       const cancelBtn = document.getElementById("cancel-scan-btn");
       if (cancelBtn) {
-        const showCancel = session.status === "scoped";
-        cancelBtn.classList.toggle("hidden", !showCancel);
+        cancelBtn.classList.add("hidden");
       }
 
       let tasks = [];
@@ -256,7 +255,7 @@ export async function renderProgress(container, params) {
         return; // Stop polling
       }
 
-      if (session.status === "scoped") {
+      if (session.status === "ready") {
         document.getElementById("progress-text").textContent = "Waiting for AI review to begin...";
       }
 

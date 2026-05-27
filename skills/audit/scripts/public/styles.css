@@ -418,7 +418,6 @@ img, svg { display: block; }
   line-height: 1.6;
 }
 .badge-created { background: var(--bg-active); color: var(--text-muted); }
-.badge-scoped { background: var(--info-dim); color: var(--info-hover); }
 .badge-ready { background: var(--warning-dim); color: var(--warning); }
 .badge-reviewing { background: var(--purple-dim); color: var(--purple); }
 .badge-completed { background: var(--success-dim); color: var(--success); }

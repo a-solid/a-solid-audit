@@ -18,7 +18,6 @@ function relativeTime(dateStr) {
 
 const STATUS_CONFIG = {
   created:    { color: "text-muted",   accent: "",                    badge: "badge-created" },
-  scoped:     { color: "text-info",    accent: "card-accent-info",    badge: "badge-scoped" },
   ready:      { color: "text-warning", accent: "card-accent-warning", badge: "badge-ready" },
   reviewing:  { color: "text-info",    accent: "card-accent-info",    badge: "badge-reviewing" },
   completed:  { color: "text-success", accent: "card-accent-success", badge: "badge-completed" },
@@ -120,7 +119,7 @@ export async function renderHome(container) {
         const id = card.dataset.id;
         const status = card.dataset.status;
         if (status === "completed") location.hash = `#/summary/${id}`;
-        else if (status === "created" || status === "scoped") location.hash = `#/wizard/${id}`;
+        else if (status === "created") location.hash = `#/wizard/${id}`;
         else location.hash = `#/progress/${id}`;
       });
       card.addEventListener("keydown", (e) => {

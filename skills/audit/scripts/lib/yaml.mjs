@@ -102,6 +102,10 @@ function getIndent(line) {
   return m ? m[1].length : 0;
 }
 
+function getContentOffset(line) {
+  return line.trim().length > 0 ? line.match(/^(\s*)/)[1].length : 0;
+}
+
 function parseBlock(lines, startIdx, baseIndent) {
   const result = {};
   let i = startIdx;
@@ -142,7 +146,7 @@ function parseBlock(lines, startIdx, baseIndent) {
               if (subValRaw === "|" || subValRaw === ">") {
                 const blockLines = [];
                 while (i < lines.length && (lines[i].trim() === "" || getIndent(lines[i]) > subIndent)) {
-                  blockLines.push(lines[i].substring(subIndent + 2));
+                  blockLines.push(lines[i].substring(getContentOffset(lines[i])));
                   i++;
                 }
                 const raw = blockLines.join("\n").replace(/\n+$/, "");
@@ -197,7 +201,7 @@ function parseBlock(lines, startIdx, baseIndent) {
       i++;
       const blockLines = [];
       while (i < lines.length && (lines[i].trim() === "" || getIndent(lines[i]) > kvIndent)) {
-        blockLines.push(lines[i].substring(kvIndent + 2));
+        blockLines.push(lines[i].substring(getContentOffset(lines[i])));
         i++;
       }
       const raw = blockLines.join("\n").replace(/\n+$/, "");

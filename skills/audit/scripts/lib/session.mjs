@@ -92,7 +92,7 @@ export function updateSessionStatus(reportsDir, sid, newStatus) {
   const transitions = {
     created: ["scanning", "ready"],
     scanned: ["grouping", "ready"],
-    grouping: ["scanned", "ready"],
+    grouping: ["ready"],
     scanning: ["ready", "scanned"],
     ready: ["reviewing"],
     reviewing: ["completed"],

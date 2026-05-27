@@ -71,17 +71,13 @@ export async function renderReview(container, params) {
         ? "Won't Fix"
         : status === "not-an-issue"
         ? "Not an Issue"
-        : status === "acknowledged"
-        ? "Won't Fix"
-        : status === "deferred"
-        ? "Need Fix"
         : "Reverted";
       showToast(`${statusLabel}: ${snippet}`, "success");
       // Brief visual transition before re-render
       const findingCard = document.querySelector(`[data-finding="${findingIdx}"]`);
       if (findingCard) {
         findingCard.style.transition = "opacity 200ms ease-out";
-        findingCard.style.opacity = status === "need-fix" || status === "deferred" ? "1" : "0.6";
+        findingCard.style.opacity = status === "need-fix" ? "1" : "0.6";
       }
       preserveDetailScroll = true;
       requestAnimationFrame(() => {
@@ -181,10 +177,9 @@ export async function renderReview(container, params) {
       const noteTask = noteTasks.find(nt => nt.file === t.file);
       (noteTask?.findings || []).forEach(f => {
         if (!f) return;
-        const s = f.status === "acknowledged" ? "wont-fix" : f.status === "deferred" ? "need-fix" : f.status;
-        if (s === "need-fix") needFixCount++;
-        else if (s === "wont-fix") wontFixCount++;
-        else if (s === "not-an-issue") notAnIssueCount++;
+        if (f.status === "need-fix") needFixCount++;
+        else if (f.status === "wont-fix") wontFixCount++;
+        else if (f.status === "not-an-issue") notAnIssueCount++;
       });
     });
     const reviewedCount = needFixCount + wontFixCount + notAnIssueCount;
@@ -362,11 +357,9 @@ export async function renderReview(container, params) {
       const score = t.review?.score;
       const dotClass = score >= 7 ? "score-dot-green" : score >= 4 ? "score-dot-amber" : "score-dot-red";
       const noteTaskForSidebar = noteTasks.find(nt => nt.file === t.file);
-      const normalizeStatus = (s) => s === "acknowledged" ? "wont-fix" : s === "deferred" ? "need-fix" : s;
       const reviewedCounts = { "need-fix": 0, "wont-fix": 0, "not-an-issue": 0, pending: 0 };
       (t.review?.findings || []).forEach((f, fi) => {
-        const raw = noteTaskForSidebar?.findings?.[fi]?.status;
-        const s = normalizeStatus(raw);
+        const s = noteTaskForSidebar?.findings?.[fi]?.status;
         if (reviewedCounts[s] !== undefined) reviewedCounts[s]++;
         else reviewedCounts.pending++;
       });

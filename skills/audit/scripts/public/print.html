@@ -101,8 +101,9 @@
   }
   .badge-sev { background: #f1f5f9; color: #1a1a2e; }
   .badge-status { font-size: 10px; background: none; padding: 0; }
-  .badge-confirmed { color: #166534; }
-  .badge-dismissed { color: #92400e; }
+  .badge-need-fix { color: #b91c1c; }
+  .badge-wont-fix { color: #92400e; }
+  .badge-not-an-issue { color: #1d4ed8; }
   .badge-unreviewed { color: #64748b; }
 
   .finding-desc { font-size: 12px; color: #1a1a2e; line-height: 1.45; }
@@ -187,25 +188,20 @@ async function init() {
   });
 
   const noteTasks = notes?.tasks || [];
-  let confirmed = 0, actionRequired = 0, deferred = 0;
-  noteTasks.forEach(t => {
-    (t.findings || []).forEach(f => {
-      if (f.status === "confirmed") confirmed++;
-      else if (f.status === "deferred") deferred++;
-    });
-  });
+  let needFixCount = 0, wontFixCount = 0, notAnIssueCount = 0;
   tasks.forEach(t => {
     const noteTask = noteTasks.find(nt => nt.file === t.file);
     const taskFindings = t.review?.findings || [];
     const noteFindings = noteTask?.findings || [];
     taskFindings.forEach((f, i) => {
-      const noteF = noteFindings[i];
-      if (noteF?.status === "confirmed" && (f.severity === "critical" || f.severity === "major" || f.severity === "high")) {
-        actionRequired++;
-      }
+      const status = noteFindings[i]?.status;
+      if (status === "need-fix") needFixCount++;
+      else if (status === "wont-fix") wontFixCount++;
+      else if (status === "not-an-issue") notAnIssueCount++;
     });
   });
-  const unreviewed = totalFindings - confirmed - deferred;
+  const reviewedCount = needFixCount + wontFixCount + notAnIssueCount;
+  const pendingCount = totalFindings - reviewedCount;
 
   const maxSevCount = Math.max(...Object.values(bySeverity), 1);
   const signoff = notes?.summary?.signoff;
@@ -243,10 +239,10 @@ async function init() {
   <!-- Stats -->
   <div class="stats-row">
     <div class="stat-box"><div class="stat-value">${totalFindings}</div><div class="stat-label">Total</div></div>
-    <div class="stat-box"><div class="stat-value">${confirmed}</div><div class="stat-label">Confirmed</div></div>
-    <div class="stat-box"><div class="stat-value">${actionRequired}</div><div class="stat-label">Action Req.</div></div>
-    <div class="stat-box"><div class="stat-value">${deferred}</div><div class="stat-label">Deferred</div></div>
-    <div class="stat-box"><div class="stat-value">${unreviewed}</div><div class="stat-label">Unreviewed</div></div>
+    <div class="stat-box"><div class="stat-value" style="color:#b91c1c">${needFixCount}</div><div class="stat-label">Need Fix</div></div>
+    <div class="stat-box"><div class="stat-value" style="color:#92400e">${wontFixCount}</div><div class="stat-label">Won't Fix</div></div>
+    <div class="stat-box"><div class="stat-value" style="color:#1d4ed8">${notAnIssueCount}</div><div class="stat-label">Not an Issue</div></div>
+    <div class="stat-box"><div class="stat-value">${pendingCount}</div><div class="stat-label">Pending</div></div>
   </div>
 
   ${Object.keys(bySeverity).length > 0 ? `
@@ -282,16 +278,16 @@ async function init() {
         ${findings.map(f => {
           const origIdx = f._origIdx;
           const status = noteTask?.findings?.[origIdx]?.status || null;
-          const isConfirmed = status === "confirmed";
-          const isDismissed = status === "deferred";
           const reason = noteTask?.findings?.[origIdx]?.reason || "";
+          const statusBadge = status === "need-fix" ? '<span class="badge badge-status badge-need-fix">Need Fix</span>'
+            : status === "wont-fix" ? `<span class="badge badge-status badge-wont-fix">Won't Fix${reason ? ": " + esc(reason.length > 40 ? reason.slice(0, 40) + "..." : reason) : ""}</span>`
+            : status === "not-an-issue" ? `<span class="badge badge-status badge-not-an-issue">Not an Issue${reason ? ": " + esc(reason.length > 40 ? reason.slice(0, 40) + "..." : reason) : ""}</span>`
+            : '<span class="badge badge-status badge-unreviewed">Pending</span>';
           return `
           <div class="finding ${f.severity}">
             <div class="finding-top">
               <span class="badge">${f.severity}</span>
-              ${isConfirmed ? '<span class="badge badge-status badge-confirmed">Confirmed</span>' : ""}
-              ${isDismissed ? `<span class="badge badge-status badge-dismissed">Dismissed${reason ? ": " + esc(reason) : ""}</span>` : ""}
-              ${!isConfirmed && !isDismissed ? '<span class="badge badge-status badge-unreviewed">Unreviewed</span>' : ""}
+              ${statusBadge}
             </div>
             <div class="finding-desc">${esc(f.description || "")}</div>
             ${f.suggestion ? `<div class="finding-suggestion">Suggestion: ${esc(f.suggestion)}</div>` : ""}

@@ -52,8 +52,7 @@ export async function renderSummary(container, params) {
     const noteTask = noteTasks.find(nt => nt.file === t.file);
     taskFindings.forEach((f, i) => {
       const noteF = noteTask?.findings?.[i];
-      const raw = noteF?.status;
-      const status = raw === "acknowledged" ? "wont-fix" : raw === "deferred" ? "need-fix" : raw;
+      const status = noteF?.status;
       if (status === "need-fix") needFixCount++;
       else if (status === "wont-fix") wontFixCount++;
       else if (status === "not-an-issue") notAnIssueCount++;
@@ -269,7 +268,7 @@ export async function renderSummary(container, params) {
             });
 
             const noteTask = noteTasks.find(t => t.file === task.file);
-            const reviewedCount = (noteTask?.findings || []).filter(f => f && ["need-fix", "wont-fix", "not-an-issue", "acknowledged", "deferred"].includes(f.status)).length;
+            const reviewedCount = (noteTask?.findings || []).filter(f => f && ["need-fix", "wont-fix", "not-an-issue"].includes(f.status)).length;
             let reviewStatus = "none";
             if (totalFindings > 0) {
               if (reviewedCount === 0) reviewStatus = "unreviewed";

@@ -82,15 +82,11 @@ export function renderTaskDetail(task, notes) {
           <div class="space-y-3">
             ${findings.map((f, i) => {
               const status = noteTask?.findings?.[i]?.status || null;
-              // Support legacy values (acknowledged→wont-fix, deferred→need-fix) and new values
-              const normalizedStatus = status === "acknowledged" ? "wont-fix"
-                : status === "deferred" ? "need-fix"
-                : status;
-              const isNeedFix = normalizedStatus === "need-fix";
-              const isWontFix = normalizedStatus === "wont-fix";
-              const isNotAnIssue = normalizedStatus === "not-an-issue";
+              const isNeedFix = status === "need-fix";
+              const isWontFix = status === "wont-fix";
+              const isNotAnIssue = status === "not-an-issue";
               const isReviewed = isNeedFix || isWontFix || isNotAnIssue;
-              const isUnreviewed = !normalizedStatus;
+              const isUnreviewed = !status;
               const reason = noteTask?.findings?.[i]?.reason || "";
 
               const statusBadge = isNeedFix ? `<span class="badge badge-need-fix">${icon("alertCircle", 10)} Need Fix</span>`

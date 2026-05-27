@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { sanitizePath, sanitizeFilePath, updateSessionStatus } from "./session.mjs";
-import { readYaml, writeYaml } from "./yaml.mjs";
+import { readYaml, writeYaml, writeIndexYaml } from "./yaml.mjs";
 import { AppError } from "./errors.mjs";
 
 const ALLOWED_STATUSES = ["pending", "reviewing", "reviewed"];
@@ -21,8 +21,8 @@ export function updateTask(reportsDir, sid, taskFile, status, score, reviewData,
   if (!fs.existsSync(taskPath)) throw new AppError("Task file not found", "NOT_FOUND", 404);
   if (!fs.existsSync(indexPath)) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
 
+  // Update task file (review data only, no status)
   const task = readYaml(taskPath);
-  task.status = status;
   if (score !== undefined && score !== null) task.review.score = parseInt(score, 10);
   if (reviewData) {
     task.review = { ...task.review, ...reviewData };
@@ -32,18 +32,22 @@ export function updateTask(reportsDir, sid, taskFile, status, score, reviewData,
   }
   writeYaml(taskPath, task);
 
+  // Update status in index.yaml
   const index = readYaml(indexPath);
-  let allReviewed = true;
-  for (const taskGroup of ["codeTasks", "storyTasks", "projectTasks"]) {
-    for (const ref of index[taskGroup] || []) {
-      const tp = path.join(sessionDir, ref.file);
-      if (!fs.existsSync(tp) || readYaml(tp).status !== "reviewed") {
-        allReviewed = false;
-        break;
-      }
+  const allTaskGroups = ["codeTasks", "storyTasks", "projectTasks"];
+  for (const group of allTaskGroups) {
+    const ref = (index[group] || []).find(t => t.file === safeTaskFile);
+    if (ref) {
+      ref.status = status;
+      break;
     }
-    if (!allReviewed) break;
   }
+  writeIndexYaml(indexPath, index);
+
+  // Check if all tasks are reviewed
+  const allReviewed = allTaskGroups.every(group =>
+    (index[group] || []).every(t => t.status === "reviewed")
+  );
   if (allReviewed) {
     updateSessionStatus(reportsDir, safeSid, "completed");
   }

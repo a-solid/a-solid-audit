@@ -40,7 +40,7 @@ For each task with `type === "code"` and status `pending`, dispatch up to **3 su
 
 ### 4. Story Review Loop (if `type === "all"` session)
 
-For each story task with status `pending`, same parallel pattern (up to 3):
+For each story task with status `pending`, same parallel pattern (up to 2):
 
 1. `POST /api/sessions/:id/tasks/:file/review` with `{"status":"reviewing"}`
 2. Dispatch sub-agent with `prompts/story-review.md`, passing `session-id` and `task-file` as context
@@ -49,7 +49,7 @@ For each story task with status `pending`, same parallel pattern (up to 3):
 
 ### 5. Project Scan Loop (if `type === "project"` session)
 
-For each project task with status `pending`, same parallel pattern (up to 3):
+For each project task with status `pending`, same parallel pattern (up to 2):
 
 1. `POST /api/sessions/:id/tasks/:file/review` with `{"status":"reviewing"}`
 2. Dispatch sub-agent with `prompts/project-review.md`, passing `session-id` and `task-file` as context

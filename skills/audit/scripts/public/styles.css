@@ -424,6 +424,12 @@ img, svg { display: block; }
 .badge-pending { background: var(--bg-active); color: var(--text-muted); }
 .badge-reviewed { background: var(--success-dim); color: var(--success); }
 .badge-reviewing-task { background: var(--purple-dim); color: var(--purple); animation: reviewPulse 2s ease-in-out infinite; }
+/* Combined AI / Human review status badges */
+.badge-ai-pending { background: var(--bg-active); color: var(--text-muted); }
+.badge-ai-analyzing { background: var(--purple-dim); color: var(--purple); animation: reviewPulse 2s ease-in-out infinite; }
+.badge-unreviewed { background: rgba(234, 88, 12, 0.12); color: #ea580c; }
+.badge-in-progress { background: var(--purple-dim); color: var(--purple); }
+.badge-complete { background: var(--success-dim); color: var(--success); }
 .badge-scanning {
   background: rgba(59, 130, 246, 0.1);
   color: var(--info);

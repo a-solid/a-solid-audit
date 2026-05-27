@@ -243,7 +243,7 @@ export async function renderProgress(container, params) {
             </div>
             <div class="flex items-center gap-3" style="flex-shrink:0">
               ${t.review?.score ? `<span class="text-sm font-mono ${scoreColor}">${t.review.score}/10</span>` : ""}
-              <span class="badge badge-${t.status === "reviewing" ? "reviewing-task" : escapeHtml(t.status)}">${escapeHtml(t.status)}</span>
+              <span class="badge badge-${t.status === "reviewing" ? "ai-analyzing" : t.status === "pending" ? "ai-pending" : "complete"}">${t.status === "reviewing" ? "AI Analyzing" : t.status === "pending" ? "AI Pending" : "Complete"}</span>
             </div>
           </div>`;
       }).join("");

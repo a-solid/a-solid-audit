@@ -360,15 +360,39 @@ export async function renderReview(container, params) {
       }).length;
       const pendingCount = (t.review?.findings || []).length - ackCount - deferCount;
       const separator = sortedIdx === reviewed.length ? `<div class="task-sidebar-separator">Pending</div>` : "";
+      // Compute combined AI/Human status badge
+      let statusBadge, statusBadgeClass;
+      if (t.status === "pending") {
+        statusBadge = "AI Pending";
+        statusBadgeClass = "badge-ai-pending";
+      } else if (t.status === "reviewing") {
+        statusBadge = "AI Analyzing";
+        statusBadgeClass = "badge-ai-analyzing";
+      } else {
+        const humanDone = ackCount + deferCount;
+        const humanTotal = ackCount + deferCount + pendingCount;
+        if (humanDone === 0) {
+          statusBadge = "Unreviewed";
+          statusBadgeClass = "badge-unreviewed";
+        } else if (humanDone < humanTotal) {
+          statusBadge = "In Progress";
+          statusBadgeClass = "badge-in-progress";
+        } else {
+          statusBadge = "Complete";
+          statusBadgeClass = "badge-complete";
+        }
+      }
+      const humanTotal = ackCount + deferCount + pendingCount;
       return `${separator}
         <div class="task-nav-item ${i === currentTaskIdx ? "active" : ""}" data-idx="${i}" tabindex="0" role="button" aria-label="${escapeHtml(t.name || t.file)}, score ${score ?? '-'}">
           <div class="score-dot ${score ? dotClass : ""}" style="${!score ? "background:var(--text-muted)" : ""}"></div>
           <div style="min-width:0;flex:1">
             <div class="text-sm font-mono truncate" title="${escapeHtml(t.name || t.file)}">${escapeHtml(t.name || t.file)}</div>
             <div class="flex items-center gap-2 mt-1">
-              <span class="badge badge-${t.status === "reviewing" ? "reviewing-task" : t.status}">${t.status}</span>
-              <span class="text-xs text-muted">${score ?? "-"}/10 · ${ackCount + deferCount}/${ackCount + deferCount + pendingCount}</span>
+              <span class="badge ${statusBadgeClass}">${statusBadge}</span>
+              <span class="text-xs text-muted">${score ?? "-"}/10${humanTotal > 0 ? ` · ${ackCount + deferCount}/${humanTotal}` : ""}</span>
             </div>
+            ${t.status === "reviewed" ? `
             <div class="task-nav-progress-segmented">
                 ${(ackCount > 0) ? `<div class="task-nav-progress-seg seg-ack" style="flex:${ackCount}"></div>` : ""}
                 ${(deferCount > 0) ? `<div class="task-nav-progress-seg seg-defer" style="flex:${deferCount}"></div>` : ""}
@@ -379,6 +403,7 @@ export async function renderReview(container, params) {
                 ${deferCount > 0 ? `<span style="color:var(--warning)">${deferCount} defer</span>` : ""}
                 ${pendingCount > 0 ? `<span>${pendingCount} pending</span>` : ""}
               </div>
+            ` : ""}
           </div>
         </div>`;
     }).join("");

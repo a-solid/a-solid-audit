@@ -39,7 +39,7 @@ export function sanitizePath(segment) {
 
 export function sanitizeFilePath(segment) {
   const s = String(segment);
-  if (s.includes("..") || s.includes("\\") || s.includes("\0")) {
+  if (s.includes("..") || s.includes("\\") || s.includes("\0") || path.isAbsolute(s)) {
     throw new Error("Invalid file path: " + s);
   }
   return s;

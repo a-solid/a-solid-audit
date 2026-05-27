@@ -37,15 +37,21 @@ export async function renderReview(container, params) {
   `;
 
   let reviewContext = "";
-  try { tasks = await api.getTasks(sessionId); } catch (e) {
-    showToast("Failed to load tasks: " + e.message);
+  try {
+    const [taskRes, notesRes, ctxRes] = await Promise.allSettled([
+      api.getTasks(sessionId),
+      api.getNotes(sessionId),
+      api.getReviewContext(sessionId),
+    ]);
+    if (taskRes.status === "ok") tasks = taskRes.value;
+    else { showToast("Failed to load tasks: " + taskRes.reason?.message); return; }
+    if (notesRes.status === "ok") notes = notesRes.value;
+    else showToast("Notes unavailable — finding statuses may not display", "warning");
+    if (ctxRes.status === "ok") reviewContext = ctxRes.value.context || "";
+  } catch (e) {
+    showToast("Failed to load review data: " + e.message);
     return;
   }
-  try { notes = await api.getNotes(sessionId); } catch (e) {
-    showToast("Notes unavailable — finding statuses may not display", "warning");
-  }
-  try { await api.getSession(sessionId); } catch (e) { /* session info optional */ }
-  try { const ctx = await api.getReviewContext(sessionId); reviewContext = ctx.context || ""; } catch (e) { /* no context file */ }
 
   async function updateFindingStatus(sid, task, findingIdx, status, reason) {
     const findingsCount = (task.review?.findings || []).length;

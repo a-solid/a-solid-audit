@@ -248,6 +248,15 @@ export async function renderWizard(container, params) {
     }
   }
 
+  let pollTimer = null;
+  function clearPoll() {
+    if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
+  }
+  function schedulePoll(fn, ms) {
+    clearPoll();
+    pollTimer = setTimeout(fn, ms);
+  }
+
   function render() {
     const shortId = sessionId && !isNew ? sessionId.slice(0, 7) : "";
     setBreadcrumb([
@@ -511,16 +520,6 @@ export async function renderWizard(container, params) {
     document.getElementById("group-back").addEventListener("click", () => { clearPoll(); goBack(2, "group-back"); });
 
     let groups = null;
-    let pollTimer = null;
-
-    function clearPoll() {
-      if (pollTimer) { clearTimeout(pollTimer); pollTimer = null; }
-    }
-
-    function schedulePoll(fn, ms) {
-      clearPoll();
-      pollTimer = setTimeout(fn, ms);
-    }
 
     function renderScanning() {
       const el = document.getElementById("group-step-content");

@@ -26,12 +26,18 @@ export async function renderSummary(container, params) {
     <div id="summary-content"></div>
   `;
 
-  try { tasks = await api.getTasks(sessionId); } catch (e) {
-    showToast("Failed to load tasks: " + e.message);
+  try {
+    const [taskRes, notesRes] = await Promise.allSettled([
+      api.getTasks(sessionId),
+      api.getNotes(sessionId),
+    ]);
+    if (taskRes.status === "ok") tasks = taskRes.value;
+    else { showToast("Failed to load tasks: " + taskRes.reason?.message); return; }
+    if (notesRes.status === "ok") notes = notesRes.value;
+    else showToast("Notes unavailable — sign-off section may not display", "warning");
+  } catch (e) {
+    showToast("Failed to load data: " + e.message);
     return;
-  }
-  try { notes = await api.getNotes(sessionId); } catch (e) {
-    showToast("Notes unavailable — sign-off section may not display", "warning");
   }
 
   const totalFindings = tasks.reduce((sum, t) => sum + (t.review?.findings?.length || 0), 0);

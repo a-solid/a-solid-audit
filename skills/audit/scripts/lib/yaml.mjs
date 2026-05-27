@@ -32,7 +32,7 @@ function serializeYaml(data, indent, lines) {
   const pad = "  ".repeat(indent);
   if (Array.isArray(data)) {
     if (data.length === 0) {
-      lines[lines.length - 1] += " []";
+      lines.push(pad + "[]");
       return;
     }
     for (const item of data) {

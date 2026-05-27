@@ -1,7 +1,7 @@
 // skills/audit/scripts/public/js/views/summary.mjs
 import { api } from "../api.mjs";
 import { showToast, setBreadcrumb, icon, escapeHtml } from "../app.mjs";
-import { SEVERITY_LABELS, SEVERITY_COLORS, scoreColor } from "../constants.mjs";
+import { SEVERITY_LABELS, SEVERITY_COLORS, scoreColor, aggregateFindings } from "../constants.mjs";
 
 export async function renderSummary(container, params) {
   const sessionId = params[0];
@@ -40,32 +40,8 @@ export async function renderSummary(container, params) {
     return;
   }
 
-  const totalFindings = tasks.reduce((sum, t) => sum + (t.review?.findings?.length || 0), 0);
-  const bySeverity = {};
-  tasks.forEach(t => {
-    (t.review?.findings || []).forEach(f => {
-      bySeverity[f.severity] = (bySeverity[f.severity] || 0) + 1;
-    });
-  });
-
+  const { totalFindings, bySeverity, needFix: needFixCount, wontFix: wontFixCount, notAnIssue: notAnIssueCount, pendingCount: pending, reviewed: reviewedCount } = aggregateFindings(tasks, notes);
   const noteTasks = notes?.tasks || [];
-  let needFixCount = 0;
-  let wontFixCount = 0;
-  let notAnIssueCount = 0;
-  let pending = 0;
-  tasks.forEach(t => {
-    const taskFindings = t.review?.findings || [];
-    const noteTask = noteTasks.find(nt => nt.file === t.file);
-    taskFindings.forEach((f, i) => {
-      const noteF = noteTask?.findings?.[i];
-      const status = noteF?.status;
-      if (status === "need-fix") needFixCount++;
-      else if (status === "wont-fix") wontFixCount++;
-      else if (status === "not-an-issue") notAnIssueCount++;
-      else pending++;
-    });
-  });
-  const reviewedCount = needFixCount + wontFixCount + notAnIssueCount;
 
   const maxSevCount = Math.max(...Object.values(bySeverity), 1);
 
@@ -93,10 +69,14 @@ export async function renderSummary(container, params) {
     <div class="card mb-6">
       <div class="font-medium mb-2">Review Progress</div>
       <div class="review-progress-bar">
-        ${(needFixCount > 0) ? `<div class="review-progress-seg seg-need-fix" style="width:${Math.round(needFixCount / Math.max(totalFindings, 1) * 100)}%"></div>` : ""}
-        ${(wontFixCount > 0) ? `<div class="review-progress-seg seg-wont-fix" style="width:${Math.round(wontFixCount / Math.max(totalFindings, 1) * 100)}%"></div>` : ""}
-        ${(notAnIssueCount > 0) ? `<div class="review-progress-seg seg-not-an-issue" style="width:${Math.round(notAnIssueCount / Math.max(totalFindings, 1) * 100)}%"></div>` : ""}
-        <div class="review-progress-seg seg-pending" style="width:${Math.round(pending / Math.max(totalFindings, 1) * 100)}%"></div>
+        ${(() => {
+          const t = Math.max(totalFindings, 1);
+          const nPct = Math.round(needFixCount / t * 100);
+          const wPct = Math.round(wontFixCount / t * 100);
+          const niPct = Math.round(notAnIssueCount / t * 100);
+          const pPct = 100 - nPct - wPct - niPct;
+          return `${needFixCount > 0 ? `<div class="review-progress-seg seg-need-fix" style="width:${nPct}%"></div>` : ""}${wontFixCount > 0 ? `<div class="review-progress-seg seg-wont-fix" style="width:${wPct}%"></div>` : ""}${notAnIssueCount > 0 ? `<div class="review-progress-seg seg-not-an-issue" style="width:${niPct}%"></div>` : ""}<div class="review-progress-seg seg-pending" style="width:${pPct}%"></div>`;
+        })()}
       </div>
       <div class="review-progress-label">
         <span>${Math.round(reviewedCount / Math.max(totalFindings, 1) * 100)}% reviewed</span>

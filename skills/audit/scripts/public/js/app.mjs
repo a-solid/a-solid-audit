@@ -13,7 +13,7 @@ initTheme();
 
 const container = document.getElementById("app");
 const breadcrumbEl = document.getElementById("breadcrumb");
-let currentCleanup = null;
+let cleanupFns = [];
 
 // ─── Shared Utilities ───
 
@@ -170,10 +170,8 @@ function parseHash() {
 
 async function navigate() {
   // Cleanup previous view's listeners
-  if (currentCleanup) {
-    currentCleanup();
-    currentCleanup = null;
-  }
+  cleanupFns.forEach(fn => { try { fn(); } catch {} });
+  cleanupFns = [];
   if (activePollTimer) {
     clearInterval(activePollTimer);
     activePollTimer = null;
@@ -231,7 +229,7 @@ function handleError(e) {
 
 // Allow views to register cleanup functions
 export function onNavigateCleanup(fn) {
-  currentCleanup = fn;
+  cleanupFns.push(fn);
 }
 
 // Shared tab keyboard navigation (arrow keys + enter/space)

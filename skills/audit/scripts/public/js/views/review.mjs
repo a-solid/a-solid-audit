@@ -2,7 +2,7 @@
 import { api } from "../api.mjs";
 import { renderTaskDetail, renderMermaidDiagrams } from "../components/task-detail.mjs";
 import { showToast, setBreadcrumb, icon, escapeHtml, onNavigateCleanup, initTabKeyboard } from "../app.mjs";
-import { SEVERITY_LABELS, SEVERITY_COLORS } from "../constants.mjs";
+import { SEVERITY_LABELS, SEVERITY_COLORS, aggregateFindings } from "../constants.mjs";
 
 export async function renderReview(container, params) {
   const sessionId = params[0];
@@ -159,38 +159,13 @@ export async function renderReview(container, params) {
         </div>`;
       return;
     }
-    const totalFindings = tasks.reduce((sum, t) => sum + (t.review?.findings?.length || 0), 0);
-    const bySeverity = {};
-    tasks.forEach(t => {
-      (t.review?.findings || []).forEach(f => {
-        bySeverity[f.severity] = (bySeverity[f.severity] || 0) + 1;
-      });
-    });
+    const { totalFindings, bySeverity, needFix: needFixCount, wontFix: wontFixCount, notAnIssue: notAnIssueCount, reviewed: reviewedCount, pendingCount: unreviewedCount } = aggregateFindings(tasks, notes);
     const avgScore = tasks.length
       ? Math.round(tasks.reduce((s, t) => s + (t.review?.score || 0), 0) / tasks.length)
       : 0;
 
     const maxSevCount = Math.max(...Object.values(bySeverity), 1);
-
-    let needFixCount = 0;
-    let wontFixCount = 0;
-    let notAnIssueCount = 0;
-    let totalFindingsFromAll = 0;
-    const noteTasks = notes?.tasks || [];
-    tasks.forEach(t => {
-      const taskFindings = t.review?.findings || [];
-      totalFindingsFromAll += taskFindings.length;
-      const noteTask = noteTasks.find(nt => nt.file === t.file);
-      (noteTask?.findings || []).forEach(f => {
-        if (!f) return;
-        if (f.status === "need-fix") needFixCount++;
-        else if (f.status === "wont-fix") wontFixCount++;
-        else if (f.status === "not-an-issue") notAnIssueCount++;
-      });
-    });
-    const reviewedCount = needFixCount + wontFixCount + notAnIssueCount;
-    const unreviewedCount = totalFindingsFromAll - reviewedCount;
-    const findingsTotal = totalFindingsFromAll || 1;
+    const findingsTotal = totalFindings || 1;
     const needFixPct = Math.round(needFixCount / findingsTotal * 100);
     const wontFixPct = Math.round(wontFixCount / findingsTotal * 100);
     const notAnIssuePct = Math.round(notAnIssueCount / findingsTotal * 100);

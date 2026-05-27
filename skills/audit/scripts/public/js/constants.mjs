@@ -23,3 +23,27 @@ export const ENTRY_TYPES = {
   script:    { label: "Script",    color: "var(--accent)" },
   unknown:   { label: "Module",    color: "var(--text-muted)" },
 };
+
+export function aggregateFindings(tasks, notes) {
+  const noteTasks = notes?.tasks || [];
+  let needFix = 0, wontFix = 0, notAnIssue = 0, pendingCount = 0;
+  const bySeverity = {};
+  let totalFindings = 0;
+  tasks.forEach(t => {
+    const findings = t.review?.findings || [];
+    totalFindings += findings.length;
+    findings.forEach(f => {
+      bySeverity[f.severity] = (bySeverity[f.severity] || 0) + 1;
+    });
+    const noteTask = noteTasks.find(nt => nt.file === t.file);
+    findings.forEach((f, i) => {
+      const status = noteTask?.findings?.[i]?.status;
+      if (status === "need-fix") needFix++;
+      else if (status === "wont-fix") wontFix++;
+      else if (status === "not-an-issue") notAnIssue++;
+      else pendingCount++;
+    });
+  });
+  const reviewed = needFix + wontFix + notAnIssue;
+  return { totalFindings, bySeverity, needFix, wontFix, notAnIssue, pendingCount, reviewed };
+}

@@ -1,7 +1,7 @@
 // skills/audit/scripts/server/handlers/project-scan.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { setProjectScope, getProjectMap, getScanLogs, generateTasksFromGroups } from "../../lib/project-scan.mjs";
+import { setProjectScope, getProjectMap, getScanLogs, clearScanLogs, generateTasksFromGroups } from "../../lib/project-scan.mjs";
 import { readYaml, writeIndexYaml } from "../../lib/yaml.mjs";
 import { sanitizePath, updateSessionStatus } from "../../lib/session.mjs";
 import { jsonResponse, errorResponse } from "../index.mjs";
@@ -35,7 +35,7 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
       try {
         result = setProjectScope(targetDir, reportsDir, safeSid, { mode: "scan" });
       } catch (e) {
-        // Revert to created on failure
+        clearScanLogs(safeSid);
         const revert = readYaml(indexPath);
         revert.session.status = "created";
         writeIndexYaml(indexPath, revert);
@@ -44,6 +44,7 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
 
       // scanning → scanned
       updateSessionStatus(reportsDir, safeSid, "scanned");
+      clearScanLogs(safeSid);
 
       jsonResponse(res, { ok: true, ...result });
     } catch (e) {

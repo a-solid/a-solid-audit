@@ -63,16 +63,23 @@ export function startServer(projectDir, port = 3456) {
 
     const match = router.resolve(req.method, url.pathname);
     if (match) {
-      try {
-        return match.handler(req, res, match.params, url.searchParams);
-      } catch (e) {
+      const handleError = (e) => {
         if (e instanceof AppError) return errorResponse(res, e.message, e.code, e.status);
         if (e instanceof SyntaxError) {
           return errorResponse(res, "Invalid JSON", "PARSE_ERROR", 400);
         }
         console.error(e);
         errorResponse(res, "Internal server error", "INTERNAL_ERROR", 500);
+      };
+      try {
+        const result = match.handler(req, res, match.params, url.searchParams);
+        if (result && typeof result.catch === "function") {
+          result.catch(handleError);
+        }
+      } catch (e) {
+        handleError(e);
       }
+      return;
     }
 
     serveStatic(req, res, url.pathname);

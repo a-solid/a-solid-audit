@@ -189,7 +189,7 @@ export async function renderReview(container, params) {
 
       <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
         <div class="stat-card">
-          <div class="stat-value">${totalFindingsFromAll}</div>
+          <div class="stat-value">${totalFindings}</div>
           <div class="stat-label">Total</div>
         </div>
         <div class="stat-card">

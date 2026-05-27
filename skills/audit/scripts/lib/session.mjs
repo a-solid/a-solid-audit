@@ -202,26 +202,23 @@ export function createSession(reportsDir, sid, options = {}) {
 // Reset reviewing tasks to pending (for resume)
 export function resetReviewing(reportsDir, sid) {
   const safeSid = sanitizePath(sid);
-  const sessionDir = path.join(reportsDir, safeSid);
-  const indexPath = path.join(sessionDir, "index.yaml");
+  const indexPath = path.join(reportsDir, safeSid, "index.yaml");
   if (!fs.existsSync(indexPath)) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
 
+  const index = readYaml(indexPath);
   let resetCount = 0;
 
   for (const taskGroup of ["codeTasks", "storyTasks", "projectTasks"]) {
-    const index = readYaml(indexPath);
-    const tasks = index[taskGroup] || [];
-    for (const ref of tasks) {
-      const taskPath = path.join(sessionDir, ref.file);
-      if (fs.existsSync(taskPath)) {
-        const task = readYaml(taskPath);
-        if (task.status === "reviewing") {
-          task.status = "pending";
-          writeYaml(taskPath, task);
-          resetCount++;
-        }
+    for (const ref of index[taskGroup] || []) {
+      if (ref.status === "reviewing") {
+        ref.status = "pending";
+        resetCount++;
       }
     }
+  }
+
+  if (resetCount > 0) {
+    writeIndexYaml(indexPath, index);
   }
 
   return resetCount;

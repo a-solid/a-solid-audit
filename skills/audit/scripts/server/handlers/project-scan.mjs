@@ -1,7 +1,8 @@
 // skills/audit/scripts/server/handlers/project-scan.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { setProjectScope, getProjectMap, getScanLogs, clearScanLogs, generateTasksFromGroups } from "../../lib/project-scan.mjs";
+import { setProjectScope, getProjectMap, generateTasksFromGroups } from "../../lib/project-scan.mjs";
+import { getScanLogs, clearScanLogs } from "../../lib/scan-log.mjs";
 import { readYaml, writeIndexYaml } from "../../lib/yaml.mjs";
 import { sanitizePath, updateSessionStatus } from "../../lib/session.mjs";
 import { jsonResponse, errorResponse } from "../index.mjs";

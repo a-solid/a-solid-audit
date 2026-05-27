@@ -1,5 +1,5 @@
 // skills/audit/scripts/server/handlers/audit.mjs
-import { getCommits, getBranches, runGitDiff, parseDiffByFile, getUntrackedFiles } from "../../lib/git.mjs";
+import { getCommits, getBranches, getDiffFileStats, getUntrackedFiles } from "../../lib/git.mjs";
 import { setScope } from "../../lib/mapping.mjs";
 import { jsonResponse, readBody, errorResponse } from "../index.mjs";
 
@@ -40,16 +40,9 @@ export function registerAuditRoutes(router, projectDir, reportsDir) {
       if (body.ref && !/^[a-zA-Z0-9._\-\/\s]+$/.test(body.ref)) {
         return errorResponse(res, "Invalid ref format", "VALIDATION_ERROR", 400);
       }
-      const diff = runGitDiff(body.method, body.ref || "", projectDir);
-      const filesMap = diff.trim() ? parseDiffByFile(diff) : {};
-      const files = [];
-      for (const [filePath, fileData] of Object.entries(filesMap)) {
-        const hasChanges = fileData.diff.split("\n").some(
-          l => (l.startsWith("+") && !l.startsWith("+++")) || (l.startsWith("-") && !l.startsWith("---"))
-        );
-        if (!hasChanges) continue;
-        files.push({ path: filePath, additions: fileData.additions, deletions: fileData.deletions });
-      }
+      const files = getDiffFileStats(body.method, body.ref || "", projectDir).filter(
+        f => f.additions > 0 || f.deletions > 0
+      );
       // Include untracked files for uncommitted scope
       if (body.method === "uncommitted") {
         const untracked = getUntrackedFiles(projectDir);

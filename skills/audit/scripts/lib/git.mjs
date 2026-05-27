@@ -48,6 +48,44 @@ export function runGitDiff(scopeType, scopeRef, projectDir) {
   return "";
 }
 
+// Fast file stats via --numstat (avoids full diff parsing)
+export function getDiffFileStats(scopeType, scopeRef, projectDir) {
+  const args = ["diff", "--numstat"];
+  if (scopeType === "uncommitted") {
+    const wd = runGit([...args], projectDir);
+    const staged = runGit([...args, "--cached"], projectDir);
+    return parseNumstat(wd + "\n" + staged);
+  }
+  if (scopeType === "commits") {
+    const ids = scopeRef.split(" ");
+    return parseNumstat(runGit([...args, ids[0], ids[1]], projectDir));
+  }
+  if (scopeType === "branch") {
+    return parseNumstat(runGit([...args, scopeRef], projectDir));
+  }
+  return [];
+}
+
+function parseNumstat(output) {
+  if (!output.trim()) return [];
+  const files = new Map();
+  for (const line of output.trim().split("\n")) {
+    const parts = line.split("\t");
+    if (parts.length < 3) continue;
+    const additions = parts[0] === "-" ? 0 : parseInt(parts[0], 10) || 0;
+    const deletions = parts[1] === "-" ? 0 : parseInt(parts[1], 10) || 0;
+    const filePath = parts[2];
+    const existing = files.get(filePath);
+    if (existing) {
+      existing.additions += additions;
+      existing.deletions += deletions;
+    } else {
+      files.set(filePath, { path: filePath, additions, deletions });
+    }
+  }
+  return [...files.values()];
+}
+
 export function parseDiffByFile(diffOutput) {
   const files = {};
   const lines = diffOutput.split("\n");

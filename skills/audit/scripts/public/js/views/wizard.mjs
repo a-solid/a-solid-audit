@@ -811,6 +811,20 @@ export async function renderWizard(container, params) {
     renderTerminalCard(termEl, `start review ${sessionId}`, {
       viewProgressHref: `#/progress/${sessionId}`,
     });
+
+    // Poll for session status change — auto-redirect when review starts
+    function pollProjectReadyStatus() {
+      api.getSession(sessionId).then(session => {
+        if (session.status === "reviewing" || session.status === "completed") {
+          location.hash = `#/progress/${sessionId}`;
+          return;
+        }
+        schedulePoll(pollProjectReadyStatus, 3000);
+      }).catch(() => {
+        schedulePoll(pollProjectReadyStatus, 5000);
+      });
+    }
+    pollProjectReadyStatus();
   }
 
   function renderStep2() {
@@ -1342,8 +1356,23 @@ export async function renderWizard(container, params) {
     }
 
     document.getElementById("step4-back").addEventListener("click", () => {
+      clearPoll();
       goBack(reviewType === "code" ? 2 : 3, "step4-back");
     });
+
+    // Poll for session status change — auto-redirect when review starts
+    function pollReadyStatus() {
+      api.getSession(sessionId).then(session => {
+        if (session.status === "reviewing" || session.status === "completed") {
+          location.hash = `#/progress/${sessionId}`;
+          return;
+        }
+        schedulePoll(pollReadyStatus, 3000);
+      }).catch(() => {
+        schedulePoll(pollReadyStatus, 5000);
+      });
+    }
+    pollReadyStatus();
 
     setDirty(false);
     localStorage.removeItem(`audit-wizard-${sessionId}`);
@@ -1358,5 +1387,6 @@ export async function renderWizard(container, params) {
 
   onNavigateCleanup(() => {
     window.onbeforeunload = null;
+    clearPoll();
   });
 }

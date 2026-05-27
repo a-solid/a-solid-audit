@@ -258,7 +258,7 @@ export function initTabKeyboard(tabContainer) {
 // ─── Terminal Card Component ───
 
 export function renderTerminalCard(container, command, options = {}) {
-  const instruction = options.instruction || "Go to your AI terminal and type:";
+  const instruction = options.instruction || "Run the following command in your AI terminal. This page will update automatically once the review begins.";
   const viewProgressHref = options.viewProgressHref || null;
 
   container.innerHTML = `

@@ -43,20 +43,24 @@ export async function renderSummary(container, params) {
   });
 
   const noteTasks = notes?.tasks || [];
-  let acknowledged = 0;
-  let deferred = 0;
+  let needFixCount = 0;
+  let wontFixCount = 0;
+  let notAnIssueCount = 0;
   let pending = 0;
   tasks.forEach(t => {
     const taskFindings = t.review?.findings || [];
     const noteTask = noteTasks.find(nt => nt.file === t.file);
     taskFindings.forEach((f, i) => {
       const noteF = noteTask?.findings?.[i];
-      const status = noteF?.status;
-      if (status === "acknowledged") acknowledged++;
-      else if (status === "deferred") deferred++;
+      const raw = noteF?.status;
+      const status = raw === "acknowledged" ? "wont-fix" : raw === "deferred" ? "need-fix" : raw;
+      if (status === "need-fix") needFixCount++;
+      else if (status === "wont-fix") wontFixCount++;
+      else if (status === "not-an-issue") notAnIssueCount++;
       else pending++;
     });
   });
+  const reviewedCount = needFixCount + wontFixCount + notAnIssueCount;
 
   const maxSevCount = Math.max(...Object.values(bySeverity), 1);
 
@@ -68,28 +72,29 @@ export async function renderSummary(container, params) {
         <div class="stat-label">Total</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value stat-value-success">${acknowledged}</div>
-        <div class="stat-label">Acknowledged</div>
+        <div class="stat-value" style="color:var(--danger)">${needFixCount}</div>
+        <div class="stat-label">Need Fix</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value stat-value-warning">${deferred}</div>
-        <div class="stat-label">Deferred</div>
+        <div class="stat-value stat-value-warning">${wontFixCount}</div>
+        <div class="stat-label">Won't Fix</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value" style="color:var(--text-muted)">${pending}</div>
-        <div class="stat-label">Pending</div>
+        <div class="stat-value" style="color:var(--info)">${notAnIssueCount}</div>
+        <div class="stat-label">Not an Issue</div>
       </div>
     </div>
 
     <div class="card mb-6">
       <div class="font-medium mb-2">Review Progress</div>
       <div class="review-progress-bar">
-        ${(acknowledged > 0) ? `<div class="review-progress-seg seg-ack" style="width:${Math.round(acknowledged / Math.max(totalFindings, 1) * 100)}%"></div>` : ""}
-        ${(deferred > 0) ? `<div class="review-progress-seg seg-defer" style="width:${Math.round(deferred / Math.max(totalFindings, 1) * 100)}%"></div>` : ""}
+        ${(needFixCount > 0) ? `<div class="review-progress-seg seg-need-fix" style="width:${Math.round(needFixCount / Math.max(totalFindings, 1) * 100)}%"></div>` : ""}
+        ${(wontFixCount > 0) ? `<div class="review-progress-seg seg-wont-fix" style="width:${Math.round(wontFixCount / Math.max(totalFindings, 1) * 100)}%"></div>` : ""}
+        ${(notAnIssueCount > 0) ? `<div class="review-progress-seg seg-not-an-issue" style="width:${Math.round(notAnIssueCount / Math.max(totalFindings, 1) * 100)}%"></div>` : ""}
         <div class="review-progress-seg seg-pending" style="width:${Math.round(pending / Math.max(totalFindings, 1) * 100)}%"></div>
       </div>
       <div class="review-progress-label">
-        <span>${Math.round((acknowledged + deferred) / Math.max(totalFindings, 1) * 100)}% reviewed</span>
+        <span>${Math.round(reviewedCount / Math.max(totalFindings, 1) * 100)}% reviewed</span>
         <span>${pending} remaining</span>
       </div>
     </div>
@@ -264,7 +269,7 @@ export async function renderSummary(container, params) {
             });
 
             const noteTask = noteTasks.find(t => t.file === task.file);
-            const reviewedCount = (noteTask?.findings || []).filter(f => f && (f.status === "acknowledged" || f.status === "deferred")).length;
+            const reviewedCount = (noteTask?.findings || []).filter(f => f && ["need-fix", "wont-fix", "not-an-issue", "acknowledged", "deferred"].includes(f.status)).length;
             let reviewStatus = "none";
             if (totalFindings > 0) {
               if (reviewedCount === 0) reviewStatus = "unreviewed";

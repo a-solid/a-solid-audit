@@ -82,26 +82,35 @@ export function renderTaskDetail(task, notes) {
           <div class="space-y-3">
             ${findings.map((f, i) => {
               const status = noteTask?.findings?.[i]?.status || null;
-              const isConfirmed = status === "acknowledged";
-              const isDismissed = status === "deferred";
-              const isUnreviewed = !status;
+              // Support legacy values (acknowledged→wont-fix, deferred→need-fix) and new values
+              const normalizedStatus = status === "acknowledged" ? "wont-fix"
+                : status === "deferred" ? "need-fix"
+                : status;
+              const isNeedFix = normalizedStatus === "need-fix";
+              const isWontFix = normalizedStatus === "wont-fix";
+              const isNotAnIssue = normalizedStatus === "not-an-issue";
+              const isReviewed = isNeedFix || isWontFix || isNotAnIssue;
+              const isUnreviewed = !normalizedStatus;
               const reason = noteTask?.findings?.[i]?.reason || "";
 
+              const statusBadge = isNeedFix ? `<span class="badge badge-need-fix">${icon("alertCircle", 10)} Need Fix</span>`
+                : isWontFix ? `<span class="badge badge-wont-fix"${reason ? ` title="${escapeHtml(reason)}"` : ""}>${icon("minus", 10)} Won't Fix${reason ? ": " + escapeHtml(reason.length > 25 ? reason.slice(0, 25) + "..." : reason) : ""}</span>`
+                : isNotAnIssue ? `<span class="badge badge-not-an-issue"${reason ? ` title="${escapeHtml(reason)}"` : ""}>${icon("x", 10)} Not an Issue${reason ? ": " + escapeHtml(reason.length > 25 ? reason.slice(0, 25) + "..." : reason) : ""}</span>`
+                : `<span class="badge" style="background:transparent;color:var(--text-muted);border:1px dashed var(--border)">Pending</span>`;
+
               return `
-              <div class="finding-card severity-${f.severity}${isConfirmed ? " confirmed" : ""}${isDismissed ? " dismissed" : ""}" data-finding="${i}">
+              <div class="finding-card severity-${f.severity}${isReviewed ? " reviewed" : ""}" data-finding="${i}">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center gap-2">
                     <span class="badge severity-${f.severity}">${getSeverityIcon(f.severity)} ${f.severity}</span>
-                    ${isConfirmed ? `<span class="badge" style="background:var(--accent-dim);color:var(--accent)">${icon("check", 10)} Acknowledged</span>` : ""}
-                    ${isDismissed ? `<span class="badge dismiss-reason-badge"${reason ? ` title="${escapeHtml(reason)}"` : ""} style="background:var(--warning-dim);color:var(--warning)">${icon("x", 10)} Deferred${reason ? ": " + escapeHtml(reason.length > 25 ? reason.slice(0, 25) + "..." : reason) : ""}</span>` : ""}
-                    ${isUnreviewed ? `<span class="badge" style="background:transparent;color:var(--text-muted);border:1px dashed var(--border)">Pending</span>` : ""}
+                    ${statusBadge}
                   </div>
-                  ${(isConfirmed || isDismissed) ? `<button class="btn-revert" data-revert="${i}" title="Revert to pending">${icon("undo2", 12)} Revert</button>` : ""}
+                  ${isReviewed ? `<button class="btn-revert" data-revert="${i}" title="Revert to pending">${icon("undo2", 12)} Revert</button>` : ""}
                 </div>
                 <div class="text-sm" style="margin-top:var(--space-2)">${escapeHtml(f.description || "")}</div>
                 <div class="dismiss-panel hidden" data-dismiss-panel="${i}">
                   <div class="dismiss-reasons">
-                    ${["False positive", "Acceptable risk", "Out of scope", "Already addressed", "Intentional design"].map(r =>
+                    ${["Intentional design", "Acceptable risk", "Low priority", "Already addressed"].map(r =>
                       `<button class="dismiss-reason-btn" data-reason="${r}">${escapeHtml(r)}</button>`
                     ).join("")}
                   </div>
@@ -110,10 +119,22 @@ export function renderTaskDetail(task, notes) {
                     <button class="btn btn-sm btn-primary dismiss-submit-btn" data-dismiss-submit="${i}">Submit</button>
                   </div>
                 </div>
+                <div class="dismiss-panel hidden" data-not-issue-panel="${i}">
+                  <div class="dismiss-reasons">
+                    ${["AI misunderstood context", "Not applicable", "Already handled elsewhere", "Feature, not a bug"].map(r =>
+                      `<button class="not-issue-reason-btn" data-reason="${r}">${escapeHtml(r)}</button>`
+                    ).join("")}
+                  </div>
+                  <div class="flex gap-2 mt-2">
+                    <input class="dismiss-custom-input" placeholder="Other reason..." data-not-issue-custom="${i}">
+                    <button class="btn btn-sm btn-primary not-issue-submit-btn" data-not-issue-submit="${i}">Submit</button>
+                  </div>
+                </div>
                 ${isUnreviewed ? `
                   <div class="finding-action-bar">
-                    <button class="btn-acknowledge" data-ack="${i}" title="Acknowledge finding">${icon("check", 14)} Acknowledge</button>
-                    <button class="btn-defer-action" data-defer="${i}" title="Defer finding">${icon("x", 14)} Defer</button>
+                    <button class="btn-need-fix" data-need-fix="${i}" title="Mark as needing a fix">${icon("alertCircle", 14)} Need Fix</button>
+                    <button class="btn-wont-fix" data-wont-fix="${i}" title="Accept, won't fix">${icon("minus", 14)} Won't Fix</button>
+                    <button class="btn-not-an-issue" data-not-issue="${i}" title="Not a real issue">${icon("x", 14)} Not an Issue</button>
                   </div>
                 ` : ""}
                 ${(f.code || f.suggestion) ? `

@@ -65,17 +65,23 @@ export async function renderReview(container, params) {
       noteTask.findings = noteFindings;
       const desc = task.review?.findings?.[findingIdx]?.description || "";
       const snippet = desc.length > 60 ? desc.slice(0, 60) + "..." : desc;
-      const statusLabel = status === "acknowledged"
-        ? "Acknowledged"
+      const statusLabel = status === "need-fix"
+        ? "Need Fix"
+        : status === "wont-fix"
+        ? "Won't Fix"
+        : status === "not-an-issue"
+        ? "Not an Issue"
+        : status === "acknowledged"
+        ? "Won't Fix"
         : status === "deferred"
-        ? "Deferred"
+        ? "Need Fix"
         : "Reverted";
       showToast(`${statusLabel}: ${snippet}`, "success");
       // Brief visual transition before re-render
       const findingCard = document.querySelector(`[data-finding="${findingIdx}"]`);
       if (findingCard) {
         findingCard.style.transition = "opacity 200ms ease-out";
-        findingCard.style.opacity = status === "acknowledged" ? "0.6" : status === "deferred" ? "0.3" : "0.6";
+        findingCard.style.opacity = status === "need-fix" || status === "deferred" ? "1" : "0.6";
       }
       preserveDetailScroll = true;
       requestAnimationFrame(() => {
@@ -101,7 +107,7 @@ export async function renderReview(container, params) {
       if (existing) return existing;
       if (LOW_SEVS.includes(f.severity)) {
         changed = true;
-        return { status: "acknowledged", reason: "" };
+        return { status: "wont-fix", reason: "Auto-marked: low severity" };
       }
       return null;
     });
@@ -164,8 +170,9 @@ export async function renderReview(container, params) {
 
     const maxSevCount = Math.max(...Object.values(bySeverity), 1);
 
-    let confirmed = 0;
-    let deferred = 0;
+    let needFixCount = 0;
+    let wontFixCount = 0;
+    let notAnIssueCount = 0;
     let totalFindingsFromAll = 0;
     const noteTasks = notes?.tasks || [];
     tasks.forEach(t => {
@@ -174,15 +181,19 @@ export async function renderReview(container, params) {
       const noteTask = noteTasks.find(nt => nt.file === t.file);
       (noteTask?.findings || []).forEach(f => {
         if (!f) return;
-        if (f.status === "acknowledged") confirmed++;
-        else if (f.status === "deferred") deferred++;
+        const s = f.status === "acknowledged" ? "wont-fix" : f.status === "deferred" ? "need-fix" : f.status;
+        if (s === "need-fix") needFixCount++;
+        else if (s === "wont-fix") wontFixCount++;
+        else if (s === "not-an-issue") notAnIssueCount++;
       });
     });
-    const unreviewedCount = totalFindingsFromAll - confirmed - deferred;
+    const reviewedCount = needFixCount + wontFixCount + notAnIssueCount;
+    const unreviewedCount = totalFindingsFromAll - reviewedCount;
     const findingsTotal = totalFindingsFromAll || 1;
-    const confirmPct = Math.round(confirmed / findingsTotal * 100);
-    const dismissPct = Math.round(deferred / findingsTotal * 100);
-    const unreviewedPct = 100 - confirmPct - dismissPct;
+    const needFixPct = Math.round(needFixCount / findingsTotal * 100);
+    const wontFixPct = Math.round(wontFixCount / findingsTotal * 100);
+    const notAnIssuePct = Math.round(notAnIssueCount / findingsTotal * 100);
+    const unreviewedPct = 100 - needFixPct - wontFixPct - notAnIssuePct;
 
     el.innerHTML = `
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -206,28 +217,29 @@ export async function renderReview(container, params) {
           <div class="stat-label">Total</div>
         </div>
         <div class="stat-card">
-          <div class="stat-value stat-value-success">${confirmed}</div>
-          <div class="stat-label">Acknowledged</div>
+          <div class="stat-value" style="color:var(--danger)">${needFixCount}</div>
+          <div class="stat-label">Need Fix</div>
         </div>
         <div class="stat-card">
-          <div class="stat-value stat-value-warning">${deferred}</div>
-          <div class="stat-label">Deferred</div>
+          <div class="stat-value stat-value-warning">${wontFixCount}</div>
+          <div class="stat-label">Won't Fix</div>
         </div>
         <div class="stat-card">
-          <div class="stat-value" style="color:var(--text-muted)">${unreviewedCount}</div>
-          <div class="stat-label">Pending</div>
+          <div class="stat-value" style="color:var(--info)">${notAnIssueCount}</div>
+          <div class="stat-label">Not an Issue</div>
         </div>
       </div>
 
       <div class="card mb-4">
         <div class="font-medium mb-2">Review Progress</div>
         <div class="review-progress-bar">
-          ${(confirmed > 0) ? `<div class="review-progress-seg seg-ack" style="width:${confirmPct}%"></div>` : ""}
-          ${(deferred > 0) ? `<div class="review-progress-seg seg-defer" style="width:${dismissPct}%"></div>` : ""}
+          ${(needFixCount > 0) ? `<div class="review-progress-seg seg-need-fix" style="width:${needFixPct}%"></div>` : ""}
+          ${(wontFixCount > 0) ? `<div class="review-progress-seg seg-wont-fix" style="width:${wontFixPct}%"></div>` : ""}
+          ${(notAnIssueCount > 0) ? `<div class="review-progress-seg seg-not-an-issue" style="width:${notAnIssuePct}%"></div>` : ""}
           <div class="review-progress-seg seg-pending" style="width:${unreviewedPct}%"></div>
         </div>
         <div class="review-progress-label">
-          <span>${confirmPct + dismissPct}% reviewed</span>
+          <span>${Math.round(reviewedCount / findingsTotal * 100)}% reviewed</span>
           <span>${unreviewedCount} remaining</span>
         </div>
       </div>
@@ -350,15 +362,16 @@ export async function renderReview(container, params) {
       const score = t.review?.score;
       const dotClass = score >= 7 ? "score-dot-green" : score >= 4 ? "score-dot-amber" : "score-dot-red";
       const noteTaskForSidebar = noteTasks.find(nt => nt.file === t.file);
-      const ackCount = (t.review?.findings || []).filter((f, fi) => {
-        const nf = noteTaskForSidebar?.findings?.[fi];
-        return nf?.status === "acknowledged";
-      }).length;
-      const deferCount = (t.review?.findings || []).filter((f, fi) => {
-        const nf = noteTaskForSidebar?.findings?.[fi];
-        return nf?.status === "deferred";
-      }).length;
-      const pendingCount = (t.review?.findings || []).length - ackCount - deferCount;
+      const normalizeStatus = (s) => s === "acknowledged" ? "wont-fix" : s === "deferred" ? "need-fix" : s;
+      const reviewedCounts = { "need-fix": 0, "wont-fix": 0, "not-an-issue": 0, pending: 0 };
+      (t.review?.findings || []).forEach((f, fi) => {
+        const raw = noteTaskForSidebar?.findings?.[fi]?.status;
+        const s = normalizeStatus(raw);
+        if (reviewedCounts[s] !== undefined) reviewedCounts[s]++;
+        else reviewedCounts.pending++;
+      });
+      const humanDone = reviewedCounts["need-fix"] + reviewedCounts["wont-fix"] + reviewedCounts["not-an-issue"];
+      const pendingCount = reviewedCounts.pending;
       const separator = sortedIdx === reviewed.length ? `<div class="task-sidebar-separator">Pending</div>` : "";
       // Compute combined AI/Human status badge
       let statusBadge, statusBadgeClass;
@@ -369,8 +382,7 @@ export async function renderReview(container, params) {
         statusBadge = "AI Analyzing";
         statusBadgeClass = "badge-ai-analyzing";
       } else {
-        const humanDone = ackCount + deferCount;
-        const humanTotal = ackCount + deferCount + pendingCount;
+        const humanTotal = humanDone + pendingCount;
         if (humanDone === 0) {
           statusBadge = "Unreviewed";
           statusBadgeClass = "badge-unreviewed";
@@ -382,7 +394,7 @@ export async function renderReview(container, params) {
           statusBadgeClass = "badge-complete";
         }
       }
-      const humanTotal = ackCount + deferCount + pendingCount;
+      const humanTotal = humanDone + pendingCount;
       return `${separator}
         <div class="task-nav-item ${i === currentTaskIdx ? "active" : ""}" data-idx="${i}" tabindex="0" role="button" aria-label="${escapeHtml(t.name || t.file)}, score ${score ?? '-'}">
           <div class="score-dot ${score ? dotClass : ""}" style="${!score ? "background:var(--text-muted)" : ""}"></div>
@@ -390,17 +402,19 @@ export async function renderReview(container, params) {
             <div class="text-sm font-mono truncate" title="${escapeHtml(t.name || t.file)}">${escapeHtml(t.name || t.file)}</div>
             <div class="flex items-center gap-2 mt-1">
               <span class="badge ${statusBadgeClass}">${statusBadge}</span>
-              <span class="text-xs text-muted">${score ?? "-"}/10${humanTotal > 0 ? ` · ${ackCount + deferCount}/${humanTotal}` : ""}</span>
+              <span class="text-xs text-muted">${score ?? "-"}/10${humanTotal > 0 ? ` · ${humanDone}/${humanTotal}` : ""}</span>
             </div>
             ${t.status === "reviewed" ? `
             <div class="task-nav-progress-segmented">
-                ${(ackCount > 0) ? `<div class="task-nav-progress-seg seg-ack" style="flex:${ackCount}"></div>` : ""}
-                ${(deferCount > 0) ? `<div class="task-nav-progress-seg seg-defer" style="flex:${deferCount}"></div>` : ""}
+                ${(reviewedCounts["need-fix"] > 0) ? `<div class="task-nav-progress-seg seg-need-fix" style="flex:${reviewedCounts["need-fix"]}"></div>` : ""}
+                ${(reviewedCounts["wont-fix"] > 0) ? `<div class="task-nav-progress-seg seg-wont-fix" style="flex:${reviewedCounts["wont-fix"]}"></div>` : ""}
+                ${(reviewedCounts["not-an-issue"] > 0) ? `<div class="task-nav-progress-seg seg-not-an-issue" style="flex:${reviewedCounts["not-an-issue"]}"></div>` : ""}
                 ${(pendingCount > 0) ? `<div class="task-nav-progress-seg seg-pending" style="flex:${pendingCount}"></div>` : ""}
               </div>
               <div class="task-nav-progress-legend">
-                ${ackCount > 0 ? `<span style="color:var(--accent)">${ackCount} ack</span>` : ""}
-                ${deferCount > 0 ? `<span style="color:var(--warning)">${deferCount} defer</span>` : ""}
+                ${reviewedCounts["need-fix"] > 0 ? `<span style="color:var(--danger)">${reviewedCounts["need-fix"]} fix</span>` : ""}
+                ${reviewedCounts["wont-fix"] > 0 ? `<span style="color:var(--warning)">${reviewedCounts["wont-fix"]} skip</span>` : ""}
+                ${reviewedCounts["not-an-issue"] > 0 ? `<span style="color:var(--info)">${reviewedCounts["not-an-issue"]} N/A</span>` : ""}
                 ${pendingCount > 0 ? `<span>${pendingCount} pending</span>` : ""}
               </div>
             ` : ""}
@@ -446,21 +460,33 @@ export async function renderReview(container, params) {
     detailPanel.scrollTop = preserveDetailScroll ? savedDetailScroll : 0;
     preserveDetailScroll = false;
 
-    // Wire up acknowledge buttons
-    detailPanel.querySelectorAll(".btn-acknowledge").forEach(btn => {
+    // Wire up Need Fix buttons
+    detailPanel.querySelectorAll(".btn-need-fix").forEach(btn => {
       btn.addEventListener("click", async () => {
-        const idx = parseInt(btn.dataset.ack);
-        await updateFindingStatus(sessionId, tasks[currentTaskIdx], idx, "acknowledged", "");
+        const idx = parseInt(btn.dataset.needFix);
+        await updateFindingStatus(sessionId, tasks[currentTaskIdx], idx, "need-fix", "");
       });
     });
-    // Wire up defer buttons (toggle dismiss panel)
-    detailPanel.querySelectorAll(".btn-defer-action").forEach(btn => {
+    // Wire up Won't Fix buttons (toggle dismiss panel)
+    detailPanel.querySelectorAll(".btn-wont-fix").forEach(btn => {
       btn.addEventListener("click", () => {
-        const idx = btn.dataset.defer;
-        detailPanel.querySelectorAll(".dismiss-panel").forEach(p => {
-          if (p.dataset.dismissPanel !== idx) p.classList.add("hidden");
-        });
+        const idx = btn.dataset.wontFix;
+        detailPanel.querySelectorAll(".dismiss-panel").forEach(p => p.classList.add("hidden"));
         const panel = detailPanel.querySelector(`[data-dismiss-panel="${idx}"]`);
+        panel.classList.toggle("hidden");
+        if (!panel.classList.contains("hidden")) {
+          requestAnimationFrame(() => {
+            panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          });
+        }
+      });
+    });
+    // Wire up Not an Issue buttons (toggle not-issue panel)
+    detailPanel.querySelectorAll(".btn-not-an-issue").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const idx = btn.dataset.notIssue;
+        detailPanel.querySelectorAll(".dismiss-panel").forEach(p => p.classList.add("hidden"));
+        const panel = detailPanel.querySelector(`[data-not-issue-panel="${idx}"]`);
         panel.classList.toggle("hidden");
         if (!panel.classList.contains("hidden")) {
           requestAnimationFrame(() => {
@@ -476,16 +502,16 @@ export async function renderReview(container, params) {
         await updateFindingStatus(sessionId, tasks[currentTaskIdx], idx, null, "");
       });
     });
-    // Dismiss reason buttons
+    // Won't Fix reason buttons
     detailPanel.querySelectorAll(".dismiss-reason-btn").forEach(btn => {
       btn.addEventListener("click", async (e) => {
         e.stopPropagation();
         const idx = parseInt(btn.closest("[data-dismiss-panel]").dataset.dismissPanel);
         const reason = btn.dataset.reason;
-        await updateFindingStatus(sessionId, tasks[currentTaskIdx], idx, "deferred", reason);
+        await updateFindingStatus(sessionId, tasks[currentTaskIdx], idx, "wont-fix", reason);
       });
     });
-    // Dismiss custom submit
+    // Won't Fix custom submit
     detailPanel.querySelectorAll(".dismiss-submit-btn").forEach(btn => {
       btn.addEventListener("click", async (e) => {
         e.stopPropagation();
@@ -493,7 +519,27 @@ export async function renderReview(container, params) {
         const input = detailPanel.querySelector(`[data-dismiss-custom="${idx}"]`);
         const reason = input?.value?.trim();
         if (!reason) { showToast("Enter a reason"); return; }
-        await updateFindingStatus(sessionId, tasks[currentTaskIdx], idx, "deferred", reason);
+        await updateFindingStatus(sessionId, tasks[currentTaskIdx], idx, "wont-fix", reason);
+      });
+    });
+    // Not an Issue reason buttons
+    detailPanel.querySelectorAll(".not-issue-reason-btn").forEach(btn => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.closest("[data-not-issue-panel]").dataset.notIssuePanel);
+        const reason = btn.dataset.reason;
+        await updateFindingStatus(sessionId, tasks[currentTaskIdx], idx, "not-an-issue", reason);
+      });
+    });
+    // Not an Issue custom submit
+    detailPanel.querySelectorAll(".not-issue-submit-btn").forEach(btn => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.dataset.notIssueSubmit);
+        const input = detailPanel.querySelector(`[data-not-issue-custom="${idx}"]`);
+        const reason = input?.value?.trim();
+        if (!reason) { showToast("Enter a reason"); return; }
+        await updateFindingStatus(sessionId, tasks[currentTaskIdx], idx, "not-an-issue", reason);
       });
     });
     // Prevent dismiss custom input clicks from bubbling

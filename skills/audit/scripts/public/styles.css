@@ -164,7 +164,7 @@
 [data-theme="light"] .sev-count-major { color: #b91c1c; background: rgba(239, 68, 68, 0.08); }
 [data-theme="light"] .sev-count-minor { color: #92400e; background: rgba(245, 158, 11, 0.1); }
 [data-theme="light"] .sev-count-info { color: #1e40af; background: rgba(59, 130, 246, 0.1); }
-[data-theme="light"] .finding-card.confirmed { background: linear-gradient(135deg, rgba(22,163,74,0.08), var(--bg-surface)); }
+[data-theme="light"] .finding-card.reviewed { background: linear-gradient(135deg, rgba(22,163,74,0.08), var(--bg-surface)); }
 [data-theme="light"] * { scrollbar-color: rgba(0, 0, 0, 0.2) transparent; }
 [data-theme="light"] ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.2); }
 [data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.35); }
@@ -787,8 +787,9 @@ img, svg { display: block; }
   border-radius: 1px;
   transition: flex var(--duration-base) var(--ease-spring);
 }
-.task-nav-progress-seg.seg-ack { background: var(--accent); }
-.task-nav-progress-seg.seg-defer { background: var(--warning); }
+.task-nav-progress-seg.seg-need-fix { background: #ef4444; }
+.task-nav-progress-seg.seg-wont-fix { background: var(--warning); }
+.task-nav-progress-seg.seg-not-an-issue { background: var(--info); }
 .task-nav-progress-seg.seg-pending { background: var(--border); }
 .task-nav-progress-legend {
   display: flex;
@@ -838,8 +839,9 @@ img, svg { display: block; }
   height: 100%;
   transition: width var(--duration-base) var(--ease-spring);
 }
-.review-progress-seg.seg-ack { background: var(--accent); }
-.review-progress-seg.seg-defer { background: var(--warning); }
+.review-progress-seg.seg-need-fix { background: #ef4444; }
+.review-progress-seg.seg-wont-fix { background: var(--warning); }
+.review-progress-seg.seg-not-an-issue { background: var(--info); }
 .review-progress-seg.seg-pending { background: var(--border); }
 .review-progress-label {
   display: flex;
@@ -1170,12 +1172,11 @@ code {
 .finding-card.severity-medium { background: linear-gradient(135deg, var(--warning-dim), var(--bg-surface)); }
 .finding-card.severity-info,
 .finding-card.severity-low { background: linear-gradient(135deg, var(--info-dim), var(--bg-surface)); }
-.finding-card.confirmed {
-  background: linear-gradient(135deg, var(--success-dim), var(--bg-surface));
-  border-color: var(--accent);
-  border-left-color: var(--accent);
-}
-.finding-card.dismissed { opacity: 0.7; }
+.finding-card.reviewed { opacity: 0.85; }
+/* ─── Finding Status Badges ─── */
+.badge-need-fix { background: rgba(239, 68, 68, 0.12); color: #ef4444; }
+.badge-wont-fix { background: var(--warning-dim); color: var(--warning); }
+.badge-not-an-issue { background: var(--info-dim); color: var(--info); }
 /* ─── Finding Card Action Bar ─── */
 .finding-action-bar {
   display: flex;
@@ -1184,13 +1185,13 @@ code {
   margin-top: var(--space-2);
   border-top: 1px solid var(--border);
 }
-.btn-acknowledge {
+.btn-need-fix {
   flex: 1;
   height: 36px;
-  border: 1px solid var(--accent);
+  border: 1px solid rgba(239, 68, 68, 0.4);
   border-radius: var(--radius-md);
-  background: var(--accent-dim);
-  color: var(--accent);
+  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
   font-size: var(--text-sm);
   font-weight: 500;
   font-family: var(--font-ui);
@@ -1204,16 +1205,11 @@ code {
   min-height: 36px;
   min-width: 44px;
 }
-.btn-acknowledge:hover {
-  background: var(--accent);
-  color: var(--bg-base);
-}
-.btn-acknowledge:active {
-  opacity: 0.8;
-}
-.btn-defer-action {
+.btn-need-fix:hover { background: rgba(239, 68, 68, 0.2); }
+.btn-need-fix:active { opacity: 0.8; }
+.btn-wont-fix {
+  flex: 1;
   height: 36px;
-  padding: 0 var(--space-4);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: transparent;
@@ -1227,16 +1223,34 @@ code {
   justify-content: center;
   gap: var(--space-1);
   transition: background var(--duration-fast), border-color var(--duration-fast);
+  padding: 0 var(--space-3);
   min-height: 36px;
   min-width: 44px;
 }
-.btn-defer-action:hover {
-  border-color: var(--warning);
-  background: var(--warning-dim);
+.btn-wont-fix:hover { border-color: var(--warning); background: var(--warning-dim); }
+.btn-wont-fix:active { opacity: 0.8; }
+.btn-not-an-issue {
+  flex: 1;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--info);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  transition: background var(--duration-fast), border-color var(--duration-fast);
+  padding: 0 var(--space-3);
+  min-height: 36px;
+  min-width: 44px;
 }
-.btn-defer-action:active {
-  opacity: 0.8;
-}
+.btn-not-an-issue:hover { border-color: var(--info); background: var(--info-dim); }
+.btn-not-an-issue:active { opacity: 0.8; }
 /* ─── Finding Card Revert ─── */
 .btn-revert {
   padding: 2px 8px;
@@ -1338,8 +1352,7 @@ code {
 }
 @media (prefers-reduced-motion: reduce) {
   .finding-card,
-  .finding-card.confirmed,
-  .finding-card.dismissed {
+  .finding-card.reviewed {
     transition: none;
   }
 }
@@ -1483,7 +1496,7 @@ code {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  min-height: 480px;
+  height: calc(100vh - 160px);
   background: var(--bg-surface-solid);
 }
 .sidebar-panel {
@@ -1841,8 +1854,9 @@ code {
   }
   .stat-card { page-break-inside: avoid; }
   .severity-bar-row { page-break-inside: avoid; }
-  .print-badge-confirmed { color: #166534; border-color: #86efac; background: #f0fdf4; }
-  .print-badge-dismissed { color: #92400e; border-color: #fcd34d; background: #fffbeb; }
+  .print-badge-need-fix { color: #991b1b; border-color: #fca5a5; background: #fef2f2; }
+  .print-badge-wont-fix { color: #92400e; border-color: #fcd34d; background: #fffbeb; }
+  .print-badge-not-an-issue { color: #1e40af; border-color: #93c5fd; background: #eff6ff; }
   .print-badge-unreviewed { color: #6b7280; border-color: #d1d5db; background: #f9fafb; }
 
   /* Print/PDF utility overrides */

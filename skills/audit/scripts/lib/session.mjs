@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { readYaml, writeIndexYaml, patchYaml } from "./yaml.mjs";
+import { AppError } from "./errors.mjs";
 
 const VALID_STATUSES = ["created", "scanned", "ready", "scanning", "grouping", "reviewing", "completed"];
 
@@ -32,7 +33,7 @@ const TRANSITIONS = {
 export function sanitizePath(segment) {
   const s = String(segment);
   if (s.includes("..") || s.includes("/") || s.includes("\\") || s.includes("\0")) {
-    throw new Error("Invalid path segment: " + s);
+    throw new AppError("Invalid path segment: " + s, "VALIDATION_ERROR", 400);
   }
   return s;
 }
@@ -40,7 +41,7 @@ export function sanitizePath(segment) {
 export function sanitizeFilePath(segment) {
   const s = String(segment);
   if (s.includes("..") || s.includes("\\") || s.includes("\0") || path.isAbsolute(s)) {
-    throw new Error("Invalid file path: " + s);
+    throw new AppError("Invalid file path: " + s, "VALIDATION_ERROR", 400);
   }
   return s;
 }
@@ -104,11 +105,11 @@ export function getSession(reportsDir, sid) {
 // Update session status with type-aware state machine validation
 export function updateSessionStatus(reportsDir, sid, newStatus) {
   if (!VALID_STATUSES.includes(newStatus)) {
-    throw new Error("Invalid status: " + newStatus);
+    throw new AppError("Invalid status: " + newStatus, "VALIDATION_ERROR", 400);
   }
   const safeSid = sanitizePath(sid);
   const indexPath = path.join(reportsDir, safeSid, "index.yaml");
-  if (!fs.existsSync(indexPath)) throw new Error("Session not found: " + safeSid);
+  if (!fs.existsSync(indexPath)) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
   const index = readYaml(indexPath);
   const current = index.session.status || "created";
   const type = index.session.type || "code";
@@ -116,7 +117,7 @@ export function updateSessionStatus(reportsDir, sid, newStatus) {
   const transitions = TRANSITIONS[type] || TRANSITIONS.code;
   const allowed = transitions[current] || [];
   if (!allowed.includes(newStatus)) {
-    throw new Error(`Cannot transition from "${current}" to "${newStatus}" (type: ${type}). Allowed: ${allowed.join(", ") || "none"}`);
+    throw new AppError(`Cannot transition from "${current}" to "${newStatus}" (type: ${type}). Allowed: ${allowed.join(", ") || "none"}`, "CONFLICT", 409);
   }
 
   index.session.status = newStatus;
@@ -129,7 +130,7 @@ const MUTABLE_FIELDS = ["projectDir"];
 export function updateSession(reportsDir, sid, updates) {
   const safeSid = sanitizePath(sid);
   const indexPath = path.join(reportsDir, safeSid, "index.yaml");
-  if (!fs.existsSync(indexPath)) throw new Error("Session not found: " + safeSid);
+  if (!fs.existsSync(indexPath)) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
   const index = readYaml(indexPath);
   for (const key of MUTABLE_FIELDS) {
     if (key in updates) {
@@ -181,7 +182,7 @@ export function resetReviewing(reportsDir, sid) {
   const safeSid = sanitizePath(sid);
   const sessionDir = path.join(reportsDir, safeSid);
   const indexPath = path.join(sessionDir, "index.yaml");
-  if (!fs.existsSync(indexPath)) throw new Error("Session not found: " + safeSid);
+  if (!fs.existsSync(indexPath)) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
 
   const index = readYaml(indexPath);
   let resetCount = 0;

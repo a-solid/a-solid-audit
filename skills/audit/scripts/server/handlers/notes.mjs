@@ -28,7 +28,6 @@ export function registerNoteRoutes(router, reportsDir) {
       }
       jsonResponse(res, readNotes(sessionDir));
     } catch (e) {
-      if (e.message.includes("Invalid path")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
       throw e;
     }
   });
@@ -72,7 +71,6 @@ export function registerNoteRoutes(router, reportsDir) {
       writeNotes(sessionDir, notes);
       jsonResponse(res, { ok: true });
     } catch (e) {
-      if (e.message.includes("Invalid path")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
       throw e;
     }
   });
@@ -103,7 +101,6 @@ export function registerNoteRoutes(router, reportsDir) {
       writeNotes(sessionDir, notes);
       jsonResponse(res, { ok: true });
     } catch (e) {
-      if (e.message.includes("Invalid path")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
       throw e;
     }
   });

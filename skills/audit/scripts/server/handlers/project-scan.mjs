@@ -48,8 +48,6 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
 
       jsonResponse(res, { ok: true, ...result });
     } catch (e) {
-      if (e.message.includes("not found")) return errorResponse(res, e.message, "NOT_FOUND", 404);
-      if (e.message.includes("Invalid path")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
       throw e;
     }
   });
@@ -92,7 +90,6 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
         jsonResponse(res, { status: "none" });
       }
     } catch (e) {
-      if (e.message.includes("Invalid path")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
       throw e;
     }
   });
@@ -105,7 +102,6 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
       if (!map) return errorResponse(res, "Project map not found", "NOT_FOUND", 404);
       jsonResponse(res, map);
     } catch (e) {
-      if (e.message.includes("Invalid path")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
       throw e;
     }
   });
@@ -160,7 +156,6 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
       const data = JSON.parse(fs.readFileSync(graphDataPath, "utf-8"));
       jsonResponse(res, data);
     } catch (e) {
-      if (e.message.includes("Invalid path")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
       throw e;
     }
   });
@@ -176,7 +171,6 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
       const groups = JSON.parse(fs.readFileSync(groupsPath, "utf-8"));
       jsonResponse(res, { status: "ready", groups });
     } catch (e) {
-      if (e.message.includes("Invalid path")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
       throw e;
     }
   });
@@ -201,7 +195,6 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
       fs.writeFileSync(groupsPath, JSON.stringify(data.groups, null, 2), "utf-8");
       jsonResponse(res, { ok: true });
     } catch (e) {
-      if (e.message.includes("Invalid path")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
       throw e;
     }
   });
@@ -223,8 +216,6 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
 
       jsonResponse(res, { ok: true, ...result });
     } catch (e) {
-      if (e.message.includes("not found")) return errorResponse(res, e.message, "NOT_FOUND", 404);
-      if (e.message.includes("Invalid path")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
       throw e;
     }
   });

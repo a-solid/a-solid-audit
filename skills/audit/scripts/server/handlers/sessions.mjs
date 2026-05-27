@@ -53,7 +53,6 @@ export function registerSessionRoutes(router, reportsDir) {
       if (!session) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
       jsonResponse(res, session);
     } catch (e) {
-      if (e.message.includes("Invalid path")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
       throw e;
     }
   });
@@ -68,9 +67,6 @@ export function registerSessionRoutes(router, reportsDir) {
       const session = updateSessionStatus(reportsDir, params.id, body.status);
       jsonResponse(res, session);
     } catch (e) {
-      if (e.message.includes("Cannot transition")) return errorResponse(res, e.message, "CONFLICT", 409);
-      if (e.message.includes("Invalid status")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
-      if (e.message.includes("not found")) return errorResponse(res, e.message, "NOT_FOUND", 404);
       throw e;
     }
   });
@@ -85,7 +81,6 @@ export function registerSessionRoutes(router, reportsDir) {
       const session = updateSession(reportsDir, params.id, body);
       jsonResponse(res, session);
     } catch (e) {
-      if (e.message.includes("not found")) return errorResponse(res, e.message, "NOT_FOUND", 404);
       throw e;
     }
   });
@@ -101,7 +96,6 @@ export function registerSessionRoutes(router, reportsDir) {
       const context = readContextFile(sessionDir);
       jsonResponse(res, { context });
     } catch (e) {
-      if (e.message.includes("Invalid path")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
       throw e;
     }
   });
@@ -121,7 +115,6 @@ export function registerSessionRoutes(router, reportsDir) {
       writeContextFile(sessionDir, body.context);
       jsonResponse(res, { ok: true });
     } catch (e) {
-      if (e.message.includes("Invalid path")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
       throw e;
     }
   });
@@ -159,7 +152,6 @@ export function registerSessionRoutes(router, reportsDir) {
       fs.writeFileSync(contextPath, content, "utf-8");
       jsonResponse(res, { ok: true });
     } catch (e) {
-      if (e.message.includes("Invalid path")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
       throw e;
     }
   });

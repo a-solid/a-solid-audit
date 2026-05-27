@@ -63,7 +63,6 @@ export function registerStoryRoutes(router, reportsDir) {
       }
       jsonResponse(res, stories);
     } catch (e) {
-      if (e.message.includes("Invalid path")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
       throw e;
     }
   });
@@ -110,7 +109,6 @@ export function registerStoryRoutes(router, reportsDir) {
 
       jsonResponse(res, { file: storyFile, name: safeName }, 201);
     } catch (e) {
-      if (e.message.includes("Invalid path")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
       throw e;
     }
   });
@@ -137,7 +135,6 @@ export function registerStoryRoutes(router, reportsDir) {
 
       jsonResponse(res, { ok: true });
     } catch (e) {
-      if (e.message.includes("Invalid path")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
       throw e;
     }
   });
@@ -178,7 +175,6 @@ export function registerStoryRoutes(router, reportsDir) {
 
       jsonResponse(res, { ok: true });
     } catch (e) {
-      if (e.message.includes("Invalid path")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
       throw e;
     }
   });

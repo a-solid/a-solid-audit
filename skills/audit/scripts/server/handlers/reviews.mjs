@@ -59,10 +59,6 @@ export function registerReviewRoutes(router, reportsDir) {
       const index = readYaml(path.join(sessionDir, "index.yaml"));
       jsonResponse(res, { ok: true, file: result.file, status: result.status, sessionStatus: index.session.status });
     } catch (e) {
-      if (e.message.includes("Cannot transition")) return errorResponse(res, e.message, "CONFLICT", 409);
-      if (e.message.includes("not found")) return errorResponse(res, e.message, "NOT_FOUND", 404);
-      if (e.message.includes("Invalid status")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
-      if (e.message.includes("Invalid path")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
       throw e;
     }
   });

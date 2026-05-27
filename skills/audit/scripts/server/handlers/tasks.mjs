@@ -16,8 +16,6 @@ export function registerTaskRoutes(router, reportsDir) {
       const tasks = getTasks(reportsDir, params.id);
       jsonResponse(res, tasks);
     } catch (e) {
-      if (e.message.includes("not found")) return errorResponse(res, e.message, "NOT_FOUND", 404);
-      if (e.message.includes("Invalid path")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);
       throw e;
     }
   });

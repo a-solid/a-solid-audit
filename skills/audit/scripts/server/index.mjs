@@ -12,6 +12,7 @@ import { registerNoteRoutes } from "./handlers/notes.mjs";
 import { registerReviewRoutes } from "./handlers/reviews.mjs";
 import { registerProjectScanRoutes } from "./handlers/project-scan.mjs";
 import { registerSettingsRoutes } from "./handlers/settings.mjs";
+import { AppError } from "../lib/errors.mjs";
 
 export function jsonResponse(res, data, status = 200) {
   res.writeHead(status, { "Content-Type": "application/json" });
@@ -27,9 +28,12 @@ export function readBody(req, maxBytes = 1024 * 1024) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     let size = 0;
+    let destroyed = false;
     req.on("data", (c) => {
+      if (destroyed) return;
       size += c.length;
       if (size > maxBytes) {
+        destroyed = true;
         req.destroy();
         reject(new Error("Request body too large"));
         return;
@@ -62,6 +66,7 @@ export function startServer(projectDir, port = 3456) {
       try {
         return match.handler(req, res, match.params, url.searchParams);
       } catch (e) {
+        if (e instanceof AppError) return errorResponse(res, e.message, e.code, e.status);
         if (e instanceof SyntaxError) {
           return errorResponse(res, "Invalid JSON", "PARSE_ERROR", 400);
         }

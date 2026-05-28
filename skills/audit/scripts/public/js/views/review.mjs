@@ -53,6 +53,8 @@ export async function renderReview(container, params) {
     return;
   }
 
+  await autoPersistWellDone();
+
   async function updateFindingStatus(sid, task, findingIdx, status, reason) {
     const findingsCount = (task.review?.findings || []).length;
     const noteFindings = Array.from({ length: findingsCount }, (_, i) => {
@@ -96,6 +98,33 @@ export async function renderReview(container, params) {
     }
   }
 
+
+
+  async function autoPersistWellDone() {
+    for (const task of tasks) {
+      const findings = task.review?.findings || [];
+      if (findings.length === 0) continue;
+      const noteTask = notes?.tasks?.find(nt => nt.file === task.file);
+      const noteFindings = noteTask?.findings || [];
+      let changed = false;
+      for (let i = 0; i < findings.length; i++) {
+        if (findings[i].severity === "met" && !noteFindings[i]?.status) {
+          noteFindings[i] = { status: "well-done" };
+          changed = true;
+        }
+      }
+      if (changed) {
+        await api.updateTaskNote(sessionId, task.file, { findings: noteFindings });
+        let existing = notes.tasks.find(nt => nt.file === task.file);
+        if (!existing) {
+          existing = { file: task.file, findings: noteFindings };
+          notes.tasks.push(existing);
+        } else {
+          existing.findings = noteFindings;
+        }
+      }
+    }
+  }
 
   async function autoAcknowledgeLowSeverity(task) {
     const taskFindings = task.review?.findings || [];
@@ -159,7 +188,7 @@ export async function renderReview(container, params) {
         </div>`;
       return;
     }
-    const { totalFindings, bySeverity, needFix: needFixCount, wontFix: wontFixCount, notAnIssue: notAnIssueCount, reviewed: reviewedCount, pendingCount: unreviewedCount } = aggregateFindings(tasks, notes);
+    const { totalFindings, bySeverity, needFix: needFixCount, wontFix: wontFixCount, notAnIssue: notAnIssueCount, wellDone: wellDoneCount, reviewed: reviewedCount, pendingCount: unreviewedCount } = aggregateFindings(tasks, notes);
     const avgScore = tasks.length
       ? Math.round(tasks.reduce((s, t) => s + (t.review?.score || 0), 0) / tasks.length)
       : 0;
@@ -169,7 +198,8 @@ export async function renderReview(container, params) {
     const needFixPct = Math.round(needFixCount / findingsTotal * 100);
     const wontFixPct = Math.round(wontFixCount / findingsTotal * 100);
     const notAnIssuePct = Math.round(notAnIssueCount / findingsTotal * 100);
-    const unreviewedPct = 100 - needFixPct - wontFixPct - notAnIssuePct;
+    const wellDonePct = Math.round(wellDoneCount / findingsTotal * 100);
+    const unreviewedPct = 100 - needFixPct - wontFixPct - notAnIssuePct - wellDonePct;
 
     el.innerHTML = `
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -187,7 +217,7 @@ export async function renderReview(container, params) {
         </div>
       </div>
 
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
         <div class="stat-card">
           <div class="stat-value">${totalFindings}</div>
           <div class="stat-label">Total</div>
@@ -204,6 +234,10 @@ export async function renderReview(container, params) {
           <div class="stat-value" style="color:var(--info)">${notAnIssueCount}</div>
           <div class="stat-label">Not an Issue</div>
         </div>
+        <div class="stat-card">
+          <div class="stat-value" style="color:var(--accent)">${wellDoneCount}</div>
+          <div class="stat-label">Well Done</div>
+        </div>
       </div>
 
       <div class="card mb-4">
@@ -212,6 +246,7 @@ export async function renderReview(container, params) {
           ${(needFixCount > 0) ? `<div class="review-progress-seg seg-need-fix" style="width:${needFixPct}%"></div>` : ""}
           ${(wontFixCount > 0) ? `<div class="review-progress-seg seg-wont-fix" style="width:${wontFixPct}%"></div>` : ""}
           ${(notAnIssueCount > 0) ? `<div class="review-progress-seg seg-not-an-issue" style="width:${notAnIssuePct}%"></div>` : ""}
+          ${(wellDoneCount > 0) ? `<div class="review-progress-seg seg-well-done" style="width:${wellDonePct}%"></div>` : ""}
           <div class="review-progress-seg seg-pending" style="width:${unreviewedPct}%"></div>
         </div>
         <div class="review-progress-label">
@@ -338,13 +373,13 @@ export async function renderReview(container, params) {
       const score = t.review?.score;
       const dotClass = score >= 7 ? "score-dot-green" : score >= 4 ? "score-dot-amber" : "score-dot-red";
       const noteTaskForSidebar = noteTasks.find(nt => nt.file === t.file);
-      const reviewedCounts = { "need-fix": 0, "wont-fix": 0, "not-an-issue": 0, pending: 0 };
+      const reviewedCounts = { "need-fix": 0, "wont-fix": 0, "not-an-issue": 0, "well-done": 0, pending: 0 };
       (t.review?.findings || []).forEach((f, fi) => {
-        const s = noteTaskForSidebar?.findings?.[fi]?.status;
-        if (reviewedCounts[s] !== undefined) reviewedCounts[s]++;
+        const s = noteTaskForSidebar?.findings?.[fi]?.status || (f.severity === "met" ? "well-done" : null);
+        if (s && reviewedCounts[s] !== undefined) reviewedCounts[s]++;
         else reviewedCounts.pending++;
       });
-      const humanDone = reviewedCounts["need-fix"] + reviewedCounts["wont-fix"] + reviewedCounts["not-an-issue"];
+      const humanDone = reviewedCounts["need-fix"] + reviewedCounts["wont-fix"] + reviewedCounts["not-an-issue"] + reviewedCounts["well-done"];
       const pendingCount = reviewedCounts.pending;
       const separator = sortedIdx === reviewed.length ? `<div class="task-sidebar-separator">Pending</div>` : "";
       // Compute combined AI/Human status badge
@@ -357,7 +392,10 @@ export async function renderReview(container, params) {
         statusBadgeClass = "badge-ai-analyzing";
       } else {
         const humanTotal = humanDone + pendingCount;
-        if (humanDone === 0) {
+        if (humanTotal === 0) {
+          statusBadge = "Complete";
+          statusBadgeClass = "badge-complete";
+        } else if (humanDone === 0) {
           statusBadge = "Unreviewed";
           statusBadgeClass = "badge-unreviewed";
         } else if (humanDone < humanTotal) {
@@ -383,12 +421,14 @@ export async function renderReview(container, params) {
                 ${(reviewedCounts["need-fix"] > 0) ? `<div class="task-nav-progress-seg seg-need-fix" style="flex:${reviewedCounts["need-fix"]}"></div>` : ""}
                 ${(reviewedCounts["wont-fix"] > 0) ? `<div class="task-nav-progress-seg seg-wont-fix" style="flex:${reviewedCounts["wont-fix"]}"></div>` : ""}
                 ${(reviewedCounts["not-an-issue"] > 0) ? `<div class="task-nav-progress-seg seg-not-an-issue" style="flex:${reviewedCounts["not-an-issue"]}"></div>` : ""}
+                ${(reviewedCounts["well-done"] > 0) ? `<div class="task-nav-progress-seg seg-well-done" style="flex:${reviewedCounts["well-done"]}"></div>` : ""}
                 ${(pendingCount > 0) ? `<div class="task-nav-progress-seg seg-pending" style="flex:${pendingCount}"></div>` : ""}
               </div>
               <div class="task-nav-progress-legend">
                 ${reviewedCounts["need-fix"] > 0 ? `<span style="color:var(--danger)">${reviewedCounts["need-fix"]} fix</span>` : ""}
                 ${reviewedCounts["wont-fix"] > 0 ? `<span style="color:var(--warning)">${reviewedCounts["wont-fix"]} skip</span>` : ""}
                 ${reviewedCounts["not-an-issue"] > 0 ? `<span style="color:var(--info)">${reviewedCounts["not-an-issue"]} N/A</span>` : ""}
+                ${reviewedCounts["well-done"] > 0 ? `<span style="color:var(--accent)">${reviewedCounts["well-done"]} done</span>` : ""}
                 ${pendingCount > 0 ? `<span>${pendingCount} pending</span>` : ""}
               </div>
             ` : ""}

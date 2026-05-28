@@ -52,8 +52,8 @@ curl -s -X POST http://localhost:3456/api/sessions/<session-id>/tasks/review \
 
 ### Score Guide
 
-- **0-2:** Severe, systemic problems — critical security vulnerabilities or data loss
-- **3-4:** Critical issues — exploitable security vulnerability or major logic bugs
+- **0-2:** Severe, systemic problems — multiple critical vulnerabilities or fundamental design flaws
+- **3-4:** Critical issue — single exploitable vulnerability or major logic bug
 - **5-6:** Significant concerns — should address before merge
 - **7-8:** Minor issues — suggestions for improvement
 - **9-10:** Clean code — excellent quality
@@ -64,13 +64,15 @@ curl -s -X POST http://localhost:3456/api/sessions/<session-id>/tasks/review \
 - **Major:** Logic error, significant performance issue, missing error handling
 - **Minor:** Code style, naming, minor optimization
 - **Info:** Suggestions, alternative approaches
+- **Positive:** Good practices, well-designed patterns, clean code — use for high-quality code (score 7+)
 
 ### Field Rules
 
 - `description` is required for each finding
 - `file`, `line`, `code`, `suggestion` are optional — include when helpful
 - Provide `suggestion` for critical and major findings
-- `findings` and `positives` arrays may be empty — omit or send `[]`
+- `findings` array must contain at least one entry — include a `positive` severity finding for high-quality code (score 7+)
+- `positives` array may be empty — findings with `positive` severity serve this purpose
 
 ## Review Context File
 

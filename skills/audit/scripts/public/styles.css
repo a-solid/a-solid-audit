@@ -802,6 +802,7 @@ img, svg { display: block; }
 .task-nav-progress-seg.seg-wont-fix { background: var(--warning); }
 .task-nav-progress-seg.seg-not-an-issue { background: var(--info); }
 .task-nav-progress-seg.seg-pending { background: var(--border); }
+.task-nav-progress-seg.seg-well-done { background: var(--accent); }
 .task-nav-progress-legend {
   display: flex;
   gap: var(--space-2);
@@ -855,6 +856,7 @@ img, svg { display: block; }
 .review-progress-seg.seg-wont-fix { background: var(--warning); }
 .review-progress-seg.seg-not-an-issue { background: var(--info); }
 .review-progress-seg.seg-pending { background: var(--border); }
+.review-progress-seg.seg-well-done { background: var(--accent); }
 .review-progress-label {
   display: flex;
   justify-content: space-between;

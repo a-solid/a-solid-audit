@@ -26,7 +26,7 @@ export const ENTRY_TYPES = {
 
 export function aggregateFindings(tasks, notes) {
   const noteTasks = notes?.tasks || [];
-  let needFix = 0, wontFix = 0, notAnIssue = 0, pendingCount = 0;
+  let needFix = 0, wontFix = 0, notAnIssue = 0, wellDone = 0, pendingCount = 0;
   const bySeverity = {};
   let totalFindings = 0;
   tasks.forEach(t => {
@@ -41,9 +41,10 @@ export function aggregateFindings(tasks, notes) {
       if (status === "need-fix") needFix++;
       else if (status === "wont-fix") wontFix++;
       else if (status === "not-an-issue") notAnIssue++;
+      else if (status === "well-done") wellDone++;
       else pendingCount++;
     });
   });
-  const reviewed = needFix + wontFix + notAnIssue;
-  return { totalFindings, bySeverity, needFix, wontFix, notAnIssue, pendingCount, reviewed };
+  const reviewed = needFix + wontFix + notAnIssue + wellDone;
+  return { totalFindings, bySeverity, needFix, wontFix, notAnIssue, wellDone, pendingCount, reviewed };
 }

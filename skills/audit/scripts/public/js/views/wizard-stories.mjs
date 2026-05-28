@@ -3,7 +3,7 @@ import { api } from "../api.mjs";
 import { showToast, icon, escapeHtml } from "../app.mjs";
 import { renderFileTree } from "../components/file-tree.mjs";
 
-export function renderStoriesStep(content, state) {
+export async function renderStoriesStep(content, state) {
   content.innerHTML = `
     <div class="card mb-4">
       <h2 class="font-semibold mb-4">Story Collection</h2>

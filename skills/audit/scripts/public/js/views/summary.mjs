@@ -40,14 +40,14 @@ export async function renderSummary(container, params) {
     return;
   }
 
-  const { totalFindings, bySeverity, needFix: needFixCount, wontFix: wontFixCount, notAnIssue: notAnIssueCount, pendingCount: pending, reviewed: reviewedCount } = aggregateFindings(tasks, notes);
+  const { totalFindings, bySeverity, needFix: needFixCount, wontFix: wontFixCount, notAnIssue: notAnIssueCount, wellDone: wellDoneCount, pendingCount: pending, reviewed: reviewedCount } = aggregateFindings(tasks, notes);
   const noteTasks = notes?.tasks || [];
 
   const maxSevCount = Math.max(...Object.values(bySeverity), 1);
 
   const content = document.getElementById("summary-content");
   content.innerHTML = `
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
       <div class="stat-card">
         <div class="stat-value">${totalFindings}</div>
         <div class="stat-label">Total</div>
@@ -64,6 +64,10 @@ export async function renderSummary(container, params) {
         <div class="stat-value" style="color:var(--info)">${notAnIssueCount}</div>
         <div class="stat-label">Not an Issue</div>
       </div>
+      <div class="stat-card">
+        <div class="stat-value" style="color:var(--accent)">${wellDoneCount}</div>
+        <div class="stat-label">Well Done</div>
+      </div>
     </div>
 
     <div class="card mb-6">
@@ -74,8 +78,9 @@ export async function renderSummary(container, params) {
           const nPct = Math.round(needFixCount / t * 100);
           const wPct = Math.round(wontFixCount / t * 100);
           const niPct = Math.round(notAnIssueCount / t * 100);
-          const pPct = 100 - nPct - wPct - niPct;
-          return `${needFixCount > 0 ? `<div class="review-progress-seg seg-need-fix" style="width:${nPct}%"></div>` : ""}${wontFixCount > 0 ? `<div class="review-progress-seg seg-wont-fix" style="width:${wPct}%"></div>` : ""}${notAnIssueCount > 0 ? `<div class="review-progress-seg seg-not-an-issue" style="width:${niPct}%"></div>` : ""}<div class="review-progress-seg seg-pending" style="width:${pPct}%"></div>`;
+          const wdPct = Math.round(wellDoneCount / t * 100);
+          const pPct = 100 - nPct - wPct - niPct - wdPct;
+          return `${needFixCount > 0 ? `<div class="review-progress-seg seg-need-fix" style="width:${nPct}%"></div>` : ""}${wontFixCount > 0 ? `<div class="review-progress-seg seg-wont-fix" style="width:${wPct}%"></div>` : ""}${notAnIssueCount > 0 ? `<div class="review-progress-seg seg-not-an-issue" style="width:${niPct}%"></div>` : ""}${wellDoneCount > 0 ? `<div class="review-progress-seg seg-well-done" style="width:${wdPct}%"></div>` : ""}<div class="review-progress-seg seg-pending" style="width:${pPct}%"></div>`;
         })()}
       </div>
       <div class="review-progress-label">
@@ -254,12 +259,17 @@ export async function renderSummary(container, params) {
             });
 
             const noteTask = noteTasks.find(t => t.file === task.file);
-            const reviewedCount = (noteTask?.findings || []).filter(f => f && ["need-fix", "wont-fix", "not-an-issue"].includes(f.status)).length;
+            const reviewedCount = (noteTask?.findings || []).filter(f => f && ["need-fix", "wont-fix", "not-an-issue", "well-done"].includes(f.status)).length;
             let reviewStatus = "none";
-            if (totalFindings > 0) {
-              if (reviewedCount === 0) reviewStatus = "unreviewed";
-              else if (reviewedCount >= totalFindings) reviewStatus = "reviewed";
-              else reviewStatus = "partial";
+            if (totalFindings === 0) {
+              reviewStatus = "none";
+            } else if (reviewedCount === 0) {
+              reviewStatus = "unreviewed";
+            } else if (reviewedCount >= totalFindings) {
+              reviewStatus = "reviewed";
+            } else {
+              reviewStatus = "partial";
+            }
             }
 
             const score = task.review?.score;

@@ -22,7 +22,7 @@ export async function renderWizard(container, params) {
   let sessionId = params[0]?.split("?")[0];
   const isNew = !sessionId || sessionId === "new";
   const urlParams = new URLSearchParams(window.location.hash.split("?")[1] || "");
-  const preselectType = urlParams.get("type");
+  let preselectType = urlParams.get("type");
   let step = 1;
   let prevStep = 0;
   let reviewType = "code";

@@ -51,7 +51,13 @@ export function renderScopeStep(content, state) {
           return;
         }
       }
-      await api.setScope(state.sessionId, state.scopeMethod, state.scopeRef, state.excludedFiles);
+      const result = await api.setScope(state.sessionId, state.scopeMethod, state.scopeRef, state.excludedFiles);
+      if (!result.taskCount || result.taskCount === 0) {
+        showToast("No changed files found in this scope. Try a different scope or commit changes first.", "warning");
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+        return;
+      }
       state.step = 3;
       state.save();
       state.render();

@@ -147,7 +147,6 @@ export function parseDiffByFile(diffOutput) {
         currentChunks = [line];
       }
     } else if (currentFile) {
-    } else if (currentFile) {
       currentChunks.push(line);
     }
   }

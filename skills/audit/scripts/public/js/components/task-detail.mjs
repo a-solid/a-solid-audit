@@ -11,6 +11,7 @@ function getSeverityIcon(severity) {
     medium: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
     info: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>',
     low: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>',
+    positive: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
   };
   return icons[severity] || '';
 }
@@ -78,6 +79,7 @@ export function renderTaskDetail(task, notes) {
 
       ${findings.length > 0 ? (() => {
         const allMet = findings.every(f => f.severity === "met");
+        const allPositive = findings.every(f => f.severity === "positive");
         if (allMet) {
           return `
           <div>
@@ -107,13 +109,40 @@ export function renderTaskDetail(task, notes) {
             </div>
           </div>`;
         }
-        // Normal findings rendering (unchanged from original)
+        if (allPositive) {
+          return `
+          <div>
+            <div class="text-xs text-muted font-semibold mb-3">FINDINGS (${findings.length})</div>
+            <div class="card" style="text-align:center;padding:var(--space-6);color:var(--accent)">
+              ${icon("check", 24)}
+              <div class="text-sm mt-2">Clean code — no issues found</div>
+            </div>
+            <div class="space-y-2 mt-3">
+              ${findings.map((f, i) => {
+                const status = noteTask?.findings?.[i]?.status || "well-done";
+                const isReviewed = status !== null && status !== undefined;
+                return `
+                <div class="finding-card severity-positive${isReviewed ? " reviewed" : ""}" data-finding="${i}">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <span class="badge severity-positive">${getSeverityIcon("positive")} positive</span>
+                      <span class="badge" style="background:var(--accent);color:var(--btn-primary-text)">${icon("check", 10)} Well Done</span>
+                    </div>
+                    ${isReviewed ? `<button class="btn-revert" data-revert="${i}" title="Revert to pending">${icon("undo2", 12)} Revert</button>` : ""}
+                  </div>
+                  <div class="text-sm" style="margin-top:var(--space-2)">${escapeHtml(f.description || "")}</div>
+                </div>`;
+              }).join("")}
+            </div>
+          </div>`;
+        }
+        // Normal findings rendering
         return `
         <div>
           <div class="text-xs text-muted font-semibold mb-3">FINDINGS (${findings.length})</div>
           <div class="space-y-3">
             ${findings.map((f, i) => {
-              const status = noteTask?.findings?.[i]?.status || (f.severity === "met" ? "well-done" : null);
+              const status = noteTask?.findings?.[i]?.status || (f.severity === "met" || f.severity === "positive" ? "well-done" : null);
               const isNeedFix = status === "need-fix";
               const isWontFix = status === "wont-fix";
               const isNotAnIssue = status === "not-an-issue";

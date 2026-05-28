@@ -1,5 +1,5 @@
 // skills/audit/scripts/server/handlers/tasks.mjs
-import { getTasks, getTask } from "../../lib/task.mjs";
+import { getTasks, getTask, getTasksSummary } from "../../lib/task.mjs";
 import { jsonResponse, errorResponse } from "../index.mjs";
 
 export function registerTaskRoutes(router, reportsDir) {
@@ -14,6 +14,16 @@ export function registerTaskRoutes(router, reportsDir) {
         return jsonResponse(res, task);
       }
       const tasks = getTasks(reportsDir, params.id);
+      jsonResponse(res, tasks);
+    } catch (e) {
+      throw e;
+    }
+  });
+
+  // GET /api/sessions/:id/tasks/summary — lightweight task list
+  router.get("/api/sessions/:id/tasks/summary", (req, res, params) => {
+    try {
+      const tasks = getTasksSummary(reportsDir, params.id);
       jsonResponse(res, tasks);
     } catch (e) {
       throw e;

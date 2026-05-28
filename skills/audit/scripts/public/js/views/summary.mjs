@@ -31,9 +31,9 @@ export async function renderSummary(container, params) {
       api.getTasks(sessionId),
       api.getNotes(sessionId),
     ]);
-    if (taskRes.status === "ok") tasks = taskRes.value;
+    if (taskRes.status === "fulfilled") tasks = taskRes.value;
     else { showToast("Failed to load tasks: " + taskRes.reason?.message); return; }
-    if (notesRes.status === "ok") notes = notesRes.value;
+    if (notesRes.status === "fulfilled") notes = notesRes.value;
     else showToast("Notes unavailable — sign-off section may not display", "warning");
   } catch (e) {
     showToast("Failed to load data: " + e.message);

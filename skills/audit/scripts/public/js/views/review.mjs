@@ -43,11 +43,11 @@ export async function renderReview(container, params) {
       api.getNotes(sessionId),
       api.getReviewContext(sessionId),
     ]);
-    if (taskRes.status === "ok") tasks = taskRes.value;
+    if (taskRes.status === "fulfilled") tasks = taskRes.value;
     else { showToast("Failed to load tasks: " + taskRes.reason?.message); return; }
-    if (notesRes.status === "ok") notes = notesRes.value;
+    if (notesRes.status === "fulfilled") notes = notesRes.value;
     else showToast("Notes unavailable — finding statuses may not display", "warning");
-    if (ctxRes.status === "ok") reviewContext = ctxRes.value.context || "";
+    if (ctxRes.status === "fulfilled") reviewContext = ctxRes.value.context || "";
   } catch (e) {
     showToast("Failed to load review data: " + e.message);
     return;

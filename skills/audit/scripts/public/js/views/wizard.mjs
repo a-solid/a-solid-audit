@@ -247,6 +247,7 @@ export async function renderWizard(container, params) {
   function renderStep1(content) {
     if (preselectType && isNew) {
       reviewType = preselectType;
+      preselectType = null;
     }
     content.innerHTML = `
       <div class="card mb-4">

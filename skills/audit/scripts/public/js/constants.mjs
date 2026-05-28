@@ -4,6 +4,7 @@ export const SEVERITY_LABELS = {
   'partially-met': 'Partial',
   'not-met': 'Not Met',
   'met': 'Met',
+  'positive': 'Positive',
 };
 
 export const SEVERITY_COLORS = {
@@ -11,6 +12,7 @@ export const SEVERITY_COLORS = {
   medium: "var(--warning)", minor: "var(--warning)",
   low: "var(--info)", info: "var(--info)",
   met: "var(--accent)",
+  positive: "var(--accent)",
 };
 
 export function scoreColor(score) {

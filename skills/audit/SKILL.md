@@ -49,7 +49,7 @@ This skill operates with **high autonomy**. Do not ask for permission between in
    ```
 5. Get the task list:
    ```bash
-   curl -s http://localhost:3456/api/sessions/<session-id>/tasks
+   curl -s http://localhost:3456/api/sessions/<session-id>/tasks/summary
    ```
 
 ### 3. Code Review Loop

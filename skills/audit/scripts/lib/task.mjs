@@ -84,6 +84,31 @@ export function getTasks(reportsDir, sid) {
   return result;
 }
 
+// Lightweight task list from index.yaml only — no per-task YAML reads
+export function getTasksSummary(reportsDir, sid) {
+  const safeSid = sanitizePath(sid);
+  const sessionDir = path.join(reportsDir, safeSid);
+  const indexPath = path.join(sessionDir, "index.yaml");
+  if (!fs.existsSync(indexPath)) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
+
+  const index = readYaml(indexPath);
+  const result = [];
+
+  const groups = [
+    { refs: index.codeTasks || [], type: "code" },
+    { refs: index.storyTasks || [], type: "story" },
+    { refs: index.projectTasks || [], type: "project" },
+  ];
+
+  for (const { refs, type } of groups) {
+    for (const ref of refs) {
+      result.push({ type, file: ref.file, status: ref.status || "pending" });
+    }
+  }
+
+  return result;
+}
+
 // Get single task detail
 export function getTask(reportsDir, sid, taskFile) {
   const safeSid = sanitizePath(sid);

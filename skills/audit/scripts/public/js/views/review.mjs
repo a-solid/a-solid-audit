@@ -102,8 +102,8 @@ export async function renderReview(container, params) {
 
   async function autoPersistWellDone() {
     for (const task of tasks) {
+      if (task.status !== "reviewed") continue;
       const findings = task.review?.findings || [];
-      if (findings.length === 0) continue;
       const noteTask = notes?.tasks?.find(nt => nt.file === task.file);
       const noteFindings = noteTask?.findings || [];
       let changed = false;
@@ -112,6 +112,10 @@ export async function renderReview(container, params) {
           noteFindings[i] = { status: "well-done" };
           changed = true;
         }
+      }
+      // Create note entry for zero-finding tasks so sidebar shows "Complete"
+      if (findings.length === 0 && !noteTask) {
+        changed = true;
       }
       if (changed) {
         await api.updateTaskNote(sessionId, task.file, { findings: noteFindings });
@@ -262,10 +266,15 @@ export async function renderReview(container, params) {
           <p class="text-sm text-muted mt-2" style="max-width:320px;margin:0 auto">No findings were identified in this review.</p>
         </div>
       ` : `
-        ${Object.keys(bySeverity).length > 0 ? `
-          <div class="card mb-4">
+        ${(() => {
+          const problemSeverities = Object.fromEntries(
+            Object.entries(bySeverity).filter(([sev]) => sev !== "met")
+          );
+          const metCount = bySeverity.met || 0;
+          if (Object.keys(problemSeverities).length === 0 && metCount === 0) return "";
+          return `<div class="card mb-4">
             <div class="font-medium mb-4">Findings by Severity</div>
-            ${Object.entries(bySeverity).map(([sev, count]) => {
+            ${Object.entries(problemSeverities).map(([sev, count]) => {
               const pct = totalFindings > 0 ? Math.round(count / totalFindings * 100) : 0;
               return `
               <div class="severity-bar-row">
@@ -277,8 +286,18 @@ export async function renderReview(container, params) {
                 <span class="severity-bar-pct">${pct}%</span>
               </div>`;
             }).join("")}
-          </div>
-        ` : ""}
+            ${metCount > 0 ? `
+              <div class="severity-bar-row" style="margin-top:8px">
+                <span class="badge severity-met severity-bar-label">Met</span>
+                <div class="severity-bar-track">
+                  <div class="severity-bar-fill" style="width:${totalFindings > 0 ? (metCount / maxSevCount) * 100 : 0}%;background:${SEVERITY_COLORS.met}"></div>
+                </div>
+                <span class="severity-bar-count">${metCount}</span>
+                <span class="severity-bar-pct">${totalFindings > 0 ? Math.round(metCount / totalFindings * 100) : 0}%</span>
+              </div>
+            ` : ""}
+          </div>`;
+        })()}
 
         <div class="card">
           <div class="font-medium mb-3">Needs Attention</div>

@@ -61,6 +61,7 @@ export const api = {
 
   // Tasks
   getTasks: (id) => request("GET", `/api/sessions/${encodeURIComponent(id)}/tasks`),
+  getTasksSummary: (id) => request("GET", `/api/sessions/${encodeURIComponent(id)}/tasks/summary`),
   getTask: (id, file) =>
     request("GET", `/api/sessions/${encodeURIComponent(id)}/tasks?file=${encodeURIComponent(file)}`),
 

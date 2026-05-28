@@ -10,6 +10,7 @@ export const SEVERITY_COLORS = {
   critical: "var(--danger)", major: "var(--danger)", high: "var(--danger)",
   medium: "var(--warning)", minor: "var(--warning)",
   low: "var(--info)", info: "var(--info)",
+  met: "var(--accent)",
 };
 
 export function scoreColor(score) {

@@ -71,6 +71,10 @@
   .sev-fill.sev-major, .sev-fill.sev-high { background: #dc2626; }
   .sev-fill.sev-medium, .sev-fill.sev-minor { background: #a16207; }
   .sev-fill.sev-low, .sev-fill.sev-info { background: #1d4ed8; }
+  .finding.met { border-left-color: #16a34a; }
+  .sev-label.sev-met { border-left-color: #16a34a; color: #166534; }
+  .sev-fill.sev-met { background: #16a34a; }
+  .badge-well-done { color: #16a34a; }
   .sev-count { font-size: 12px; font-weight: 600; min-width: 16px; text-align: right; color: #1a1a2e; }
 
   /* ─── Task Cards ─── */
@@ -188,7 +192,7 @@ async function init() {
   });
 
   const noteTasks = notes?.tasks || [];
-  let needFixCount = 0, wontFixCount = 0, notAnIssueCount = 0;
+  let needFixCount = 0, wontFixCount = 0, notAnIssueCount = 0, wellDoneCount = 0;
   tasks.forEach(t => {
     const noteTask = noteTasks.find(nt => nt.file === t.file);
     const taskFindings = t.review?.findings || [];
@@ -198,9 +202,10 @@ async function init() {
       if (status === "need-fix") needFixCount++;
       else if (status === "wont-fix") wontFixCount++;
       else if (status === "not-an-issue") notAnIssueCount++;
+      else if (status === "well-done") wellDoneCount++;
     });
   });
-  const reviewedCount = needFixCount + wontFixCount + notAnIssueCount;
+  const reviewedCount = needFixCount + wontFixCount + notAnIssueCount + wellDoneCount;
   const pendingCount = totalFindings - reviewedCount;
 
   const maxSevCount = Math.max(...Object.values(bySeverity), 1);
@@ -242,7 +247,7 @@ async function init() {
     <div class="stat-box"><div class="stat-value" style="color:#b91c1c">${needFixCount}</div><div class="stat-label">Need Fix</div></div>
     <div class="stat-box"><div class="stat-value" style="color:#92400e">${wontFixCount}</div><div class="stat-label">Won't Fix</div></div>
     <div class="stat-box"><div class="stat-value" style="color:#1d4ed8">${notAnIssueCount}</div><div class="stat-label">Not an Issue</div></div>
-    <div class="stat-box"><div class="stat-value">${pendingCount}</div><div class="stat-label">Pending</div></div>
+    <div class="stat-box"><div class="stat-value" style="color:#16a34a">${wellDoneCount}</div><div class="stat-label">Well Done</div></div>
   </div>
 
   ${Object.keys(bySeverity).length > 0 ? `
@@ -262,7 +267,8 @@ async function init() {
   ${tasks.map(t => {
     const score = t.review?.score;
     const rawFindings = t.review?.findings || [];
-    const findings = rawFindings
+    const allMet = rawFindings.length > 0 && rawFindings.every(f => f.severity === "met");
+    const findings = allMet ? rawFindings : rawFindings
       .map((f, origIdx) => ({ ...f, _origIdx: origIdx }))
       .sort((a, b) => (SEVERITY_ORDER.indexOf(a.severity) ?? 99) - (SEVERITY_ORDER.indexOf(b.severity) ?? 99));
     const noteTask = noteTasks.find(nt => nt.file === t.file);
@@ -273,7 +279,24 @@ async function init() {
         <span class="task-name">${esc(t.name || t.file)}</span>
         <span class="task-score">${score ?? "-"}/10</span>
       </div>
-      ${findings.length > 0 ? `
+      ${rawFindings.length === 0 ? `
+        <div style="color:#16a34a;text-align:center;padding:12px">&#10003; Clean code — no issues found</div>
+      ` : allMet ? `
+        <div style="color:#16a34a;padding:8px 0">&#10003; All acceptance criteria met (${rawFindings.length}/${rawFindings.length})</div>
+        <div style="margin-top:6px">
+          ${rawFindings.map((f, origIdx) => {
+            const reason = noteTask?.findings?.[origIdx]?.reason || "";
+            return `<div class="finding met" style="padding:4px 10px;margin-bottom:4px">
+              <div class="finding-top">
+                <span class="badge" style="border-left:3px solid #16a34a;background:none;color:#16a34a;font-weight:600">met</span>
+                <span class="badge badge-status badge-well-done">Well Done</span>
+              </div>
+              <div class="finding-desc">${esc(f.description || "")}</div>
+              ${f.criteria ? `<div class="finding-file">AC: ${esc(f.criteria)}</div>` : ""}
+            </div>`;
+          }).join("")}
+        </div>
+      ` : `
         <div class="findings-header">Findings (${findings.length})</div>
         ${findings.map(f => {
           const origIdx = f._origIdx;
@@ -282,6 +305,7 @@ async function init() {
           const statusBadge = status === "need-fix" ? '<span class="badge badge-status badge-need-fix">Need Fix</span>'
             : status === "wont-fix" ? `<span class="badge badge-status badge-wont-fix">Won't Fix${reason ? ": " + esc(reason.length > 40 ? reason.slice(0, 40) + "..." : reason) : ""}</span>`
             : status === "not-an-issue" ? `<span class="badge badge-status badge-not-an-issue">Not an Issue${reason ? ": " + esc(reason.length > 40 ? reason.slice(0, 40) + "..." : reason) : ""}</span>`
+            : status === "well-done" ? '<span class="badge badge-status badge-well-done">Well Done</span>'
             : '<span class="badge badge-status badge-unreviewed">Pending</span>';
           return `
           <div class="finding ${f.severity}">
@@ -294,8 +318,7 @@ async function init() {
             ${f.file ? `<div class="finding-file">${esc(f.file)}${f.line ? ":" + f.line : ""}</div>` : ""}
           </div>`;
         }).join("")}
-      ` : ""}
-
+      `}
     </div>`;
   }).join("")}
 </div>`;

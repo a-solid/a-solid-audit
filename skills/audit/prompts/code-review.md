@@ -24,30 +24,30 @@ For each file, evaluate:
 
 ## Submitting Results
 
-Submit your review via the audit server API. You will receive `session-id` and `task-file` as context.
+Submit your review via curl. You will receive `session-id` and `task-file` as context.
 
-POST to `http://localhost:3456/api/sessions/<session-id>/tasks/review` with JSON:
-
-```json
-{
-  "file": "<task-file>",
-  "status": "reviewed",
-  "score": <0-10>,
-  "review": {
-    "summary": "<2-3 sentence summary>",
-    "findings": [
-      {
-        "severity": "<critical|major|minor|info>",
-        "description": "<specific finding>",
-        "file": "<file path>",
-        "line": <line number>,
-        "code": "<multi-line code snippet>",
-        "suggestion": "<fix recommendation>"
-      }
-    ],
-    "positives": ["<what was done well>"]
-  }
-}
+```bash
+curl -s -X POST http://localhost:3456/api/sessions/<session-id>/tasks/review \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "file": "<task-file>",
+    "status": "reviewed",
+    "score": <0-10>,
+    "review": {
+      "summary": "<2-3 sentence summary>",
+      "findings": [
+        {
+          "severity": "<critical|major|minor|info>",
+          "description": "<specific finding>",
+          "file": "<file path>",
+          "line": <line number>,
+          "code": "<multi-line code snippet>",
+          "suggestion": "<fix recommendation>"
+        }
+      ],
+      "positives": ["<what was done well>"]
+    }
+  }'
 ```
 
 ### Score Guide
@@ -76,11 +76,12 @@ POST to `http://localhost:3456/api/sessions/<session-id>/tasks/review` with JSON
 
 Read `review-context.md` from the session directory (`.audit/<session-id>/review-context.md`). The `## User Context` section has project background and focus areas — use it to prioritize your review.
 
-After reviewing, append cross-file observations via the API:
+After reviewing, append cross-file observations:
 
-```
-POST http://localhost:3456/api/sessions/<session-id>/review-notes
-{ "notes": "- <your observation>" }
+```bash
+curl -s -X POST http://localhost:3456/api/sessions/<session-id>/review-notes \
+  -H 'Content-Type: application/json' \
+  -d '{"notes": "- <your observation>"}'
 ```
 
 This atomically appends to the `## Review Notes` section.

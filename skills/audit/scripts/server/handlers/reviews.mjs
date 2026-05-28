@@ -1,7 +1,7 @@
 // skills/audit/scripts/server/handlers/reviews.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { updateTask } from "../../lib/task.mjs";
+import { updateTask, getTask } from "../../lib/task.mjs";
 import { sanitizePath, sanitizeFilePath } from "../../lib/session.mjs";
 import { readYaml } from "../../lib/yaml.mjs";
 import { jsonResponse, errorResponse, readBody } from "../index.mjs";
@@ -51,7 +51,8 @@ export function registerReviewRoutes(router, reportsDir) {
         return errorResponse(res, "Task not found", "NOT_FOUND", 404);
       }
 
-      const currentTask = readYaml(taskPath);
+      const currentTask = getTask(reportsDir, safeSid, safeTaskFile);
+      if (!currentTask) return errorResponse(res, "Task not found", "NOT_FOUND", 404);
       validateTransition(currentTask.status, status);
 
       const result = updateTask(reportsDir, safeSid, safeTaskFile, status, score, review, overview);

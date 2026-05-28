@@ -108,7 +108,7 @@ export async function renderReview(container, params) {
       const noteFindings = noteTask?.findings || [];
       let changed = false;
       for (let i = 0; i < findings.length; i++) {
-        if (findings[i].severity === "met" && !noteFindings[i]?.status) {
+        if ((findings[i].severity === "met" || findings[i].severity === "positive") && !noteFindings[i]?.status) {
           noteFindings[i] = { status: "well-done" };
           changed = true;
         }
@@ -177,6 +177,7 @@ export async function renderReview(container, params) {
       medium: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
       info: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>',
       low: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="8" y1="12" x2="16" y2="12"/></svg>',
+      positive: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
     };
     return m[sev] || '';
   }
@@ -268,10 +269,11 @@ export async function renderReview(container, params) {
       ` : `
         ${(() => {
           const problemSeverities = Object.fromEntries(
-            Object.entries(bySeverity).filter(([sev]) => sev !== "met")
+            Object.entries(bySeverity).filter(([sev]) => sev !== "met" && sev !== "positive")
           );
           const metCount = bySeverity.met || 0;
-          if (Object.keys(problemSeverities).length === 0 && metCount === 0) return "";
+          const positiveCount = bySeverity.positive || 0;
+          if (Object.keys(problemSeverities).length === 0 && metCount === 0 && positiveCount === 0) return "";
           return `<div class="card mb-4">
             <div class="font-medium mb-4">Findings by Severity</div>
             ${Object.entries(problemSeverities).map(([sev, count]) => {
@@ -294,6 +296,16 @@ export async function renderReview(container, params) {
                 </div>
                 <span class="severity-bar-count">${metCount}</span>
                 <span class="severity-bar-pct">${totalFindings > 0 ? Math.round(metCount / totalFindings * 100) : 0}%</span>
+              </div>
+            ` : ""}
+            ${positiveCount > 0 ? `
+              <div class="severity-bar-row" style="margin-top:${metCount > 0 ? "4px" : "8px"}">
+                <span class="badge severity-positive severity-bar-label">Positive</span>
+                <div class="severity-bar-track">
+                  <div class="severity-bar-fill" style="width:${totalFindings > 0 ? (positiveCount / maxSevCount) * 100 : 0}%;background:${SEVERITY_COLORS.positive || "var(--accent)"}"></div>
+                </div>
+                <span class="severity-bar-count">${positiveCount}</span>
+                <span class="severity-bar-pct">${totalFindings > 0 ? Math.round(positiveCount / totalFindings * 100) : 0}%</span>
               </div>
             ` : ""}
           </div>`;

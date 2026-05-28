@@ -36,7 +36,21 @@ export function getUntrackedFiles(projectDir) {
 
 export function runGitDiff(scopeType, scopeRef, projectDir) {
   if (scopeType === "uncommitted") {
-    return runGit(["diff"], projectDir) + runGit(["diff", "--cached"], projectDir);
+    let diff = runGit(["diff"], projectDir) + runGit(["diff", "--cached"], projectDir);
+    // Include untracked (new) files as full-add diffs
+    const untracked = getUntrackedFiles(projectDir);
+    for (const file of untracked) {
+      const absPath = path.join(projectDir, file);
+      if (!fs.statSync(absPath).isFile()) continue;
+      let content;
+      try { content = fs.readFileSync(absPath, "utf8"); } catch { continue; }
+      const lines = content.split("\n");
+      diff += `\ndiff --git a/${file} b/${file}\nnew file mode 100644\n--- /dev/null\n+++ b/${file}\n`;
+      for (const line of lines) {
+        diff += "+" + line + "\n";
+      }
+    }
+    return diff;
   }
   if (scopeType === "commits") {
     const ids = scopeRef.split(" ");
@@ -54,7 +68,18 @@ export function getDiffFileStats(scopeType, scopeRef, projectDir) {
   if (scopeType === "uncommitted") {
     const wd = runGit([...args], projectDir);
     const staged = runGit([...args, "--cached"], projectDir);
-    return parseNumstat(wd + "\n" + staged);
+    let numstat = parseNumstat(wd + "\n" + staged);
+    // Include untracked files as full additions
+    const untracked = getUntrackedFiles(projectDir);
+    for (const file of untracked) {
+      const absPath = path.join(projectDir, file);
+      if (!fs.statSync(absPath).isFile()) continue;
+      let content;
+      try { content = fs.readFileSync(absPath, "utf8"); } catch { continue; }
+      const lines = content.split("\n").length;
+      numstat.push({ file, additions: lines, deletions: 0 });
+    }
+    return numstat;
   }
   if (scopeType === "commits") {
     const ids = scopeRef.split(" ");

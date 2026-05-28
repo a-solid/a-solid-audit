@@ -1,5 +1,5 @@
 // skills/audit/scripts/server/handlers/audit.mjs
-import { getCommits, getBranches, getDiffFileStats, getUntrackedFiles } from "../../lib/git.mjs";
+import { getCommits, getBranches, getDiffFileStats } from "../../lib/git.mjs";
 import { setScope } from "../../lib/mapping.mjs";
 import { jsonResponse, readBody, errorResponse } from "../index.mjs";
 
@@ -43,15 +43,6 @@ export function registerAuditRoutes(router, projectDir, reportsDir) {
       const files = getDiffFileStats(body.method, body.ref || "", projectDir).filter(
         f => f.additions > 0 || f.deletions > 0
       );
-      // Include untracked files for uncommitted scope
-      if (body.method === "uncommitted") {
-        const untracked = getUntrackedFiles(projectDir);
-        const existing = new Set(files.map(f => f.path));
-        for (const filePath of untracked) {
-          if (existing.has(filePath)) continue;
-          files.push({ path: filePath, additions: 0, deletions: 0, isNew: true });
-        }
-      }
       jsonResponse(res, { files });
     } catch (e) {
       errorResponse(res, "Preview failed: " + e.message, "INTERNAL_ERROR", 500);

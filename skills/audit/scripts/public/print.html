@@ -75,6 +75,9 @@
   .sev-label.sev-met { border-left-color: #16a34a; color: #166534; }
   .sev-fill.sev-met { background: #16a34a; }
   .badge-well-done { color: #16a34a; }
+  .finding.positive { border-left-color: #16a34a; }
+  .sev-label.sev-positive { border-left-color: #16a34a; color: #166534; }
+  .sev-fill.sev-positive { background: #16a34a; }
   .sev-count { font-size: 12px; font-weight: 600; min-width: 16px; text-align: right; color: #1a1a2e; }
 
   /* ─── Task Cards ─── */
@@ -250,17 +253,36 @@ async function init() {
     <div class="stat-box"><div class="stat-value" style="color:#16a34a">${wellDoneCount}</div><div class="stat-label">Well Done</div></div>
   </div>
 
-  ${Object.keys(bySeverity).length > 0 ? `
-  <div class="severity-section">
-    <h2>Findings by Severity</h2>
-    ${Object.entries(bySeverity).map(([sev, count]) => `
-      <div class="sev-row">
-        <span class="sev-label sev-${sev}">${sev}</span>
-        <div class="sev-track"><div class="sev-fill sev-${sev}" style="width:${(count / maxSevCount) * 100}%"></div></div>
-        <span class="sev-count">${count}</span>
-      </div>
-    `).join("")}
-  </div>` : ""}
+  ${(() => {
+    const problemSevs = Object.fromEntries(Object.entries(bySeverity).filter(([s]) => s !== "met" && s !== "positive"));
+    const metCount = bySeverity.met || 0;
+    const posCount = bySeverity.positive || 0;
+    if (Object.keys(problemSevs).length === 0 && metCount === 0 && posCount === 0) return "";
+    return `<div class="severity-section">
+      <h2>Findings by Severity</h2>
+      ${Object.entries(problemSevs).map(([sev, count]) => `
+        <div class="sev-row">
+          <span class="sev-label sev-${sev}">${sev}</span>
+          <div class="sev-track"><div class="sev-fill sev-${sev}" style="width:${(count / maxSevCount) * 100}%"></div></div>
+          <span class="sev-count">${count}</span>
+        </div>
+      `).join("")}
+      ${metCount > 0 ? `
+        <div class="sev-row" style="margin-top:8px">
+          <span class="sev-label sev-met">Met</span>
+          <div class="sev-track"><div class="sev-fill sev-met" style="width:${(metCount / maxSevCount) * 100}%"></div></div>
+          <span class="sev-count">${metCount}</span>
+        </div>
+      ` : ""}
+      ${posCount > 0 ? `
+        <div class="sev-row" style="margin-top:4px">
+          <span class="sev-label sev-positive">Positive</span>
+          <div class="sev-track"><div class="sev-fill sev-positive" style="width:${(posCount / maxSevCount) * 100}%"></div></div>
+          <span class="sev-count">${posCount}</span>
+        </div>
+      ` : ""}
+    </div>`;
+  })()}
 
   <!-- Task details -->
   <div class="section-heading">Task Details</div>
@@ -268,7 +290,8 @@ async function init() {
     const score = t.review?.score;
     const rawFindings = t.review?.findings || [];
     const allMet = rawFindings.length > 0 && rawFindings.every(f => f.severity === "met");
-    const findings = allMet ? rawFindings : rawFindings
+    const allPositive = rawFindings.length > 0 && rawFindings.every(f => f.severity === "positive");
+    const findings = (allMet || allPositive) ? rawFindings : rawFindings
       .map((f, origIdx) => ({ ...f, _origIdx: origIdx }))
       .sort((a, b) => (SEVERITY_ORDER.indexOf(a.severity) ?? 99) - (SEVERITY_ORDER.indexOf(b.severity) ?? 99));
     const noteTask = noteTasks.find(nt => nt.file === t.file);
@@ -285,7 +308,6 @@ async function init() {
         <div style="color:#16a34a;padding:8px 0">&#10003; All acceptance criteria met (${rawFindings.length}/${rawFindings.length})</div>
         <div style="margin-top:6px">
           ${rawFindings.map((f, origIdx) => {
-            const reason = noteTask?.findings?.[origIdx]?.reason || "";
             return `<div class="finding met" style="padding:4px 10px;margin-bottom:4px">
               <div class="finding-top">
                 <span class="badge" style="border-left:3px solid #16a34a;background:none;color:#16a34a;font-weight:600">met</span>
@@ -293,6 +315,19 @@ async function init() {
               </div>
               <div class="finding-desc">${esc(f.description || "")}</div>
               ${f.criteria ? `<div class="finding-file">AC: ${esc(f.criteria)}</div>` : ""}
+            </div>`;
+          }).join("")}
+        </div>
+      ` : allPositive ? `
+        <div style="color:#16a34a;padding:8px 0">&#10003; Clean code — no issues found</div>
+        <div style="margin-top:6px">
+          ${rawFindings.map((f, origIdx) => {
+            return `<div class="finding positive" style="padding:4px 10px;margin-bottom:4px">
+              <div class="finding-top">
+                <span class="badge" style="border-left:3px solid #16a34a;background:none;color:#16a34a;font-weight:600">positive</span>
+                <span class="badge badge-status badge-well-done">Well Done</span>
+              </div>
+              <div class="finding-desc">${esc(f.description || "")}</div>
             </div>`;
           }).join("")}
         </div>

@@ -204,7 +204,7 @@ export async function renderProgress(container, params) {
       }
 
       let tasks = [];
-      try { tasks = await api.getTasks(sessionId); } catch (e) {
+      try { tasks = await api.getTasksSummary(sessionId); } catch (e) {
         document.getElementById("task-list").innerHTML = `<div class="text-sm text-muted" style="padding:var(--space-4)">Failed to load tasks. Retrying...</div>`;
       }
 
@@ -229,7 +229,6 @@ export async function renderProgress(container, params) {
       document.getElementById("task-list").innerHTML = tasks.map(t => {
         const isReviewing = t.status === "reviewing";
         const isReviewed = t.status === "reviewed";
-        const scoreColor = t.review?.score >= 7 ? "text-success" : t.review?.score >= 4 ? "text-warning" : "text-danger";
         return `
           <div class="card flex items-center justify-between" role="listitem" style="padding:var(--space-3) var(--space-4)">
             <div class="flex items-center gap-3" style="min-width:0">
@@ -242,7 +241,6 @@ export async function renderProgress(container, params) {
               <span class="text-sm font-mono truncate">${t.type && ENTRY_TYPES[t.type] ? `<span class="badge entry-type-badge" style="color:${ENTRY_TYPES[t.type].color};border:1px solid ${ENTRY_TYPES[t.type].color};opacity:0.9;margin-right:6px">${ENTRY_TYPES[t.type].label}</span>` : ""}${escapeHtml(t.name || t.file)}</span>
             </div>
             <div class="flex items-center gap-3" style="flex-shrink:0">
-              ${t.review?.score ? `<span class="text-sm font-mono ${scoreColor}">${t.review.score}/10</span>` : ""}
               <span class="badge badge-${t.status === "reviewing" ? "ai-analyzing" : t.status === "pending" ? "ai-pending" : "complete"}">${t.status === "reviewing" ? "AI Analyzing" : t.status === "pending" ? "AI Pending" : "Complete"}</span>
             </div>
           </div>`;

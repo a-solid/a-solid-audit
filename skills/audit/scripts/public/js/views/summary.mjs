@@ -260,16 +260,15 @@ export async function renderSummary(container, params) {
 
             const noteTask = noteTasks.find(t => t.file === task.file);
             const reviewedCount = (noteTask?.findings || []).filter(f => f && ["need-fix", "wont-fix", "not-an-issue", "well-done"].includes(f.status)).length;
-            let reviewStatus = "none";
+            let reviewStatus;
             if (totalFindings === 0) {
               reviewStatus = "none";
-            } else if (reviewedCount === 0) {
-              reviewStatus = "unreviewed";
             } else if (reviewedCount >= totalFindings) {
               reviewStatus = "reviewed";
+            } else if (reviewedCount === 0) {
+              reviewStatus = "unreviewed";
             } else {
               reviewStatus = "partial";
-            }
             }
 
             const score = task.review?.score;

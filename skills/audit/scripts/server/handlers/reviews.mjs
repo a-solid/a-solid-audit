@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { updateTask, getTask } from "../../lib/task.mjs";
 import { sanitizePath, sanitizeFilePath } from "../../lib/session.mjs";
+import { AppError } from "../../lib/errors.mjs";
 import { readYaml } from "../../lib/yaml.mjs";
 import { jsonResponse, errorResponse, readBody } from "../index.mjs";
 
@@ -15,9 +16,10 @@ const ALLOWED_TRANSITIONS = {
 function validateTransition(currentStatus, newStatus) {
   const allowed = ALLOWED_TRANSITIONS[currentStatus];
   if (!allowed || !allowed.includes(newStatus)) {
-    throw new Error(
+    throw new AppError(
       "Cannot transition task from " + currentStatus + " to " + newStatus +
-      ". Allowed transitions: pending -> reviewing, reviewing -> reviewed"
+      ". Allowed transitions: pending -> reviewing, reviewing -> reviewed",
+      "CONFLICT", 409
     );
   }
 }

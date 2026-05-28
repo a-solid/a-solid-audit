@@ -30,7 +30,6 @@ export function renderScopeStep(content, state) {
       state.scopeRef = "";
       state.excludedFiles = [];
       state.save();
-      state.setDirty(true);
       state.render();
     });
   });
@@ -81,7 +80,7 @@ export function renderScopeStep(content, state) {
             <div>
               <label for="commit-from">From</label>
               <select id="commit-from" class="mt-1">
-                ${commits.map(c => `<option value="${c.hash}">${c.hash.slice(0, 7)} ${escapeHtml(c.message)} (${c.date?.slice(0, 10)})</option>`).join("")}
+                ${commits.map((c, i) => `<option value="${c.hash}" ${i === 1 ? "selected" : ""}>${c.hash.slice(0, 7)} ${escapeHtml(c.message)} (${c.date?.slice(0, 10)})</option>`).join("")}
               </select>
             </div>
             <div>

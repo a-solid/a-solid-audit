@@ -34,6 +34,21 @@ export function getUntrackedFiles(projectDir) {
   return output.trim().split("\n").filter(Boolean);
 }
 
+const BINARY_EXTENSIONS = new Set([
+  ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".ico", ".webp", ".svg",
+  ".zip", ".tar", ".gz", ".bz2", ".xz", ".7z", ".rar",
+  ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+  ".exe", ".dll", ".so", ".dylib", ".o", ".obj", ".a", ".lib",
+  ".woff", ".woff2", ".ttf", ".eot", ".otf",
+  ".mp3", ".mp4", ".avi", ".mov", ".wav", ".flac",
+  ".class", ".jar", ".war", ".pyc", ".node",
+  ".wasm", ".sqlite", ".db",
+]);
+
+function isBinaryFile(filePath) {
+  return BINARY_EXTENSIONS.has(path.extname(filePath).toLowerCase());
+}
+
 export function runGitDiff(scopeType, scopeRef, projectDir) {
   if (scopeType === "uncommitted") {
     let diff = runGit(["diff"], projectDir) + runGit(["diff", "--cached"], projectDir);
@@ -42,9 +57,10 @@ export function runGitDiff(scopeType, scopeRef, projectDir) {
     for (const file of untracked) {
       const absPath = path.join(projectDir, file);
       if (!fs.statSync(absPath).isFile()) continue;
+      if (isBinaryFile(file)) continue;
       let content;
       try { content = fs.readFileSync(absPath, "utf8"); } catch { continue; }
-      const lines = content.split("\n");
+      const lines = content.replace(/\n$/, "").split("\n");
       diff += `\ndiff --git a/${file} b/${file}\nnew file mode 100644\n--- /dev/null\n+++ b/${file}\n`;
       for (const line of lines) {
         diff += "+" + line + "\n";
@@ -74,9 +90,10 @@ export function getDiffFileStats(scopeType, scopeRef, projectDir) {
     for (const file of untracked) {
       const absPath = path.join(projectDir, file);
       if (!fs.statSync(absPath).isFile()) continue;
+      if (isBinaryFile(file)) continue;
       let content;
       try { content = fs.readFileSync(absPath, "utf8"); } catch { continue; }
-      const lines = content.split("\n").length;
+      const lines = content.replace(/\n$/, "").split("\n").length;
       numstat.push({ path: file, additions: lines, deletions: 0 });
     }
     return numstat;
@@ -117,14 +134,19 @@ export function parseDiffByFile(diffOutput) {
   let currentFile = null;
   let currentChunks = [];
   for (const line of lines) {
-    const match = line.match(/^diff --git a\/(.+?) b\/(.+)$/);
-    if (match) {
-      if (currentFile) {
-        const diff = currentChunks.join("\n");
-        files[currentFile] = { diff, ...countChanges(diff) };
+    if (line.startsWith("diff --git ")) {
+      // Parse "diff --git a/<path> b/<path>" — split on last " b/" to handle spaces in paths
+      const rest = line.slice("diff --git ".length);
+      const bIdx = rest.lastIndexOf(" b/");
+      if (bIdx !== -1) {
+        if (currentFile) {
+          const diff = currentChunks.join("\n");
+          files[currentFile] = { diff, ...countChanges(diff) };
+        }
+        currentFile = rest.slice(bIdx + 3).trim();
+        currentChunks = [line];
       }
-      currentFile = match[2].trim();
-      currentChunks = [line];
+    } else if (currentFile) {
     } else if (currentFile) {
       currentChunks.push(line);
     }

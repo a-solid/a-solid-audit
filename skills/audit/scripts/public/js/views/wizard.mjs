@@ -207,7 +207,7 @@ export async function renderWizard(container, params) {
         ? ["Review Type", "Configure", "Group", "Ready"]
         : ["Review Type", "Scope", "Ready"];
 
-    const goingForward = step > prevStep;
+    const animClass = step === prevStep ? "" : (step > prevStep ? "wizard-step-enter" : "wizard-step-enter-back");
     prevStep = step;
 
     container.innerHTML = `
@@ -229,7 +229,7 @@ export async function renderWizard(container, params) {
           `;
         }).join("")}
       </div>
-      <div id="wizard-content" class="${goingForward ? 'wizard-step-enter' : 'wizard-step-enter-back'}"></div>
+      <div id="wizard-content" class="${animClass}"></div>
     `;
 
     const content = document.getElementById("wizard-content");
@@ -335,7 +335,9 @@ export async function renderWizard(container, params) {
   function renderStep4(content) {
     // For "all" sessions, ensure status is "ready" (setScope only marks "code" sessions as ready)
     if (reviewType === "all") {
-      api.updateSessionStatus(sessionId, "ready").catch(() => {});
+      api.updateSessionStatus(sessionId, "ready").catch(e => {
+        showToast("Failed to update session status: " + e.message, "warning");
+      });
     }
 
     content.innerHTML = `
@@ -412,19 +414,23 @@ export async function renderWizard(container, params) {
     }
 
     document.getElementById("step4-back").addEventListener("click", () => {
+      pollCancelled = true;
       clearPoll();
       goBack(reviewType === "code" ? 2 : 3, "step4-back");
     });
 
     // Poll for session status change — auto-redirect when review starts
+    let pollCancelled = false;
     function pollReadyStatus() {
       api.getSession(sessionId).then(session => {
+        if (pollCancelled) return;
         if (session.status === "reviewing" || session.status === "completed") {
           location.hash = `#/progress/${sessionId}`;
           return;
         }
         schedulePoll(pollReadyStatus, 3000);
       }).catch(() => {
+        if (pollCancelled) return;
         schedulePoll(pollReadyStatus, 5000);
       });
     }

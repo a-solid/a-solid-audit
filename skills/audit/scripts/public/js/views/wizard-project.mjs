@@ -234,8 +234,17 @@ export function renderGroupStep(content, state) {
   document.getElementById("group-back").addEventListener("click", () => { state.clearPoll(); state.goBack(2, "group-back"); });
 
   let groups = null;
+  let activeEs = null;
+
+  function closeEventSource() {
+    if (activeEs) { activeEs.close(); activeEs = null; }
+  }
+
+  onNavigateCleanup(() => { window.onbeforeunload = null; closeEventSource(); state.clearPoll(); });
 
   function renderScanning() {
+    closeEventSource();
+
     const el = document.getElementById("group-step-content");
     el.innerHTML = `
       <div class="space-y-4">
@@ -260,10 +269,9 @@ export function renderGroupStep(content, state) {
       });
     }
 
-    let es = null;
     try {
-      es = new EventSource(`/api/sessions/${state.sessionId}/scan/logs`);
-      es.onmessage = (e) => {
+      activeEs = new EventSource(`/api/sessions/${state.sessionId}/scan/logs`);
+      activeEs.onmessage = (e) => {
         try {
           const entry = JSON.parse(e.data);
           if (!logPanel) return;
@@ -279,10 +287,8 @@ export function renderGroupStep(content, state) {
           }
         } catch {}
       };
-      es.onerror = () => { es?.close(); es = null; };
+      activeEs.onerror = () => { closeEventSource(); };
     } catch {}
-
-    onNavigateCleanup(() => { window.onbeforeunload = null; es?.close(); state.clearPoll(); });
   }
 
   function pollScanStatus() {
@@ -484,8 +490,6 @@ export function renderGroupStep(content, state) {
       }).catch(() => triggerScan());
     });
   });
-
-  onNavigateCleanup(() => { window.onbeforeunload = null; state.clearPoll(); });
 }
 
 export function renderProjectReady(content, state) {

@@ -50,6 +50,7 @@ export function setScope(projectDir, reportsDir, sid, scopeType, scopeRef, exclu
     },
     codeTasks: tasks,
     storyTasks: index.storyTasks || [],
+    projectTasks: index.projectTasks || [],
   });
   // Only mark as ready for code-only sessions; "all" type needs story configuration first
   if (sessionType !== "all") {

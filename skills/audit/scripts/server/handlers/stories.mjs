@@ -75,6 +75,8 @@ export function registerStoryRoutes(router, reportsDir) {
 
       const safeSid = sanitizePath(params.id);
       const sessionDir = path.join(reportsDir, safeSid);
+      const indexPath = path.join(sessionDir, "index.yaml");
+      if (!fs.existsSync(indexPath)) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
 
       const safeName = body.name.replace(/[^a-zA-Z0-9\-_.]/g, "-");
       const storyFile = "story-tasks/" + safeName + ".yaml";
@@ -89,21 +91,18 @@ export function registerStoryRoutes(router, reportsDir) {
       });
 
       // Update index.yaml to include the new story task
-      const indexPath = path.join(sessionDir, "index.yaml");
-      if (fs.existsSync(indexPath)) {
-        const index = readYaml(indexPath);
-        const storyTasks = index.storyTasks || [];
-        if (!storyTasks.some(t => t.file === storyFile)) {
-          storyTasks.push({ file: storyFile, status: "pending" });
-          // Upgrade session type to "all" if it was "code"
-          if (index.session && index.session.type === "code") {
-            index.session.type = "all";
-          }
-          writeIndexYaml(indexPath, {
-            ...index,
-            storyTasks,
-          });
+      const index = readYaml(indexPath);
+      const storyTasks = index.storyTasks || [];
+      if (!storyTasks.some(t => t.file === storyFile)) {
+        storyTasks.push({ file: storyFile, status: "pending" });
+        // Upgrade session type to "all" if it was "code"
+        if (index.session && index.session.type === "code") {
+          index.session.type = "all";
         }
+        writeIndexYaml(indexPath, {
+          ...index,
+          storyTasks,
+        });
       }
 
       jsonResponse(res, { file: storyFile, name: safeName }, 201);

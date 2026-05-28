@@ -141,7 +141,7 @@ export function renderProjectConfigure(content, state) {
         </div>
       </div>
     </div>
-    <div class="flex justify-between">
+    <div class="wizard-nav">
       <button id="project-back" class="btn btn-ghost">${icon("arrowLeft", 14)} Back</button>
       <button id="project-next" class="btn btn-primary">Next ${icon("chevronRight", 14)}</button>
     </div>`;
@@ -226,7 +226,7 @@ export function renderGroupStep(content, state) {
         <div class="text-sm text-secondary"><span class="spinner spinner-sm"></span> Checking scan status...</div>
       </div>
     </div>
-    <div class="flex justify-between">
+    <div class="wizard-nav">
       <button id="group-back" class="btn btn-ghost">${icon("arrowLeft", 14)} Back</button>
       <button id="group-confirm-btn" class="btn btn-primary" disabled>Confirm Groups ${icon("check", 14)}</button>
     </div>`;

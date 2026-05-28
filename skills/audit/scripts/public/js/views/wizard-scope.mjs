@@ -15,7 +15,7 @@ export function renderScopeStep(content, state) {
       <div id="scope-content" class="mt-4"></div>
       <div id="file-preview-section" class="mt-4"></div>
     </div>
-    <div class="flex justify-between">
+    <div class="wizard-nav">
       <button id="step2-back" class="btn btn-ghost" aria-label="Go back">${icon("arrowLeft", 14)} Back</button>
       <button id="step2-confirm" class="btn btn-primary">Confirm Scope</button>
     </div>`;

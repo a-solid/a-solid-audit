@@ -33,7 +33,7 @@ export async function renderStoriesStep(content, state) {
       <p class="text-sm text-secondary mb-3">Click a story to expand, then check files to associate. Changes save automatically.</p>
       <div id="accordion-container" class="space-y-2"></div>
     </div>
-    <div class="flex justify-between">
+    <div class="wizard-nav">
       <button id="step3-back" class="btn btn-ghost" aria-label="Go back">${icon("arrowLeft", 14)} Back</button>
       <button id="step3-next" class="btn btn-primary">Next ${icon("chevronRight", 14)}</button>
     </div>`;

@@ -270,7 +270,7 @@ export async function renderWizard(container, params) {
           </div>
         </div>
       </div>
-      <div class="flex justify-end">
+      <div class="wizard-nav" style="justify-content:flex-end">
         <button id="step1-next" class="btn btn-primary">Next ${icon("chevronRight", 14)}</button>
       </div>`;
 
@@ -363,7 +363,7 @@ export async function renderWizard(container, params) {
         </div>
       </div>
       <div id="step4-terminal"></div>
-      <div class="flex justify-between mt-4">
+      <div class="wizard-nav">
         <button id="step4-back" class="btn btn-ghost" aria-label="Go back">${icon("arrowLeft", 14)} Back</button>
       </div>`;
 

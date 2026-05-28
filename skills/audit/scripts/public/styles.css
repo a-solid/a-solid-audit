@@ -1467,6 +1467,77 @@ code {
 .accordion-badge.has-files {
   background: var(--accent-dim); color: var(--accent);
 }
+.accordion-title {
+  flex-grow: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.accordion-subtitle {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.accordion-actions {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.story-add-bar {
+  margin-bottom: var(--space-3);
+}
+.provider-fetch-bar {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  align-items: center;
+}
+.story-form-card {
+  margin-top: var(--space-3);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  overflow: hidden;
+}
+.story-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-active);
+  border-bottom: 1px solid var(--border);
+}
+.story-form-fields {
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.story-form-fields label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.story-form-actions {
+  padding: var(--space-2) var(--space-3);
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+}
+.story-edit-form {
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+.story-edit-field textarea {
+  width: 100%;
+  font-size: var(--text-sm);
+}
 
 /* ─── Unified Collapse ─── */
 .collapse {

@@ -106,7 +106,7 @@ export async function renderHome(container) {
                 </div>
               ` : ""}
               ${progressLabel ? `<span class="session-progress-label">${progressLabel}</span>` : ''}
-              <span class="badge ${cfg.badge}">${s.status}</span>
+              <span class="badge ${cfg.badge}">${s.status === "created" && s.progress?.total > 0 ? "configuring" : s.status}</span>
               ${s.status === "completed" ? `<a href="#/review/${s.id}" class="session-findings-link" onclick="event.stopPropagation()">${icon("eye", 12)} Findings</a>` : ""}
             </div>
           </div>
@@ -119,7 +119,7 @@ export async function renderHome(container) {
         const id = card.dataset.id;
         const status = card.dataset.status;
         if (status === "completed") location.hash = `#/summary/${id}`;
-        else if (status === "created") location.hash = `#/wizard/${id}`;
+        else if (status === "created" || status === "scanned") location.hash = `#/wizard/${id}`;
         else location.hash = `#/progress/${id}`;
       });
       card.addEventListener("keydown", (e) => {

@@ -51,7 +51,10 @@ export function setScope(projectDir, reportsDir, sid, scopeType, scopeRef, exclu
     codeTasks: tasks,
     storyTasks: index.storyTasks || [],
   });
-  updateSessionStatus(reportsDir, safeSid, "ready");
+  // Only mark as ready for code-only sessions; "all" type needs story configuration first
+  if (sessionType !== "all") {
+    updateSessionStatus(reportsDir, safeSid, "ready");
+  }
 
   return { scope: { method: scopeType, ref: scopeRef }, taskCount: tasks.length };
 }

@@ -64,8 +64,8 @@ export async function renderWizard(container, params) {
             scopeMethod = session.scope.method || "uncommitted";
             scopeRef = session.scope.ref || "";
           }
-          // Jump to the appropriate step (past scope selection)
-          step = reviewType === "all" ? 3 : 3; // ready step (last step)
+          // Ready means all configuration done — go to final step
+          step = reviewType === "all" ? 4 : 4;
           // Load stories from server
           try {
             const serverStories = await api.getStories(sessionId);
@@ -91,7 +91,12 @@ export async function renderWizard(container, params) {
         } else if (session?.type && session.status === "created") {
           // New session from type selection — skip to step 2
           reviewType = session.type === "all" ? "all" : "code";
-          step = 2;
+          // If scope already confirmed (codeTasks exist), jump to step 3
+          if (session.codeTasks?.length > 0 && session.type !== "project") {
+            step = 3;
+          } else {
+            step = 2;
+          }
           save();
         }
       } catch (e) {
@@ -327,6 +332,11 @@ export async function renderWizard(container, params) {
   }
 
   function renderStep4(content) {
+    // For "all" sessions, ensure status is "ready" (setScope only marks "code" sessions as ready)
+    if (reviewType === "all") {
+      api.updateSessionStatus(sessionId, "ready").catch(() => {});
+    }
+
     content.innerHTML = `
       <div class="card mb-4">
         <h2 class="font-semibold mb-4">Ready to Start</h2>

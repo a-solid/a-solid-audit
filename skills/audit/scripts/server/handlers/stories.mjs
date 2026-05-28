@@ -112,33 +112,8 @@ export function registerStoryRoutes(router, reportsDir) {
     }
   });
 
-  // DELETE /api/sessions/:id/stories/:name — delete a story
-  router.delete("/api/sessions/:id/stories/:name", (req, res, params) => {
-    try {
-      const safeSid = sanitizePath(params.id);
-      const sessionDir = path.join(reportsDir, safeSid);
-      const safeName = sanitizePath(params.name);
-      const storyFile = "story-tasks/" + safeName + ".yaml";
-      const storyPath = path.join(sessionDir, storyFile);
-
-      // Remove the YAML file
-      if (fs.existsSync(storyPath)) fs.unlinkSync(storyPath);
-
-      // Remove from index.yaml
-      const indexPath = path.join(sessionDir, "index.yaml");
-      if (fs.existsSync(indexPath)) {
-        const index = readYaml(indexPath);
-        index.storyTasks = (index.storyTasks || []).filter(t => t.file !== storyFile);
-        writeIndexYaml(indexPath, index);
-      }
-
-      jsonResponse(res, { ok: true });
-    } catch (e) {
-      throw e;
-    }
-  });
-
   // PUT /api/sessions/:id/stories/map — replace file-story mappings
+  // MUST be registered before the :name param route to avoid "map" being captured as :name
   router.put("/api/sessions/:id/stories/map", async (req, res, params) => {
     try {
       const body = JSON.parse(await readBody(req));
@@ -170,6 +145,56 @@ export function registerStoryRoutes(router, reportsDir) {
           });
           writeYaml(taskPath, task);
         }
+      }
+
+      jsonResponse(res, { ok: true });
+    } catch (e) {
+      throw e;
+    }
+  });
+
+  // PUT /api/sessions/:id/stories/:name — update story description/acceptance
+  router.put("/api/sessions/:id/stories/:name", async (req, res, params) => {
+    try {
+      const body = JSON.parse(await readBody(req));
+      if (!body) return errorResponse(res, "Empty request body", "VALIDATION_ERROR", 400);
+
+      const safeSid = sanitizePath(params.id);
+      const safeName = sanitizePath(params.name);
+      const sessionDir = path.join(reportsDir, safeSid);
+      const storyPath = path.join(sessionDir, "story-tasks", safeName + ".yaml");
+
+      if (!fs.existsSync(storyPath)) return errorResponse(res, "Story not found", "NOT_FOUND", 404);
+
+      const story = readYaml(storyPath);
+      if (body.description !== undefined) story.description = body.description;
+      if (body.acceptance !== undefined) story.acceptance = body.acceptance;
+      writeYaml(storyPath, story);
+
+      jsonResponse(res, { ok: true });
+    } catch (e) {
+      throw e;
+    }
+  });
+
+  // DELETE /api/sessions/:id/stories/:name — delete a story
+  router.delete("/api/sessions/:id/stories/:name", (req, res, params) => {
+    try {
+      const safeSid = sanitizePath(params.id);
+      const sessionDir = path.join(reportsDir, safeSid);
+      const safeName = sanitizePath(params.name);
+      const storyFile = "story-tasks/" + safeName + ".yaml";
+      const storyPath = path.join(sessionDir, storyFile);
+
+      // Remove the YAML file
+      if (fs.existsSync(storyPath)) fs.unlinkSync(storyPath);
+
+      // Remove from index.yaml
+      const indexPath = path.join(sessionDir, "index.yaml");
+      if (fs.existsSync(indexPath)) {
+        const index = readYaml(indexPath);
+        index.storyTasks = (index.storyTasks || []).filter(t => t.file !== storyFile);
+        writeIndexYaml(indexPath, index);
       }
 
       jsonResponse(res, { ok: true });

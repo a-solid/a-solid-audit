@@ -77,7 +77,7 @@ curl -s -X POST http://localhost:3456/api/sessions/<session-id>/tasks/review \
       "summary": "<2-3 sentence summary of findings>",
       "findings": [
         {
-          "severity": "critical|major|minor|info",
+          "severity": "critical|major|minor|info|positive",
           "category": "security|bug|logic|performance|best-practice",
           "description": "<what the issue is and why it matters>",
           "file": "<relative file path>",
@@ -99,8 +99,8 @@ curl -s -X POST http://localhost:3456/api/sessions/<session-id>/tasks/review \
 - 9-10: No issues found, excellent code quality
 - 7-8: Only minor/info findings
 - 5-6: Some major findings but no critical security vulnerabilities
-- 3-4: Critical security issue or multiple major bugs
-- 0-2: Severe, systemic problems throughout the chunk
+- 3-4: Single critical security issue or major logic bug
+- 0-2: Severe, systemic problems — multiple critical vulnerabilities throughout the chunk
 
 **Finding guidelines**:
 - Every finding MUST include `file`, `line`, and `code` fields
@@ -108,6 +108,7 @@ curl -s -X POST http://localhost:3456/api/sessions/<session-id>/tasks/review \
 - Be specific — cite exact line numbers and code snippets
 - Do NOT report stylistic preferences — only report genuine security, bug, logic, or performance issues
 - `critical` is reserved for exploitable security vulnerabilities or data loss scenarios
+- `findings` array must contain at least one entry — include a `positive` severity finding for clean code (score 9-10)
 
 ### 7. Generate Overview
 

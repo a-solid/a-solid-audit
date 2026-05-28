@@ -64,37 +64,35 @@ Analyze every file in the chunk for:
 
 ### 6. Submit Results
 
-POST your review to:
-```
-POST http://localhost:3456/api/sessions/<session-id>/tasks/review
-```
+Submit your review via curl:
 
-Request body:
-```json
-{
-  "file": "<task-file>",
-  "status": "reviewed",
-  "score": <0-10>,
-  "review": {
-    "summary": "<2-3 sentence summary of findings>",
-    "findings": [
-      {
-        "severity": "critical|major|minor|info",
-        "category": "security|bug|logic|performance|best-practice",
-        "description": "<what the issue is and why it matters>",
-        "file": "<relative file path>",
-        "line": <line number>,
-        "code": "<relevant code snippet>",
-        "suggestion": "<how to fix it>"
+```bash
+curl -s -X POST http://localhost:3456/api/sessions/<session-id>/tasks/review \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "file": "<task-file>",
+    "status": "reviewed",
+    "score": <0-10>,
+    "review": {
+      "summary": "<2-3 sentence summary of findings>",
+      "findings": [
+        {
+          "severity": "critical|major|minor|info",
+          "category": "security|bug|logic|performance|best-practice",
+          "description": "<what the issue is and why it matters>",
+          "file": "<relative file path>",
+          "line": <line number>,
+          "code": "<relevant code snippet>",
+          "suggestion": "<how to fix it>"
+        }
+      ],
+      "positives": ["<things done well>"],
+      "overview": {
+        "diagram": "<Mermaid graph TD diagram of the call chain>",
+        "description": "<1-3 sentence execution flow description>"
       }
-    ],
-    "positives": ["<things done well>"],
-    "overview": {
-      "diagram": "<Mermaid graph TD diagram of the call chain>",
-      "description": "<1-3 sentence execution flow description>"
     }
-  }
-}
+  }'
 ```
 
 **Scoring guide**:
@@ -137,11 +135,12 @@ If the task has `type: unknown` (no clear entry point), describe the general pur
 
 ### 8. Update Review Context
 
-Append cross-file observations via the API:
+Append cross-file observations:
 
-```
-POST http://localhost:3456/api/sessions/<session-id>/review-notes
-{ "notes": "- <your observation>" }
+```bash
+curl -s -X POST http://localhost:3456/api/sessions/<session-id>/review-notes \
+  -H 'Content-Type: application/json' \
+  -d '{"notes": "- <your observation>"}'
 ```
 
 This atomically appends to the `## Review Notes` section. Focus on:

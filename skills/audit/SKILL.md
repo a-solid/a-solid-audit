@@ -21,26 +21,46 @@ This skill operates with **high autonomy**. Do not ask for permission between in
 ### 1. Startup
 
 1. Start the server: `node scripts/cli.mjs server` (background process)
-2. Verify the server is running: `GET http://localhost:3456/api/sessions` — if this fails, the server didn't start
+2. Verify the server is running:
+   ```bash
+   curl -s http://localhost:3456/api/sessions
+   ```
+   If this fails, the server didn't start.
 3. Tell the user: "A-Solid Audit server running at http://localhost:3456 — open this URL in your browser. When you finish configuring scope and stories, come back here and type `start review <session-id>`."
 4. **Stop and wait.** Do NOT poll.
 
 ### 2. Begin Review (triggered by user saying `start review <session-id>`)
 
 1. Parse `<session-id>` from the user's message.
-2. `GET /api/sessions/:id` — confirm the session exists and has status `ready` (or `reviewing` for resume).
+2. Confirm the session exists and has status `ready` (or `reviewing` for resume):
+   ```bash
+   curl -s http://localhost:3456/api/sessions/<session-id>
+   ```
 3. If not found or wrong status, tell user to finish configuring in the browser first.
-4. `PUT /api/sessions/:id/status` with `{ status: "reviewing" }`
-5. `GET /api/sessions/:id/tasks` — get the task list.
+4. Transition to reviewing:
+   ```bash
+   curl -s -X PUT http://localhost:3456/api/sessions/<session-id>/status \
+     -H 'Content-Type: application/json' \
+     -d '{"status":"reviewing"}'
+   ```
+5. Get the task list:
+   ```bash
+   curl -s http://localhost:3456/api/sessions/<session-id>/tasks
+   ```
 
 ### 3. Code Review Loop
 
 For each task with `type === "code"` and status `pending`, dispatch up to **3 sub-agents in parallel**:
 
-1. Set the next N pending tasks to `reviewing`: `POST /api/sessions/:id/tasks/review` with `{"file":"<task-file>","status":"reviewing"}`
+1. Set the next N pending tasks to `reviewing`:
+   ```bash
+   curl -s -X POST http://localhost:3456/api/sessions/<session-id>/tasks/review \
+     -H 'Content-Type: application/json' \
+     -d '{"file":"<task-file>","status":"reviewing"}'
+   ```
 2. Dispatch each as a sub-agent with `prompts/code-review.md` as its prompt, passing `session-id` and `task-file` as context
 3. Sub-agent reads the task YAML, performs the review, and POSTs results via the review endpoint
-4. Sub-agent appends cross-file observations via `POST /api/sessions/:id/review-notes` (atomic append)
+4. Sub-agent appends cross-file observations via review-notes endpoint (atomic append)
 5. As each sub-agent completes, dispatch the next pending task (maintaining up to 3 in flight)
 6. **If a sub-agent fails**: mark the task back to `pending` via the review endpoint, log the error, and continue with remaining tasks
 
@@ -48,18 +68,31 @@ For each task with `type === "code"` and status `pending`, dispatch up to **3 su
 
 For each story task with status `pending`, same parallel pattern (up to 2):
 
-1. `POST /api/sessions/:id/tasks/review` with `{"file":"<task-file>","status":"reviewing"}`
+1. Set task to `reviewing`:
+   ```bash
+   curl -s -X POST http://localhost:3456/api/sessions/<session-id>/tasks/review \
+     -H 'Content-Type: application/json' \
+     -d '{"file":"<task-file>","status":"reviewing"}'
+   ```
 2. Dispatch sub-agent with `prompts/story-review.md`, passing `session-id` and `task-file` as context
 3. Sub-agent reads the story task YAML, reads referenced code task YAMLs for diffs, performs the review, and POSTs results
-4. Sub-agent appends cross-file observations via `POST /api/sessions/:id/review-notes`
+4. Sub-agent appends cross-file observations via review-notes endpoint
 5. **If a sub-agent fails**: mark the task back to `pending`, log the error, and continue
 
 ### 5. Project Grouping (if type === "project" and status === "scanned")
 
 When user types "group <session-id>":
 
-1. `GET /api/sessions/<session-id>` — confirm status is `scanned`
-2. `PUT /api/sessions/<session-id>/status` with `{ status: "grouping" }`
+1. Confirm status is `scanned`:
+   ```bash
+   curl -s http://localhost:3456/api/sessions/<session-id>
+   ```
+2. Transition to grouping:
+   ```bash
+   curl -s -X PUT http://localhost:3456/api/sessions/<session-id>/status \
+     -H 'Content-Type: application/json' \
+     -d '{"status":"grouping"}'
+   ```
 3. Dispatch a sub-agent with `prompts/project-group.md`, passing session-id as context. The sub-agent:
    - Reads `.audit/<session-id>/graph-data.json`
    - Analyzes the dependency graph
@@ -74,11 +107,16 @@ When user types "group <session-id>":
 
 For each project task with status `pending`, same parallel pattern (up to 2):
 
-1. `POST /api/sessions/:id/tasks/review` with `{"file":"<task-file>","status":"reviewing"}`
+1. Set task to `reviewing`:
+   ```bash
+   curl -s -X POST http://localhost:3456/api/sessions/<session-id>/tasks/review \
+     -H 'Content-Type: application/json' \
+     -d '{"file":"<task-file>","status":"reviewing"}'
+   ```
 2. Dispatch sub-agent with `prompts/project-review.md`, passing `session-id` and `task-file` as context
 3. Sub-agent reads the task YAML (contains `files[]`, `type`, `entry`), reads source files from the project directory, performs security and quality review, and POSTs results
 4. Sub-agent generates an `overview` with a Mermaid diagram of the call chain and a description of execution flow
-5. Sub-agent appends cross-file observations via `POST /api/sessions/:id/review-notes`
+5. Sub-agent appends cross-file observations via review-notes endpoint
 6. **If a sub-agent fails**: mark the task back to `pending`, log the error, and continue
 
 ### 7. Completion

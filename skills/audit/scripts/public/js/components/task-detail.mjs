@@ -76,7 +76,39 @@ export function renderTaskDetail(task, notes) {
         </div>
       ` : ""}
 
-      ${findings.length > 0 ? `
+      ${findings.length > 0 ? (() => {
+        const allMet = findings.every(f => f.severity === "met");
+        if (allMet) {
+          return `
+          <div>
+            <div class="text-xs text-muted font-semibold mb-3">ACCEPTANCE CRITERIA (${findings.length}/${findings.length} met)</div>
+            <div class="card" style="text-align:center;padding:var(--space-6);color:var(--accent)">
+              ${icon("check", 24)}
+              <div class="text-sm mt-2">All acceptance criteria met</div>
+            </div>
+            <div class="space-y-2 mt-3">
+              ${findings.map((f, i) => {
+                const status = noteTask?.findings?.[i]?.status || "well-done";
+                const reason = noteTask?.findings?.[i]?.reason || "";
+                const isReviewed = status !== null && status !== undefined;
+                return `
+                <div class="finding-card severity-met${isReviewed ? " reviewed" : ""}" data-finding="${i}">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <span class="badge severity-met">${icon("check", 10)} met</span>
+                      <span class="badge" style="background:var(--accent);color:var(--btn-primary-text)">${icon("check", 10)} Well Done</span>
+                    </div>
+                    ${isReviewed ? `<button class="btn-revert" data-revert="${i}" title="Revert to pending">${icon("undo2", 12)} Revert</button>` : ""}
+                  </div>
+                  <div class="text-sm" style="margin-top:var(--space-2)">${escapeHtml(f.description || "")}</div>
+                  ${f.criteria ? `<div class="text-xs text-muted mt-1">AC: ${escapeHtml(f.criteria)}</div>` : ""}
+                </div>`;
+              }).join("")}
+            </div>
+          </div>`;
+        }
+        // Normal findings rendering (unchanged from original)
+        return `
         <div>
           <div class="text-xs text-muted font-semibold mb-3">FINDINGS (${findings.length})</div>
           <div class="space-y-3">
@@ -161,8 +193,8 @@ export function renderTaskDetail(task, notes) {
               </div>`;
             }).join("")}
           </div>
-        </div>
-      ` : `
+        </div>`;
+      })() : `
         <div class="card" style="text-align:center;padding:var(--space-6);color:var(--accent)">
           ${icon("check", 20)}
           <div class="text-sm mt-2">Clean code — no issues found</div>

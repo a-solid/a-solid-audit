@@ -81,17 +81,19 @@ export function renderTaskDetail(task, notes) {
           <div class="text-xs text-muted font-semibold mb-3">FINDINGS (${findings.length})</div>
           <div class="space-y-3">
             ${findings.map((f, i) => {
-              const status = noteTask?.findings?.[i]?.status || null;
+              const status = noteTask?.findings?.[i]?.status || (f.severity === "met" ? "well-done" : null);
               const isNeedFix = status === "need-fix";
               const isWontFix = status === "wont-fix";
               const isNotAnIssue = status === "not-an-issue";
-              const isReviewed = isNeedFix || isWontFix || isNotAnIssue;
+              const isWellDone = status === "well-done";
+              const isReviewed = isNeedFix || isWontFix || isNotAnIssue || isWellDone;
               const isUnreviewed = !status;
               const reason = noteTask?.findings?.[i]?.reason || "";
 
               const statusBadge = isNeedFix ? `<span class="badge badge-need-fix">${icon("alertCircle", 10)} Need Fix</span>`
                 : isWontFix ? `<span class="badge badge-wont-fix"${reason ? ` title="${escapeHtml(reason)}"` : ""}>${icon("minus", 10)} Won't Fix${reason ? ": " + escapeHtml(reason.length > 25 ? reason.slice(0, 25) + "..." : reason) : ""}</span>`
                 : isNotAnIssue ? `<span class="badge badge-not-an-issue"${reason ? ` title="${escapeHtml(reason)}"` : ""}>${icon("x", 10)} Not an Issue${reason ? ": " + escapeHtml(reason.length > 25 ? reason.slice(0, 25) + "..." : reason) : ""}</span>`
+                : isWellDone ? `<span class="badge" style="background:var(--accent);color:var(--btn-primary-text)">${icon("check", 10)} Well Done</span>`
                 : `<span class="badge" style="background:transparent;color:var(--text-muted);border:1px dashed var(--border)">Pending</span>`;
 
               return `
@@ -160,7 +162,12 @@ export function renderTaskDetail(task, notes) {
             }).join("")}
           </div>
         </div>
-      ` : ""}
+      ` : `
+        <div class="card" style="text-align:center;padding:var(--space-6);color:var(--accent)">
+          ${icon("check", 20)}
+          <div class="text-sm mt-2">Clean code — no issues found</div>
+        </div>
+      `}
 
       ${positives.length > 0 ? `
         <div>

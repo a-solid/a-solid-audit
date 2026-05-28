@@ -77,7 +77,7 @@ export function getDiffFileStats(scopeType, scopeRef, projectDir) {
       let content;
       try { content = fs.readFileSync(absPath, "utf8"); } catch { continue; }
       const lines = content.split("\n").length;
-      numstat.push({ file, additions: lines, deletions: 0 });
+      numstat.push({ path: file, additions: lines, deletions: 0 });
     }
     return numstat;
   }

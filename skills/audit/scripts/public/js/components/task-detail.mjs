@@ -129,18 +129,19 @@ export function renderTaskDetail(task, notes) {
               <div class="text-sm mt-2">All acceptance criteria met</div>
             </div>
             <div class="space-y-2 mt-3">
-              ${findings.map((f, i) => {
+              ${findings.map((f) => {
+                const oi = originalIndexMap.get(f);
                 const status = getNoteStatus(noteTask, f, originalIndexMap) || "well-done";
                 const reason = getNoteReason(noteTask, f, originalIndexMap);
                 const isReviewed = status !== null && status !== undefined;
                 return `
-                <div class="finding-card severity-met${isReviewed ? " reviewed" : ""}" data-finding="${i}">
+                <div class="finding-card severity-met${isReviewed ? " reviewed" : ""}" data-finding="${oi}">
                   <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                       <span class="badge severity-met">${icon("check", 10)} met</span>
                       <span class="badge" style="background:var(--accent);color:var(--btn-primary-text)">${icon("check", 10)} Well Done</span>
                     </div>
-                    ${isReviewed ? `<button class="btn-revert" data-revert="${i}" title="Revert to pending">${icon("undo2", 12)} Revert</button>` : ""}
+                    ${isReviewed ? `<button class="btn-revert" data-revert="${oi}" title="Revert to pending">${icon("undo2", 12)} Revert</button>` : ""}
                   </div>
                   <div class="text-sm" style="margin-top:var(--space-2)">${escapeHtml(f.description || "")}</div>
                   ${f.criteria ? `<div class="text-xs text-muted mt-1">AC: ${escapeHtml(f.criteria)}</div>` : ""}
@@ -158,17 +159,18 @@ export function renderTaskDetail(task, notes) {
               <div class="text-sm mt-2">Clean code — no issues found</div>
             </div>
             <div class="space-y-2 mt-3">
-              ${findings.map((f, i) => {
+              ${findings.map((f) => {
+                const oi = originalIndexMap.get(f);
                 const status = getNoteStatus(noteTask, f, originalIndexMap) || "well-done";
                 const isReviewed = status !== null && status !== undefined;
                 return `
-                <div class="finding-card severity-positive${isReviewed ? " reviewed" : ""}" data-finding="${i}">
+                <div class="finding-card severity-positive${isReviewed ? " reviewed" : ""}" data-finding="${oi}">
                   <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                       <span class="badge severity-positive">${getSeverityIcon("positive")} positive</span>
                       <span class="badge" style="background:var(--accent);color:var(--btn-primary-text)">${icon("check", 10)} Well Done</span>
                     </div>
-                    ${isReviewed ? `<button class="btn-revert" data-revert="${i}" title="Revert to pending">${icon("undo2", 12)} Revert</button>` : ""}
+                    ${isReviewed ? `<button class="btn-revert" data-revert="${oi}" title="Revert to pending">${icon("undo2", 12)} Revert</button>` : ""}
                   </div>
                   <div class="text-sm" style="margin-top:var(--space-2)">${escapeHtml(f.description || "")}</div>
                 </div>`;
@@ -181,7 +183,8 @@ export function renderTaskDetail(task, notes) {
         <div>
           <div class="text-xs text-muted font-semibold mb-3">FINDINGS (${findings.length})</div>
           <div class="space-y-3">
-            ${findings.map((f, i) => {
+            ${findings.map((f) => {
+              const oi = originalIndexMap.get(f);
               const status = getNoteStatus(noteTask, f, originalIndexMap) || (f.severity === "met" || f.severity === "positive" ? "well-done" : null);
               const isNeedFix = status === "need-fix";
               const isWontFix = status === "wont-fix";
@@ -198,50 +201,50 @@ export function renderTaskDetail(task, notes) {
                 : `<span class="badge" style="background:transparent;color:var(--text-muted);border:1px dashed var(--border)">Pending</span>`;
 
               return `
-              <div class="finding-card severity-${f.severity}${isReviewed ? " reviewed" : ""}" data-finding="${i}">
+              <div class="finding-card severity-${f.severity}${isReviewed ? " reviewed" : ""}" data-finding="${oi}">
                 <div class="flex items-center justify-between">
                   <div class="flex items-center gap-2">
                     <span class="badge severity-${f.severity}">${getSeverityIcon(f.severity)} ${f.severity}</span>
                     ${statusBadge}
                   </div>
-                  ${isReviewed ? `<button class="btn-revert" data-revert="${i}" title="Revert to pending">${icon("undo2", 12)} Revert</button>` : ""}
+                  ${isReviewed ? `<button class="btn-revert" data-revert="${oi}" title="Revert to pending">${icon("undo2", 12)} Revert</button>` : ""}
                 </div>
                 <div class="text-sm" style="margin-top:var(--space-2)">${escapeHtml(f.description || "")}</div>
-                <div class="dismiss-panel hidden" data-dismiss-panel="${i}">
+                <div class="dismiss-panel hidden" data-dismiss-panel="${oi}">
                   <div class="dismiss-reasons">
                     ${["Intentional design", "Acceptable risk", "Low priority", "Already addressed"].map(r =>
                       `<button class="dismiss-reason-btn" data-reason="${r}">${escapeHtml(r)}</button>`
                     ).join("")}
                   </div>
                   <div class="flex gap-2 mt-2">
-                    <input class="dismiss-custom-input" placeholder="Other reason..." data-dismiss-custom="${i}">
-                    <button class="btn btn-sm btn-primary dismiss-submit-btn" data-dismiss-submit="${i}">Submit</button>
+                    <input class="dismiss-custom-input" placeholder="Other reason..." data-dismiss-custom="${oi}">
+                    <button class="btn btn-sm btn-primary dismiss-submit-btn" data-dismiss-submit="${oi}">Submit</button>
                   </div>
                 </div>
-                <div class="dismiss-panel hidden" data-not-issue-panel="${i}">
+                <div class="dismiss-panel hidden" data-not-issue-panel="${oi}">
                   <div class="dismiss-reasons">
                     ${["AI misunderstood context", "Not applicable", "Already handled elsewhere", "Feature, not a bug"].map(r =>
                       `<button class="not-issue-reason-btn" data-reason="${r}">${escapeHtml(r)}</button>`
                     ).join("")}
                   </div>
                   <div class="flex gap-2 mt-2">
-                    <input class="dismiss-custom-input" placeholder="Other reason..." data-not-issue-custom="${i}">
-                    <button class="btn btn-sm btn-primary not-issue-submit-btn" data-not-issue-submit="${i}">Submit</button>
+                    <input class="dismiss-custom-input" placeholder="Other reason..." data-not-issue-custom="${oi}">
+                    <button class="btn btn-sm btn-primary not-issue-submit-btn" data-not-issue-submit="${oi}">Submit</button>
                   </div>
                 </div>
                 ${isUnreviewed ? `
                   <div class="finding-action-bar">
-                    <button class="btn-need-fix" data-need-fix="${i}" title="Mark as needing a fix">${icon("alertCircle", 14)} Need Fix</button>
-                    <button class="btn-wont-fix" data-wont-fix="${i}" title="Accept, won't fix">${icon("minus", 14)} Won't Fix</button>
-                    <button class="btn-not-an-issue" data-not-issue="${i}" title="Not a real issue">${icon("x", 14)} Not an Issue</button>
+                    <button class="btn-need-fix" data-need-fix="${oi}" title="Mark as needing a fix">${icon("alertCircle", 14)} Need Fix</button>
+                    <button class="btn-wont-fix" data-wont-fix="${oi}" title="Accept, won't fix">${icon("minus", 14)} Won't Fix</button>
+                    <button class="btn-not-an-issue" data-not-issue="${oi}" title="Not a real issue">${icon("x", 14)} Not an Issue</button>
                   </div>
                 ` : ""}
                 ${(f.code || f.suggestion) ? `
-                  <button class="finding-collapse-toggle mt-2" data-collapse-toggle="${i}">
+                  <button class="finding-collapse-toggle mt-2" data-collapse-toggle="${oi}">
                     <span class="toggle-icon">${icon("chevronRight", 12)}</span>
                     ${f.code && f.suggestion ? "Show details" : f.code ? "Show code" : "Show suggestion"}
                   </button>
-                  <div class="finding-collapsible" data-collapsible="${i}">
+                  <div class="finding-collapsible" data-collapsible="${oi}">
                     ${f.code ? `
                       <pre class="mt-2 p-3" style="border-color:var(--border)"><code class="text-xs">${escapeHtml(f.code)}</code></pre>
                     ` : ""}

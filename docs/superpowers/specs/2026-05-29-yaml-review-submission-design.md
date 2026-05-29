@@ -19,11 +19,10 @@ After:   sub-agent → YAML body → validate → appendFile (append text)
 
 **Existing endpoint** `POST /api/sessions/:id/tasks/review` — remains for the "set reviewing" status transition (JSON body with `{ file, status: "reviewing" }`).
 
-**New endpoint** `POST /api/sessions/:id/tasks/review-yaml` — accepts `Content-Type: text/yaml`:
+**New endpoint** `POST /api/sessions/:id/tasks/review-yaml?file=<task-file>` — accepts `Content-Type: text/yaml`. The task file is identified by the `file` query parameter, not in the body.
 
-Request body:
+Request body (pure review content, no routing info):
 ```yaml
-file: <task-file>
 score: 8
 review:
   summary: "..."
@@ -43,15 +42,14 @@ overview:
 ```
 
 Server behavior:
-1. Read raw body as text
-2. Parse with existing `parseYaml` to extract `file` and `score` fields
-3. Validate: `file` present, body is valid YAML, `score` is a number
-4. Strip the `file:` line from the raw text (simple regex or line-by-line removal)
-5. Append `\n---\n` + stripped YAML text to the task file
-6. Set task status to `reviewed` in `index.yaml`
-7. Check if all tasks reviewed → update session status
+1. Extract `file` from query parameter
+2. Read raw body as text
+3. Parse with existing `parseYaml` to validate — body is valid YAML, `score` is a number
+4. Append `\n---\n` + raw body text to the task file
+5. Set task status to `reviewed` in `index.yaml`
+6. Check if all tasks reviewed → update session status
 
-No re-serialization — the raw body text (minus the `file:` line) is appended as-is. This preserves the sub-agent's original `|` block scalars and formatting exactly.
+No re-serialization — the raw body text is appended as-is. This preserves the sub-agent's original `|` block scalars and formatting exactly.
 
 ### Task YAML generation changes
 
@@ -85,10 +83,9 @@ Review content is appended later when POSTed.
 All three review prompts (`code-review.md`, `story-review.md`, `project-review.md`) replace the JSON curl example with YAML format:
 
 ```bash
-curl -s -X POST http://localhost:3456/api/sessions/<session-id>/tasks/review-yaml \
+curl -s -X POST "http://localhost:3456/api/sessions/<session-id>/tasks/review-yaml?file=<task-file>" \
   -H 'Content-Type: text/yaml' \
-  --data-binary 'file: <task-file>
-score: <0-10>
+  --data-binary 'score: <0-10>
 review:
   summary: "<summary>"
   findings:
@@ -111,8 +108,7 @@ The `updateTask` function in `task.mjs` no longer needs to merge review data. A 
 ```js
 function appendReview(reportsDir, sid, taskFile, yamlText) {
   const taskPath = buildTaskPath(reportsDir, sid, taskFile);
-  const stripped = yamlText.replace(/^file:.*\n?/m, "");
-  fs.appendFileSync(taskPath, "\n---\n" + stripped);
+  fs.appendFileSync(taskPath, "\n---\n" + yamlText);
 }
 ```
 

@@ -92,7 +92,7 @@ function serializeYaml(data, indent, lines) {
   }
 }
 
-function parseYaml(content) {
+export function parseYaml(content) {
   const lines = content.split("\n");
   return parseBlock(lines, 0, 0).value;
 }

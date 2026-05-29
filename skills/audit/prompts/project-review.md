@@ -69,8 +69,8 @@ Submit your review via curl:
 ```bash
 curl -s -X POST "http://localhost:3456/api/sessions/<session-id>/tasks/review-yaml?file=<task-file>" \
   -H 'Content-Type: text/yaml' \
-  --data-binary 'score: <0-10>
-review:
+  --data-binary 'review:
+  score: <0-10>
   summary: "<2-3 sentence summary of findings>"
   findings:
     - severity: <critical|major|minor|info|positive>

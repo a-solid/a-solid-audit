@@ -23,8 +23,8 @@ After:   sub-agent → YAML body → validate → appendFile (append text)
 
 Request body (pure review content, no routing info):
 ```yaml
-score: 8
 review:
+  score: 8
   summary: "..."
   findings:
     - severity: critical
@@ -44,7 +44,7 @@ overview:
 Server behavior:
 1. Extract `file` from query parameter
 2. Read raw body as text
-3. Parse with existing `parseYaml` to validate — body is valid YAML, `score` is a number
+3. Parse with existing `parseYaml` to validate — body is valid YAML, `review.score` is a number
 4. Append `\n---\n` + raw body text to the task file
 5. Set task status to `reviewed` in `index.yaml`
 6. Check if all tasks reviewed → update session status

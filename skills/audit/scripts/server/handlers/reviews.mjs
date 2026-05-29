@@ -85,8 +85,8 @@ export function registerReviewRoutes(router, reportsDir) {
       } catch {
         return errorResponse(res, "Invalid YAML syntax", "PARSE_ERROR", 400);
       }
-      if (!parsed || typeof parsed.score !== "number") {
-        return errorResponse(res, "Invalid YAML: missing or non-numeric score", "VALIDATION_ERROR", 400);
+      if (!parsed || typeof parsed.review?.score !== "number") {
+        return errorResponse(res, "Invalid YAML: missing or non-numeric review.score", "VALIDATION_ERROR", 400);
       }
 
       const safeSid = sanitizePath(params.id);

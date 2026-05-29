@@ -65,7 +65,7 @@ export function appendReview(reportsDir, sid, taskFile, yamlText) {
   if (!fs.existsSync(taskPath)) throw new AppError("Task file not found", "NOT_FOUND", 404);
   if (!fs.existsSync(indexPath)) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
 
-  fs.appendFileSync(taskPath, "\n---\n" + yamlText);
+  fs.appendFileSync(taskPath, "\n\n" + yamlText);
 
   // Update status in index.yaml
   const index = readYaml(indexPath);

@@ -67,32 +67,25 @@ Analyze every file in the chunk for:
 Submit your review via curl:
 
 ```bash
-curl -s -X POST http://localhost:3456/api/sessions/<session-id>/tasks/review \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "file": "<task-file>",
-    "status": "reviewed",
-    "score": <0-10>,
-    "review": {
-      "summary": "<2-3 sentence summary of findings>",
-      "findings": [
-        {
-          "severity": "critical|major|minor|info|positive",
-          "category": "security|bug|logic|performance|best-practice",
-          "description": "<what the issue is and why it matters>",
-          "file": "<relative file path>",
-          "line": <line number>,
-          "code": "<relevant code snippet>",
-          "suggestion": "<how to fix it>"
-        }
-      ],
-      "positives": ["<things done well>"],
-      "overview": {
-        "diagram": "<Mermaid graph TD diagram of the call chain>",
-        "description": "<1-3 sentence execution flow description>"
-      }
-    }
-  }'
+curl -s -X POST "http://localhost:3456/api/sessions/<session-id>/tasks/review-yaml?file=<task-file>" \
+  -H 'Content-Type: text/yaml' \
+  --data-binary 'score: <0-10>
+review:
+  summary: "<2-3 sentence summary of findings>"
+  findings:
+    - severity: <critical|major|minor|info|positive>
+      category: <security|bug|logic|performance|best-practice>
+      description: "<what the issue is and why it matters>"
+      file: "<relative file path>"
+      line: <line number>
+      code: |
+        <actual code snippet, preserved with line breaks>
+      suggestion: "<how to fix it>"
+  positives:
+    - "<things done well>"
+overview:
+  diagram: "<Mermaid graph TD diagram of the call chain>"
+  description: "<1-3 sentence execution flow description>"'
 ```
 
 **Scoring guide**:
@@ -105,6 +98,7 @@ curl -s -X POST http://localhost:3456/api/sessions/<session-id>/tasks/review \
 **Finding guidelines**:
 - Every finding MUST include `file`, `line`, and `code` fields
 - Every finding MUST include a `category` field
+- Use YAML `|` block scalar for multi-line `code` values — do NOT flatten code into a single line
 - Be specific — cite exact line numbers and code snippets
 - Do NOT report stylistic preferences — only report genuine security, bug, logic, or performance issues
 - `critical` is reserved for exploitable security vulnerabilities or data loss scenarios

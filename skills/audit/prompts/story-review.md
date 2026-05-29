@@ -29,43 +29,39 @@ Read the code task YAMLs via the `taskFile` paths to get diffs. Read the full ch
 Submit your review via curl. You will receive `session-id` and `task-file` as context.
 
 ```bash
-curl -s -X POST http://localhost:3456/api/sessions/<session-id>/tasks/review \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "file": "<task-file>",
-    "status": "reviewed",
-    "score": <0-10>,
-    "review": {
-      "summary": "<2-3 sentence summary>",
-      "findings": [
-        {
-          "severity": "<met|partially-met|not-met>",
-          "description": "<evaluation of implementation>",
-          "criteria": "<original AC text>",
-          "file": "<file path>",
-          "code": "<multi-line code snippet>",
-          "suggestion": "<what should be added or changed>"
-        }
-      ],
-      "gaps": ["<missing implementation>"],
-      "positives": ["<what was done well>"]
-    }
-  }'
+curl -s -X POST "http://localhost:3456/api/sessions/<session-id>/tasks/review-yaml?file=<task-file>" \
+  -H 'Content-Type: text/yaml' \
+  --data-binary 'score: <0-10>
+review:
+  summary: "<2-3 sentence summary>"
+  findings:
+    - severity: <met|partially-met|not-met>
+      description: "<evaluation of implementation>"
+      criteria: "<original AC text>"
+      file: "<file path>"
+      code: |
+        <actual code snippet, preserved with line breaks>
+      suggestion: "<what should be added or changed>"
+  gaps:
+    - "<missing implementation>"
+  positives:
+    - "<what was done well>"'
 ```
 
 ### Score Guide
 
-- **0-2:** Major gaps — most AC items not implemented or fundamentally wrong
-- **3-4:** Significant gaps — key AC items missing
+- **0-2:** Fundamental misalignment — implementation contradicts the story or introduces regressions
+- **3-4:** Major gaps — key AC items missing or incorrectly implemented
 - **5-6:** Partial alignment — some AC met, some missing
 - **7-8:** Minor gaps — mostly aligned with small discrepancies
-- **9-10:** Full alignment — all AC met
+- **9-10:** Full alignment — all AC met, well-implemented
 
 ### Field Rules
 
 - `description` is required for each finding
 - `suggestion` is required for `not-met` and `partially-met`, optional for `met`
 - `criteria`, `file`, `code` are optional — include when helpful
+- Use YAML `|` block scalar for multi-line `code` values — do NOT flatten code into a single line
 - `findings`, `gaps`, `positives` arrays may be empty — omit or send `[]`
 
 ## Review Context File

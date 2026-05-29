@@ -44,14 +44,14 @@ overview:
 
 Server behavior:
 1. Read raw body as text
-2. Parse with existing `parseYaml` to extract `file` field (for routing)
-3. Validate: `file` present, body is valid YAML
-4. Re-serialize only the review/overview/score portion back to YAML text (preserving `|` block scalars)
-5. Append `---\n` + review YAML to the task file
+2. Parse with existing `parseYaml` to extract `file` and `score` fields
+3. Validate: `file` present, body is valid YAML, `score` is a number
+4. Strip the `file:` line from the raw text (simple regex or line-by-line removal)
+5. Append `\n---\n` + stripped YAML text to the task file
 6. Set task status to `reviewed` in `index.yaml`
 7. Check if all tasks reviewed → update session status
 
-The `---\n` separator ensures the appended content is a valid multi-document YAML or at least visually separated from the task metadata.
+No re-serialization — the raw body text (minus the `file:` line) is appended as-is. This preserves the sub-agent's original `|` block scalars and formatting exactly.
 
 ### Task YAML generation changes
 
@@ -111,7 +111,8 @@ The `updateTask` function in `task.mjs` no longer needs to merge review data. A 
 ```js
 function appendReview(reportsDir, sid, taskFile, yamlText) {
   const taskPath = buildTaskPath(reportsDir, sid, taskFile);
-  fs.appendFileSync(taskPath, "\n---\n" + yamlText);
+  const stripped = yamlText.replace(/^file:.*\n?/m, "");
+  fs.appendFileSync(taskPath, "\n---\n" + stripped);
 }
 ```
 
@@ -137,5 +138,5 @@ Status update logic (index.yaml + session completion check) is shared between `u
 
 ### Risks
 
-- **Parse-then-re-serialize**: The server parses YAML to validate and extract `file`, then needs to produce clean YAML text for append. If we skip re-serialization and append the raw body (minus the `file:` line), we avoid this risk but lose control over formatting.
-- **Mitigation**: Append the raw body text directly after stripping the `file:` line. The sub-agent is trusted to produce valid YAML, same as it's trusted to produce valid JSON today.
+- **Raw text append**: No re-serialization means malformed YAML from a sub-agent is stored as-is. Mitigated by the parse step — if `parseYaml` fails on the body, the request is rejected before append.
+- **Duplicate runs**: If a sub-agent posts review twice, the task file gets two review blocks. The last one wins when `parseYaml` reads the file (YAML multi-document behavior in our parser picks the last value for duplicate keys). Could add a guard checking if review already exists.

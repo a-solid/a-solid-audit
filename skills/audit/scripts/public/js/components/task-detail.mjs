@@ -31,29 +31,21 @@ const SEVERITY_ORDER = {
 };
 
 function sortFindings(findings) {
-  const sorted = [...findings].sort((a, b) => {
-    const aOrder = SEVERITY_ORDER[a.severity] ?? 3;
-    const bOrder = SEVERITY_ORDER[b.severity] ?? 3;
-    return aOrder - bOrder;
-  });
-  const originalIndexMap = new Map();
-  sorted.forEach((sf) => {
-    const idx = findings.indexOf(sf);
-    originalIndexMap.set(sf, idx);
-  });
+  const indexed = findings.map((f, i) => ({ f, oi: i }));
+  indexed.sort((a, b) => (SEVERITY_ORDER[a.f.severity] ?? 3) - (SEVERITY_ORDER[b.f.severity] ?? 3));
+  const sorted = indexed.map(e => e.f);
+  const originalIndexMap = new Map(indexed.map(e => [e.f, e.oi]));
   return { sorted, originalIndexMap };
 }
 
-function getNoteStatus(noteTask, finding, originalIndexMap) {
+function getNoteStatus(noteTask, oi) {
   if (!noteTask?.findings) return null;
-  const idx = originalIndexMap.get(finding);
-  return noteTask.findings[idx]?.status || null;
+  return noteTask.findings[oi]?.status || null;
 }
 
-function getNoteReason(noteTask, finding, originalIndexMap) {
+function getNoteReason(noteTask, oi) {
   if (!noteTask?.findings) return "";
-  const idx = originalIndexMap.get(finding);
-  return noteTask.findings[idx]?.reason || "";
+  return noteTask.findings[oi]?.reason || "";
 }
 
 export function renderTaskDetail(task, notes) {
@@ -131,8 +123,8 @@ export function renderTaskDetail(task, notes) {
             <div class="space-y-2 mt-3">
               ${findings.map((f) => {
                 const oi = originalIndexMap.get(f);
-                const status = getNoteStatus(noteTask, f, originalIndexMap) || "well-done";
-                const reason = getNoteReason(noteTask, f, originalIndexMap);
+                const status = getNoteStatus(noteTask, oi) || "well-done";
+                const reason = getNoteReason(noteTask, oi);
                 const isReviewed = status !== null && status !== undefined;
                 return `
                 <div class="finding-card severity-met${isReviewed ? " reviewed" : ""}" data-finding="${oi}">
@@ -161,7 +153,7 @@ export function renderTaskDetail(task, notes) {
             <div class="space-y-2 mt-3">
               ${findings.map((f) => {
                 const oi = originalIndexMap.get(f);
-                const status = getNoteStatus(noteTask, f, originalIndexMap) || "well-done";
+                const status = getNoteStatus(noteTask, oi) || "well-done";
                 const isReviewed = status !== null && status !== undefined;
                 return `
                 <div class="finding-card severity-positive${isReviewed ? " reviewed" : ""}" data-finding="${oi}">
@@ -185,14 +177,14 @@ export function renderTaskDetail(task, notes) {
           <div class="space-y-3">
             ${findings.map((f) => {
               const oi = originalIndexMap.get(f);
-              const status = getNoteStatus(noteTask, f, originalIndexMap) || (f.severity === "met" || f.severity === "positive" ? "well-done" : null);
+              const status = getNoteStatus(noteTask, oi) || (f.severity === "met" || f.severity === "positive" ? "well-done" : null);
               const isNeedFix = status === "need-fix";
               const isWontFix = status === "wont-fix";
               const isNotAnIssue = status === "not-an-issue";
               const isWellDone = status === "well-done";
               const isReviewed = isNeedFix || isWontFix || isNotAnIssue || isWellDone;
               const isUnreviewed = !status;
-              const reason = getNoteReason(noteTask, f, originalIndexMap);
+              const reason = getNoteReason(noteTask, oi);
 
               const statusBadge = isNeedFix ? `<span class="badge badge-need-fix">${icon("alertCircle", 10)} Need Fix</span>`
                 : isWontFix ? `<span class="badge badge-wont-fix"${reason ? ` title="${escapeHtml(reason)}"` : ""}>${icon("minus", 10)} Won't Fix${reason ? ": " + escapeHtml(reason.length > 25 ? reason.slice(0, 25) + "..." : reason) : ""}</span>`

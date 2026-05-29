@@ -21,91 +21,79 @@ function writeNotes(sessionDir, data) {
 export function registerNoteRoutes(router, reportsDir) {
   // GET /api/sessions/:id/notes
   router.get("/api/sessions/:id/notes", (req, res, params) => {
-    try {
-      const safeSid = sanitizePath(params.id);
-      const sessionDir = path.join(reportsDir, safeSid);
-      if (!fs.existsSync(path.join(sessionDir, "index.yaml"))) {
-        return errorResponse(res, "Session not found", "NOT_FOUND", 404);
-      }
-      jsonResponse(res, readNotes(sessionDir));
-    } catch (e) {
-      throw e;
+    const safeSid = sanitizePath(params.id);
+    const sessionDir = path.join(reportsDir, safeSid);
+    if (!fs.existsSync(path.join(sessionDir, "index.yaml"))) {
+      return errorResponse(res, "Session not found", "NOT_FOUND", 404);
     }
+    jsonResponse(res, readNotes(sessionDir));
   });
 
   // POST /api/sessions/:id/notes — update task review
   router.post("/api/sessions/:id/notes", async (req, res, params) => {
-    try {
-      const safeSid = sanitizePath(params.id);
-      const sessionDir = path.join(reportsDir, safeSid);
-      if (!fs.existsSync(path.join(sessionDir, "index.yaml"))) {
-        return errorResponse(res, "Session not found", "NOT_FOUND", 404);
-      }
+    const safeSid = sanitizePath(params.id);
+    const sessionDir = path.join(reportsDir, safeSid);
+    if (!fs.existsSync(path.join(sessionDir, "index.yaml"))) {
+      return errorResponse(res, "Session not found", "NOT_FOUND", 404);
+    }
 
-      const body = JSON.parse(await readBody(req));
-      if (!body || typeof body.file !== "string" || !body.file) {
-        return errorResponse(res, "Missing required field: file", "VALIDATION_ERROR", 400);
-      }
-      if (body.findings !== undefined && !Array.isArray(body.findings)) {
-        return errorResponse(res, "findings must be an array", "VALIDATION_ERROR", 400);
-      }
-      if (body.findings) {
-        for (let i = 0; i < body.findings.length; i++) {
-          const s = body.findings[i]?.status;
-          if (s && !VALID_STATUSES.includes(s)) {
-            return errorResponse(res, "Invalid status at findings[" + i + "]: " + s, "VALIDATION_ERROR", 400);
-          }
+    const body = JSON.parse(await readBody(req));
+    if (!body || typeof body.file !== "string" || !body.file) {
+      return errorResponse(res, "Missing required field: file", "VALIDATION_ERROR", 400);
+    }
+    if (body.findings !== undefined && !Array.isArray(body.findings)) {
+      return errorResponse(res, "findings must be an array", "VALIDATION_ERROR", 400);
+    }
+    if (body.findings) {
+      for (let i = 0; i < body.findings.length; i++) {
+        const s = body.findings[i]?.status;
+        if (s && !VALID_STATUSES.includes(s)) {
+          return errorResponse(res, "Invalid status at findings[" + i + "]: " + s, "VALIDATION_ERROR", 400);
         }
       }
-
-      const safeFile = sanitizeFilePath(body.file);
-      const notes = readNotes(sessionDir);
-      let entry = notes.tasks.find(t => t.file === safeFile);
-      if (!entry) {
-        const taskPath = path.join(sessionDir, safeFile);
-        const task = fs.existsSync(taskPath) ? readYaml(taskPath) : null;
-        const findingCount = (task?.review?.findings || []).length;
-        const findings = Array.from({ length: findingCount }, () => ({ status: "pending", reason: "" }));
-        entry = { file: safeFile, findings };
-        notes.tasks.push(entry);
-      }
-
-      if (body.findings !== undefined) entry.findings = body.findings;
-
-      writeNotes(sessionDir, notes);
-      jsonResponse(res, { ok: true });
-    } catch (e) {
-      throw e;
     }
+
+    const safeFile = sanitizeFilePath(body.file);
+    const notes = readNotes(sessionDir);
+    let entry = notes.tasks.find(t => t.file === safeFile);
+    if (!entry) {
+      const taskPath = path.join(sessionDir, safeFile);
+      const task = fs.existsSync(taskPath) ? readYaml(taskPath) : null;
+      const findingCount = (task?.review?.findings || []).length;
+      const findings = Array.from({ length: findingCount }, () => ({ status: "pending", reason: "" }));
+      entry = { file: safeFile, findings };
+      notes.tasks.push(entry);
+    }
+
+    if (body.findings !== undefined) entry.findings = body.findings;
+
+    writeNotes(sessionDir, notes);
+    jsonResponse(res, { ok: true });
   });
 
   // POST /api/sessions/:id/summary — update summary + sign-off
   router.post("/api/sessions/:id/summary", async (req, res, params) => {
-    try {
-      const safeSid = sanitizePath(params.id);
-      const sessionDir = path.join(reportsDir, safeSid);
-      if (!fs.existsSync(path.join(sessionDir, "index.yaml"))) {
-        return errorResponse(res, "Session not found", "NOT_FOUND", 404);
-      }
-
-      const body = JSON.parse(await readBody(req));
-      if (!body) return errorResponse(res, "Empty request body", "VALIDATION_ERROR", 400);
-
-      const notes = readNotes(sessionDir);
-      if (!notes.summary) notes.summary = { notes: "", signoff: { name: "", role: "", date: "" } };
-      if (body.notes !== undefined) notes.summary.notes = body.notes;
-      if (body.signoff !== undefined) {
-        if (body.signoff === null) {
-          notes.summary.signoff = { name: "", role: "", date: "" };
-        } else {
-          Object.assign(notes.summary.signoff, body.signoff);
-        }
-      }
-
-      writeNotes(sessionDir, notes);
-      jsonResponse(res, { ok: true });
-    } catch (e) {
-      throw e;
+    const safeSid = sanitizePath(params.id);
+    const sessionDir = path.join(reportsDir, safeSid);
+    if (!fs.existsSync(path.join(sessionDir, "index.yaml"))) {
+      return errorResponse(res, "Session not found", "NOT_FOUND", 404);
     }
+
+    const body = JSON.parse(await readBody(req));
+    if (!body) return errorResponse(res, "Empty request body", "VALIDATION_ERROR", 400);
+
+    const notes = readNotes(sessionDir);
+    if (!notes.summary) notes.summary = { notes: "", signoff: { name: "", role: "", date: "" } };
+    if (body.notes !== undefined) notes.summary.notes = body.notes;
+    if (body.signoff !== undefined) {
+      if (body.signoff === null) {
+        notes.summary.signoff = { name: "", role: "", date: "" };
+      } else {
+        Object.assign(notes.summary.signoff, body.signoff);
+      }
+    }
+
+    writeNotes(sessionDir, notes);
+    jsonResponse(res, { ok: true });
   });
 }

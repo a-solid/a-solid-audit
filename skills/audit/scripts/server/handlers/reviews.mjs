@@ -74,8 +74,8 @@ export function registerReviewRoutes(router, reportsDir) {
         return errorResponse(res, "Empty body", "VALIDATION_ERROR", 400);
       }
 
-      const taskFile = query.get("file");
-      if (!taskFile) {
+      const rawFile = query.get("file");
+      if (!rawFile) {
         return errorResponse(res, "Missing query parameter: file", "VALIDATION_ERROR", 400);
       }
 
@@ -90,6 +90,7 @@ export function registerReviewRoutes(router, reportsDir) {
       }
 
       const safeSid = sanitizePath(params.id);
+      const safeFile = sanitizeFilePath(rawFile);
       const sessionDir = path.join(reportsDir, safeSid);
       const indexPath = path.join(sessionDir, "index.yaml");
       const index = readYaml(indexPath);
@@ -98,12 +99,17 @@ export function registerReviewRoutes(router, reportsDir) {
         ...(index.storyTasks || []),
         ...(index.projectTasks || []),
       ];
-      const registered = allRefs.some(t => t.file === taskFile);
-      if (!registered) {
+      const taskRef = allRefs.find(t => t.file === safeFile);
+      if (!taskRef) {
         return errorResponse(res, "Task not found in session", "NOT_FOUND", 404);
       }
 
-      const result = appendReview(reportsDir, params.id, taskFile, raw.trim());
+      const currentStatus = taskRef.status || "pending";
+      if (currentStatus === "reviewed") {
+        return errorResponse(res, "Task already reviewed", "CONFLICT", 409);
+      }
+
+      const result = appendReview(reportsDir, safeSid, safeFile, raw.trim());
 
       jsonResponse(res, { ok: true, file: result.file, status: result.status, sessionStatus: index.session.status });
     } catch (e) {

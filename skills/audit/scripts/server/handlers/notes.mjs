@@ -6,6 +6,7 @@ import { readYaml, writeYaml } from "../../lib/yaml.mjs";
 import { jsonResponse, readBody, errorResponse } from "../index.mjs";
 
 const NOTES_FILE = "review-notes.yaml";
+const VALID_STATUSES = ["pending", "need-fix", "wont-fix", "not-an-issue", "well-done"];
 
 function readNotes(sessionDir) {
   const p = path.join(sessionDir, NOTES_FILE);
@@ -47,6 +48,14 @@ export function registerNoteRoutes(router, reportsDir) {
       }
       if (body.findings !== undefined && !Array.isArray(body.findings)) {
         return errorResponse(res, "findings must be an array", "VALIDATION_ERROR", 400);
+      }
+      if (body.findings) {
+        for (let i = 0; i < body.findings.length; i++) {
+          const s = body.findings[i]?.status;
+          if (s && !VALID_STATUSES.includes(s)) {
+            return errorResponse(res, "Invalid status at findings[" + i + "]: " + s, "VALIDATION_ERROR", 400);
+          }
+        }
       }
 
       const safeFile = sanitizeFilePath(body.file);

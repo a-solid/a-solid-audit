@@ -79,15 +79,32 @@ export function registerReviewRoutes(router, reportsDir) {
         return errorResponse(res, "Missing query parameter: file", "VALIDATION_ERROR", 400);
       }
 
-      const parsed = parseYaml(raw);
+      let parsed;
+      try {
+        parsed = parseYaml(raw);
+      } catch {
+        return errorResponse(res, "Invalid YAML syntax", "PARSE_ERROR", 400);
+      }
       if (!parsed || typeof parsed.score !== "number") {
         return errorResponse(res, "Invalid YAML: missing or non-numeric score", "VALIDATION_ERROR", 400);
       }
 
+      const safeSid = sanitizePath(params.id);
+      const sessionDir = path.join(reportsDir, safeSid);
+      const indexPath = path.join(sessionDir, "index.yaml");
+      const index = readYaml(indexPath);
+      const allRefs = [
+        ...(index.codeTasks || []),
+        ...(index.storyTasks || []),
+        ...(index.projectTasks || []),
+      ];
+      const registered = allRefs.some(t => t.file === taskFile);
+      if (!registered) {
+        return errorResponse(res, "Task not found in session", "NOT_FOUND", 404);
+      }
+
       const result = appendReview(reportsDir, params.id, taskFile, raw.trim());
 
-      const safeSid = sanitizePath(params.id);
-      const index = readYaml(path.join(reportsDir, safeSid, "index.yaml"));
       jsonResponse(res, { ok: true, file: result.file, status: result.status, sessionStatus: index.session.status });
     } catch (e) {
       if (e instanceof AppError) return errorResponse(res, e.message, e.code, e.status);

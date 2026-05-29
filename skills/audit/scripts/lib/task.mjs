@@ -55,6 +55,41 @@ export function updateTask(reportsDir, sid, taskFile, status, score, reviewData,
   return { file: safeTaskFile, status };
 }
 
+export function appendReview(reportsDir, sid, taskFile, yamlText) {
+  const safeSid = sanitizePath(sid);
+  const sessionDir = path.join(reportsDir, safeSid);
+  const safeTaskFile = sanitizeFilePath(taskFile);
+  const taskPath = path.join(sessionDir, safeTaskFile);
+  const indexPath = path.join(sessionDir, "index.yaml");
+
+  if (!fs.existsSync(taskPath)) throw new AppError("Task file not found", "NOT_FOUND", 404);
+  if (!fs.existsSync(indexPath)) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
+
+  fs.appendFileSync(taskPath, "\n---\n" + yamlText);
+
+  // Update status in index.yaml
+  const index = readYaml(indexPath);
+  const allTaskGroups = ["codeTasks", "storyTasks", "projectTasks"];
+  for (const group of allTaskGroups) {
+    const ref = (index[group] || []).find(t => t.file === safeTaskFile);
+    if (ref) {
+      ref.status = "reviewed";
+      break;
+    }
+  }
+  writeIndexYaml(indexPath, index);
+
+  // Check if all tasks are reviewed
+  const allReviewed = allTaskGroups.every(group =>
+    (index[group] || []).every(t => t.status === "reviewed")
+  );
+  if (allReviewed) {
+    updateSessionStatus(reportsDir, safeSid, "completed");
+  }
+
+  return { file: safeTaskFile, status: "reviewed" };
+}
+
 // Get all tasks for a session
 export function getTasks(reportsDir, sid) {
   const safeSid = sanitizePath(sid);

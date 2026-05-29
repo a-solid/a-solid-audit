@@ -31,30 +31,36 @@ const SEVERITY_ORDER = {
 };
 
 function sortFindings(findings) {
-  return [...findings].sort((a, b) => {
+  const sorted = [...findings].sort((a, b) => {
     const aOrder = SEVERITY_ORDER[a.severity] ?? 3;
     const bOrder = SEVERITY_ORDER[b.severity] ?? 3;
     return aOrder - bOrder;
   });
+  const originalIndexMap = new Map();
+  sorted.forEach((sf) => {
+    const idx = findings.indexOf(sf);
+    originalIndexMap.set(sf, idx);
+  });
+  return { sorted, originalIndexMap };
 }
 
-function getNoteStatus(noteTask, finding) {
+function getNoteStatus(noteTask, finding, originalIndexMap) {
   if (!noteTask?.findings) return null;
-  const match = noteTask.findings.find(n => n.description === finding.description);
-  return match?.status || null;
+  const idx = originalIndexMap.get(finding);
+  return noteTask.findings[idx]?.status || null;
 }
 
-function getNoteReason(noteTask, finding) {
+function getNoteReason(noteTask, finding, originalIndexMap) {
   if (!noteTask?.findings) return "";
-  const match = noteTask.findings.find(n => n.description === finding.description);
-  return match?.reason || "";
+  const idx = originalIndexMap.get(finding);
+  return noteTask.findings[idx]?.reason || "";
 }
 
 export function renderTaskDetail(task, notes) {
   if (!task) return `<div class="text-muted text-sm flex items-center gap-2">${icon("chevronRight", 16)} Select a task to view details.</div>`;
 
   const score = task.review?.score;
-  const findings = sortFindings(task.review?.findings || []);
+  const { sorted: findings, originalIndexMap } = sortFindings(task.review?.findings || []);
   const positives = task.review?.positives || [];
   const gaps = task.review?.gaps || [];
   const circumference = 2 * Math.PI * 42;
@@ -124,8 +130,8 @@ export function renderTaskDetail(task, notes) {
             </div>
             <div class="space-y-2 mt-3">
               ${findings.map((f, i) => {
-                const status = getNoteStatus(noteTask, f) || "well-done";
-                const reason = getNoteReason(noteTask, f);
+                const status = getNoteStatus(noteTask, f, originalIndexMap) || "well-done";
+                const reason = getNoteReason(noteTask, f, originalIndexMap);
                 const isReviewed = status !== null && status !== undefined;
                 return `
                 <div class="finding-card severity-met${isReviewed ? " reviewed" : ""}" data-finding="${i}">
@@ -153,7 +159,7 @@ export function renderTaskDetail(task, notes) {
             </div>
             <div class="space-y-2 mt-3">
               ${findings.map((f, i) => {
-                const status = getNoteStatus(noteTask, f) || "well-done";
+                const status = getNoteStatus(noteTask, f, originalIndexMap) || "well-done";
                 const isReviewed = status !== null && status !== undefined;
                 return `
                 <div class="finding-card severity-positive${isReviewed ? " reviewed" : ""}" data-finding="${i}">
@@ -176,14 +182,14 @@ export function renderTaskDetail(task, notes) {
           <div class="text-xs text-muted font-semibold mb-3">FINDINGS (${findings.length})</div>
           <div class="space-y-3">
             ${findings.map((f, i) => {
-              const status = getNoteStatus(noteTask, f) || (f.severity === "met" || f.severity === "positive" ? "well-done" : null);
+              const status = getNoteStatus(noteTask, f, originalIndexMap) || (f.severity === "met" || f.severity === "positive" ? "well-done" : null);
               const isNeedFix = status === "need-fix";
               const isWontFix = status === "wont-fix";
               const isNotAnIssue = status === "not-an-issue";
               const isWellDone = status === "well-done";
               const isReviewed = isNeedFix || isWontFix || isNotAnIssue || isWellDone;
               const isUnreviewed = !status;
-              const reason = getNoteReason(noteTask, f);
+              const reason = getNoteReason(noteTask, f, originalIndexMap);
 
               const statusBadge = isNeedFix ? `<span class="badge badge-need-fix">${icon("alertCircle", 10)} Need Fix</span>`
                 : isWontFix ? `<span class="badge badge-wont-fix"${reason ? ` title="${escapeHtml(reason)}"` : ""}>${icon("minus", 10)} Won't Fix${reason ? ": " + escapeHtml(reason.length > 25 ? reason.slice(0, 25) + "..." : reason) : ""}</span>`

@@ -27,27 +27,21 @@ For each file, evaluate:
 Submit your review via curl. You will receive `session-id` and `task-file` as context.
 
 ```bash
-curl -s -X POST http://localhost:3456/api/sessions/<session-id>/tasks/review \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "file": "<task-file>",
-    "status": "reviewed",
-    "score": <0-10>,
-    "review": {
-      "summary": "<2-3 sentence summary>",
-      "findings": [
-        {
-          "severity": "<critical|major|minor|info>",
-          "description": "<specific finding>",
-          "file": "<file path>",
-          "line": <line number>,
-          "code": "<multi-line code snippet>",
-          "suggestion": "<fix recommendation>"
-        }
-      ],
-      "positives": ["<what was done well>"]
-    }
-  }'
+curl -s -X POST "http://localhost:3456/api/sessions/<session-id>/tasks/review-yaml?file=<task-file>" \
+  -H 'Content-Type: text/yaml' \
+  --data-binary 'score: <0-10>
+review:
+  summary: "<2-3 sentence summary>"
+  findings:
+    - severity: <critical|major|minor|info|positive>
+      description: "<specific finding>"
+      file: "<file path>"
+      line: <line number>
+      code: |
+        <actual code snippet, preserved with line breaks>
+      suggestion: "<fix recommendation>"
+  positives:
+    - "<what was done well>"'
 ```
 
 ### Score Guide
@@ -70,6 +64,7 @@ curl -s -X POST http://localhost:3456/api/sessions/<session-id>/tasks/review \
 
 - `description` is required for each finding
 - `file`, `line`, `code`, `suggestion` are optional — include when helpful
+- Use YAML `|` block scalar for multi-line `code` values — do NOT flatten code into a single line
 - Provide `suggestion` for critical and major findings
 - `findings` array must contain at least one entry — include a `positive` severity finding for high-quality code (score 7+)
 - `positives` array may be empty — findings with `positive` severity serve this purpose

@@ -270,7 +270,6 @@ export function writeCodeTaskYaml(filePath, data) {
     name: data.name,
     language: data.language || "unknown",
     diff: data.diff || "",
-    review: data.review || { score: 0, summary: "", findings: [], positives: [] },
   });
 }
 
@@ -280,7 +279,6 @@ export function writeStoryTaskYaml(filePath, data) {
     description: data.description || "",
     acceptance: data.acceptance || "",
     files: data.files || [],
-    review: data.review || { score: 0, summary: "", findings: [], gaps: [], positives: [] },
   });
 }
 
@@ -290,7 +288,6 @@ export function writeProjectTaskYaml(filePath, data) {
     type: data.type || "unknown",
     entry: data.entry || null,
     files: data.files || [],
-    review: data.review || { score: 0, summary: "", findings: [], positives: [] },
   });
 }
 

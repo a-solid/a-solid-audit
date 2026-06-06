@@ -5,42 +5,38 @@ import { sanitizePath, resolveSessionPath } from "../../lib/session.mjs";
 import { readYaml, writeYaml } from "../../lib/yaml.mjs";
 import { jsonResponse, readBody, errorResponse } from "../index.mjs";
 
+const NOTES_FILE = "review-notes.yaml";
 const VALID_STATUSES = ["pending", "need-fix", "wont-fix", "not-an-issue", "well-done"];
 
-function resolveRoundDirFromSession(reportsDir, sid) {
+function resolveSessionDir(reportsDir, sid) {
   const safeSid = sanitizePath(sid);
   const indexPath = resolveSessionPath(reportsDir, safeSid);
   if (!indexPath) return null;
-  const index = readYaml(indexPath);
-  if (index.session.roundId) {
-    return path.join(reportsDir, sanitizePath(index.session.roundId));
-  }
-  // Fallback: session lives at top level, notes are in session dir
   return path.dirname(indexPath);
 }
 
-function readRoundNotes(roundDir) {
-  const p = path.join(roundDir, "review-notes.yaml");
+function readNotes(sessionDir) {
+  const p = path.join(sessionDir, NOTES_FILE);
   if (!fs.existsSync(p)) return { tasks: [], summary: { notes: "", signoff: { name: "", role: "", date: "" } } };
   return readYaml(p);
 }
 
-function writeRoundNotes(roundDir, data) {
-  writeYaml(path.join(roundDir, "review-notes.yaml"), data);
+function writeNotes(sessionDir, data) {
+  writeYaml(path.join(sessionDir, NOTES_FILE), data);
 }
 
 export function registerNoteRoutes(router, reportsDir) {
-  // GET /api/sessions/:id/notes — delegates to round-level notes
+  // GET /api/sessions/:id/notes
   router.get("/api/sessions/:id/notes", (req, res, params) => {
-    const roundDir = resolveRoundDirFromSession(reportsDir, params.id);
-    if (!roundDir) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
-    jsonResponse(res, readRoundNotes(roundDir));
+    const sessionDir = resolveSessionDir(reportsDir, params.id);
+    if (!sessionDir) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
+    jsonResponse(res, readNotes(sessionDir));
   });
 
-  // POST /api/sessions/:id/notes — delegates to round-level notes
+  // POST /api/sessions/:id/notes — update task review
   router.post("/api/sessions/:id/notes", async (req, res, params) => {
-    const roundDir = resolveRoundDirFromSession(reportsDir, params.id);
-    if (!roundDir) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
+    const sessionDir = resolveSessionDir(reportsDir, params.id);
+    if (!sessionDir) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
 
     const body = JSON.parse(await readBody(req));
     if (!body || typeof body.file !== "string" || !body.file) {
@@ -59,7 +55,7 @@ export function registerNoteRoutes(router, reportsDir) {
     }
 
     const safeFile = body.file;
-    const notes = readRoundNotes(roundDir);
+    const notes = readNotes(sessionDir);
     let entry = notes.tasks.find(t => t.file === safeFile);
     if (!entry) {
       entry = { file: safeFile, findings: [] };
@@ -68,19 +64,19 @@ export function registerNoteRoutes(router, reportsDir) {
 
     if (body.findings !== undefined) entry.findings = body.findings;
 
-    writeRoundNotes(roundDir, notes);
+    writeNotes(sessionDir, notes);
     jsonResponse(res, { ok: true });
   });
 
-  // POST /api/sessions/:id/summary — delegates to round-level summary
+  // POST /api/sessions/:id/summary — update summary + sign-off
   router.post("/api/sessions/:id/summary", async (req, res, params) => {
-    const roundDir = resolveRoundDirFromSession(reportsDir, params.id);
-    if (!roundDir) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
+    const sessionDir = resolveSessionDir(reportsDir, params.id);
+    if (!sessionDir) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
 
     const body = JSON.parse(await readBody(req));
     if (!body) return errorResponse(res, "Empty request body", "VALIDATION_ERROR", 400);
 
-    const notes = readRoundNotes(roundDir);
+    const notes = readNotes(sessionDir);
     if (!notes.summary) notes.summary = { notes: "", signoff: { name: "", role: "", date: "" } };
     if (body.notes !== undefined) notes.summary.notes = body.notes;
     if (body.signoff !== undefined) {
@@ -91,7 +87,7 @@ export function registerNoteRoutes(router, reportsDir) {
       }
     }
 
-    writeRoundNotes(roundDir, notes);
+    writeNotes(sessionDir, notes);
     jsonResponse(res, { ok: true });
   });
 }

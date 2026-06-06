@@ -445,6 +445,7 @@ export function renderGroupStep(content, state) {
       confirmBtn.innerHTML = '<span class="spinner spinner-sm"></span> Confirming...';
       try {
         await api.confirmGroups(state.sessionId);
+        await api.advance(state.sessionId, { action: "confirm-groups" }).catch(() => {});
         const stepContent = document.getElementById("group-step-content");
         if (stepContent) {
           stepContent.innerHTML = `<div style="text-align:center;padding:var(--space-8)">
@@ -524,8 +525,25 @@ export function renderProjectReady(content, state) {
   localStorage.removeItem(`audit-wizard-${state.sessionId}`);
 
   const termEl = document.getElementById("project-ready-terminal");
-  renderTerminalCard(termEl, `start review ${state.sessionId}`, {
-    viewProgressHref: `#/progress/${state.sessionId}`,
+  termEl.innerHTML = `
+    <div style="text-align:center;padding:var(--space-4)">
+      <button id="project-start-review-btn" class="btn btn-primary">${icon("zap", 14)} Start Review</button>
+    </div>`;
+
+  document.getElementById("project-start-review-btn")?.addEventListener("click", async () => {
+    const btn = document.getElementById("project-start-review-btn");
+    const originalHTML = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner spinner-sm"></span> Starting...';
+    try {
+      await api.advance(state.sessionId, { action: "start" });
+      await api.updateSessionStatus(state.sessionId, "reviewing");
+      location.hash = `#/progress/${state.sessionId}`;
+    } catch (e) {
+      showToast("Failed to start review: " + e.message);
+      btn.disabled = false;
+      btn.innerHTML = originalHTML;
+    }
   });
 
   // Poll for session status change — auto-redirect when review starts

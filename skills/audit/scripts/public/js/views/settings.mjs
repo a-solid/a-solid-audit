@@ -77,6 +77,24 @@ export async function renderSettings(container) {
     </div>
 
     <div class="card mb-4">
+      <h2 class="font-semibold mb-4">Audit Storage</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label for="audit-root">Root Directory</label>
+          <input id="audit-root" class="mt-1" placeholder="~/.audit"
+            value="${escapeHtml(settings.audit?.rootDir || "~/.audit")}">
+          <div class="text-xs text-muted mt-1">Centralized directory for all project audit data.</div>
+        </div>
+        <div>
+          <label for="audit-project">Project Name Override</label>
+          <input id="audit-project" class="mt-1" placeholder="(auto-detect from directory name)"
+            value="${escapeHtml(settings.audit?.projectName || "")}">
+          <div class="text-xs text-muted mt-1">Leave empty to use the directory name.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-4">
       <h2 class="font-semibold mb-4">CodeGraph</h2>
       <div>
         <label for="cg-path">Binary Path</label>
@@ -149,6 +167,15 @@ export async function renderSettings(container) {
 
     const cgPath = document.getElementById("cg-path").value;
     if (cgPath) payload.codegraph = { path: cgPath };
+
+    const auditRoot = document.getElementById("audit-root").value.trim();
+    const auditProject = document.getElementById("audit-project").value.trim();
+    if (auditRoot || auditProject) {
+      payload.audit = {
+        rootDir: auditRoot || "~/.audit",
+        projectName: auditProject || null,
+      };
+    }
 
     const customVarRows = varsList.querySelectorAll(".flex.gap-2");
     const vars = [];

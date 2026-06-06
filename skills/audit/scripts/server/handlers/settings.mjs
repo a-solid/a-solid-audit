@@ -52,6 +52,10 @@ function toPublicResponse(settings) {
     key: v.key,
     configured: !!(v.value),
   }));
+  result.audit = {
+    rootDir: settings.audit?.rootDir || "~/.audit",
+    projectName: settings.audit?.projectName || "",
+  };
   return result;
 }
 
@@ -75,6 +79,7 @@ export function registerSettingsRoutes(router) {
       if (body.database) existing.database = body.database;
       if (body.codegraph) existing.codegraph = body.codegraph;
       if (body.customVars) existing.customVars = body.customVars;
+      if (body.audit) existing.audit = body.audit;
 
       saveSettings(existing);
       jsonResponse(res, toPublicResponse(existing));

@@ -51,15 +51,21 @@ export function sessionId() {
 }
 
 // List all sessions in .audit/ directory
-export function listSessions(reportsDir) {
+export function listSessions(reportsDir, roundId) {
   if (!fs.existsSync(reportsDir)) return [];
-  const entries = fs.readdirSync(reportsDir).filter(e => {
-    const full = path.join(reportsDir, e);
+  let scanDir = reportsDir;
+  if (roundId) {
+    const safeRoundId = sanitizePath(roundId);
+    scanDir = path.join(reportsDir, safeRoundId);
+    if (!fs.existsSync(scanDir)) return [];
+  }
+  const entries = fs.readdirSync(scanDir).filter(e => {
+    const full = path.join(scanDir, e);
     if (!fs.statSync(full).isDirectory()) return false;
     return fs.existsSync(path.join(full, "index.yaml"));
   });
   return entries.map(id => {
-    const index = readYaml(path.join(reportsDir, id, "index.yaml"));
+    const index = readYaml(path.join(scanDir, id, "index.yaml"));
     const taskRefs = [
       ...(index.codeTasks || []),
       ...(index.storyTasks || []),
@@ -71,6 +77,7 @@ export function listSessions(reportsDir) {
       type: index.session.type,
       status: index.session.status || "created",
       created: index.session.created,
+      roundId: index.session.roundId || null,
       progress: {
         total: taskRefs.length,
         reviewed,
@@ -80,12 +87,27 @@ export function listSessions(reportsDir) {
   }).sort((a, b) => b.id.localeCompare(a.id));
 }
 
+export function resolveSessionPath(reportsDir, safeSid) {
+  // Try direct path first (flat layout, for any legacy sessions)
+  const direct = path.join(reportsDir, safeSid, "index.yaml");
+  if (fs.existsSync(direct)) return direct;
+  // Search round subdirectories
+  if (fs.existsSync(reportsDir)) {
+    for (const entry of fs.readdirSync(reportsDir)) {
+      const candidate = path.join(reportsDir, entry);
+      if (!fs.statSync(candidate).isDirectory()) continue;
+      const roundPath = path.join(candidate, safeSid, "index.yaml");
+      if (fs.existsSync(roundPath)) return roundPath;
+    }
+  }
+  return null;
+}
+
 // Get single session detail
 export function getSession(reportsDir, sid) {
   const safeSid = sanitizePath(sid);
-  const sessionDir = path.join(reportsDir, safeSid);
-  const indexPath = path.join(sessionDir, "index.yaml");
-  if (!fs.existsSync(indexPath)) return null;
+  const indexPath = resolveSessionPath(reportsDir, safeSid);
+  if (!indexPath) return null;
   const index = readYaml(indexPath);
 
   const codeTasks = [];
@@ -130,8 +152,8 @@ export function updateSessionStatus(reportsDir, sid, newStatus) {
     throw new AppError("Invalid status: " + newStatus, "VALIDATION_ERROR", 400);
   }
   const safeSid = sanitizePath(sid);
-  const indexPath = path.join(reportsDir, safeSid, "index.yaml");
-  if (!fs.existsSync(indexPath)) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
+  const indexPath = resolveSessionPath(reportsDir, safeSid);
+  if (!indexPath) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
   const index = readYaml(indexPath);
   const current = index.session.status || "created";
   const type = index.session.type || "code";
@@ -151,8 +173,8 @@ export function updateSessionStatus(reportsDir, sid, newStatus) {
 const MUTABLE_FIELDS = ["projectDir"];
 export function updateSession(reportsDir, sid, updates) {
   const safeSid = sanitizePath(sid);
-  const indexPath = path.join(reportsDir, safeSid, "index.yaml");
-  if (!fs.existsSync(indexPath)) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
+  const indexPath = resolveSessionPath(reportsDir, safeSid);
+  if (!indexPath) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
   const index = readYaml(indexPath);
   for (const key of MUTABLE_FIELDS) {
     if (key in updates) {
@@ -163,47 +185,50 @@ export function updateSession(reportsDir, sid, updates) {
   return index.session;
 }
 
-// Initialize a new session directory
-export function initSession(reportsDir, sid) {
-  const safeSid = sanitizePath(sid);
-  const base = path.join(reportsDir, safeSid);
-  fs.mkdirSync(path.join(base, "code-tasks"), { recursive: true });
-  fs.mkdirSync(path.join(base, "story-tasks"), { recursive: true });
-  fs.mkdirSync(path.join(base, "project-tasks"), { recursive: true });
-  fs.writeFileSync(
-    path.join(base, "review-context.md"),
-    "## User Context\n\n\n## Review Notes\n<!-- AI agents append shared observations here -->\n",
-    "utf-8",
-  );
-  return base;
-}
-
 // Create a new session with initial index.yaml
 export function createSession(reportsDir, sid, options = {}) {
   const safeSid = sanitizePath(sid);
-  const base = initSession(reportsDir, safeSid);
-  const indexPath = path.join(base, "index.yaml");
-  writeIndexYaml(indexPath, {
+  let sessionDir;
+  if (options.roundId) {
+    const safeRoundId = sanitizePath(options.roundId);
+    const roundDir = path.join(reportsDir, safeRoundId);
+    if (!fs.existsSync(path.join(roundDir, "round.yaml"))) {
+      throw new AppError("Round not found: " + safeRoundId, "NOT_FOUND", 404);
+    }
+    sessionDir = path.join(roundDir, safeSid);
+  } else {
+    sessionDir = path.join(reportsDir, safeSid);
+  }
+  fs.mkdirSync(path.join(sessionDir, "code-tasks"), { recursive: true });
+  fs.mkdirSync(path.join(sessionDir, "story-tasks"), { recursive: true });
+  fs.mkdirSync(path.join(sessionDir, "project-tasks"), { recursive: true });
+  fs.writeFileSync(
+    path.join(sessionDir, "review-context.md"),
+    "## User Context\n\n\n## Review Notes\n<!-- AI agents append shared observations here -->\n",
+    "utf-8",
+  );
+  writeIndexYaml(path.join(sessionDir, "index.yaml"), {
     session: {
       id: safeSid,
       type: options.type || "code",
       status: "created",
       scope: options.type === "project" ? null : { method: "", ref: "" },
       projectDir: options.projectDir || null,
+      roundId: options.roundId || null,
       created: new Date().toISOString(),
     },
     codeTasks: [],
     storyTasks: [],
     projectTasks: [],
   });
-  return { id: safeSid, dir: base };
+  return { id: safeSid, dir: sessionDir };
 }
 
 // Reset reviewing tasks to pending (for resume)
 export function resetReviewing(reportsDir, sid) {
   const safeSid = sanitizePath(sid);
-  const indexPath = path.join(reportsDir, safeSid, "index.yaml");
-  if (!fs.existsSync(indexPath)) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
+  const indexPath = resolveSessionPath(reportsDir, safeSid);
+  if (!indexPath) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
 
   const index = readYaml(indexPath);
   let resetCount = 0;

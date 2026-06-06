@@ -4,7 +4,7 @@ import path from "node:path";
 import { setProjectScope, getProjectMap, generateTasksFromGroups } from "../../lib/project-scan.mjs";
 import { getScanLogs, clearScanLogs } from "../../lib/scan-log.mjs";
 import { readYaml, writeIndexYaml } from "../../lib/yaml.mjs";
-import { sanitizePath, updateSessionStatus } from "../../lib/session.mjs";
+import { sanitizePath, updateSessionStatus, resolveSessionPath } from "../../lib/session.mjs";
 import { jsonResponse, errorResponse } from "../index.mjs";
 
 export function registerProjectScanRoutes(router, reportsDir, projectDir) {
@@ -12,12 +12,9 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
   router.post("/api/sessions/:id/scan", async (req, res, params) => {
     try {
       const safeSid = sanitizePath(params.id);
-      const sessionDir = path.join(reportsDir, safeSid);
-      const indexPath = path.join(sessionDir, "index.yaml");
-
-      if (!fs.existsSync(indexPath)) {
-        return errorResponse(res, "Session not found", "NOT_FOUND", 404);
-      }
+      const indexPath = resolveSessionPath(reportsDir, safeSid);
+      if (!indexPath) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
+      const sessionDir = path.dirname(indexPath);
 
       const index = readYaml(indexPath);
       if (!["project", "project-scan"].includes(index.session.type)) {
@@ -57,11 +54,11 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
   router.get("/api/sessions/:id/scan/status", (req, res, params) => {
     try {
       const safeSid = sanitizePath(params.id);
-      const sessionDir = path.join(reportsDir, safeSid);
-      const indexPath = path.join(sessionDir, "index.yaml");
-      if (!fs.existsSync(indexPath)) {
+      const indexPath = resolveSessionPath(reportsDir, safeSid);
+      if (!indexPath) {
         return jsonResponse(res, { status: "none" });
       }
+      const sessionDir = path.dirname(indexPath);
       const index = readYaml(indexPath);
       const status = index.session.status;
       if (status === "scanned") {
@@ -150,7 +147,10 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
   router.get("/api/sessions/:id/graph-data", (req, res, params) => {
     try {
       const safeSid = sanitizePath(params.id);
-      const graphDataPath = path.join(reportsDir, safeSid, "graph-data.json");
+      const indexPath = resolveSessionPath(reportsDir, safeSid);
+      if (!indexPath) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
+      const sessionDir = path.dirname(indexPath);
+      const graphDataPath = path.join(sessionDir, "graph-data.json");
       if (!fs.existsSync(graphDataPath)) {
         return errorResponse(res, "Graph data not found", "NOT_FOUND", 404);
       }
@@ -165,7 +165,10 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
   router.get("/api/sessions/:id/groups", (req, res, params) => {
     try {
       const safeSid = sanitizePath(params.id);
-      const groupsPath = path.join(reportsDir, safeSid, "groups.json");
+      const indexPath = resolveSessionPath(reportsDir, safeSid);
+      if (!indexPath) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
+      const sessionDir = path.dirname(indexPath);
+      const groupsPath = path.join(sessionDir, "groups.json");
       if (!fs.existsSync(groupsPath)) {
         return jsonResponse(res, { status: "pending" });
       }
@@ -180,11 +183,10 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
   router.put("/api/sessions/:id/groups", async (req, res, params) => {
     try {
       const safeSid = sanitizePath(params.id);
-      const sessionDir = path.join(reportsDir, safeSid);
+      const indexPath = resolveSessionPath(reportsDir, safeSid);
+      if (!indexPath) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
+      const sessionDir = path.dirname(indexPath);
       const groupsPath = path.join(sessionDir, "groups.json");
-      if (!fs.existsSync(path.join(sessionDir, "index.yaml"))) {
-        return errorResponse(res, "Session not found", "NOT_FOUND", 404);
-      }
 
       let body = "";
       for await (const chunk of req) body += chunk;
@@ -204,11 +206,9 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
   router.post("/api/sessions/:id/groups/confirm", async (req, res, params) => {
     try {
       const safeSid = sanitizePath(params.id);
-      const sessionDir = path.join(reportsDir, safeSid);
-      const indexPath = path.join(sessionDir, "index.yaml");
-      if (!fs.existsSync(indexPath)) {
-        return errorResponse(res, "Session not found", "NOT_FOUND", 404);
-      }
+      const indexPath = resolveSessionPath(reportsDir, safeSid);
+      if (!indexPath) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
+      const sessionDir = path.dirname(indexPath);
 
       const result = generateTasksFromGroups(reportsDir, safeSid);
 

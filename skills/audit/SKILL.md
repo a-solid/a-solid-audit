@@ -38,9 +38,9 @@ This skill operates with **high autonomy**. Do not ask for permission between in
    Note the `id` from the response. This is the `round-id`.
 5. Create a session within the round:
    ```bash
-   curl -s -X POST http://localhost:3456/api/sessions -H 'Content-Type: application/json' -d '{"type":"code","roundId":"<round-id>"}'
+   curl -s -X POST http://localhost:3456/api/rounds/<round-id>/sessions -H 'Content-Type: application/json' -d '{"type":"code"}'
    ```
-   Note the `id` from the response.
+   Note the `id` and `version` from the response.
 6. **Wait for user to finish configuring** by calling:
    ```bash
    curl http://localhost:3456/wait
@@ -132,3 +132,24 @@ For each project task with status `pending`, same parallel pattern (up to 2):
 ### 7. Completion
 
 When all tasks are reviewed, the review API automatically sets session status to `completed`. Tell the user: "Review complete. Findings at http://localhost:3456." If any tasks failed and remain `pending`, report them: "N tasks failed to review. You can retry with `start review <session-id>`."
+
+### 8. Re-Review (if findings need fixes)
+
+If the user marks findings as `need-fix` and wants to re-review after code changes:
+
+1. The user clicks "Re-review" in the browser (on the round detail page)
+2. The browser calls `POST /api/rounds/<round-id>/re-review` with selected files
+3. A new session is created with `version = previous + 1` containing only the need-fix files
+4. Wait for the new session to be ready: `curl http://localhost:3456/wait`
+5. Proceed with the review loop on the new session's tasks
+6. After completion, the round summary aggregates the latest review per file
+
+Alternatively, trigger via API:
+```bash
+curl -s -X POST http://localhost:3456/api/rounds/<round-id>/re-review -H 'Content-Type: application/json' -d '{}'
+```
+
+To include additional files beyond need-fix ones:
+```bash
+curl -s -X POST http://localhost:3456/api/rounds/<round-id>/re-review -H 'Content-Type: application/json' -d '{"files":["src/extra-file.ts"]}'
+```

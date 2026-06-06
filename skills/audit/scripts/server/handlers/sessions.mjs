@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
-  listSessions, getSession, createSession, updateSessionStatus, updateSession, sessionId, sanitizePath,
+  listSessions, getSession, createSession, updateSessionStatus, updateSession, sessionId, sanitizePath, resolveSessionPath,
 } from "../../lib/session.mjs";
 import { jsonResponse, readBody, errorResponse } from "../index.mjs";
 import { resolveProjectDir } from "../../lib/paths.mjs";
@@ -93,10 +93,9 @@ export function registerSessionRoutes(router, reportsDir) {
   router.get("/api/sessions/:id/review-context", (req, res, params) => {
     try {
       const safeSid = sanitizePath(params.id);
-      const sessionDir = path.join(reportsDir, safeSid);
-      if (!fs.existsSync(path.join(sessionDir, "index.yaml"))) {
-        return errorResponse(res, "Session not found", "NOT_FOUND", 404);
-      }
+      const resolvedIndex = resolveSessionPath(reportsDir, safeSid);
+      if (!resolvedIndex) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
+      const sessionDir = path.dirname(resolvedIndex);
       const context = readContextFile(sessionDir);
       jsonResponse(res, { context });
     } catch (e) {
@@ -108,10 +107,9 @@ export function registerSessionRoutes(router, reportsDir) {
   router.put("/api/sessions/:id/review-context", async (req, res, params) => {
     try {
       const safeSid = sanitizePath(params.id);
-      const sessionDir = path.join(reportsDir, safeSid);
-      if (!fs.existsSync(path.join(sessionDir, "index.yaml"))) {
-        return errorResponse(res, "Session not found", "NOT_FOUND", 404);
-      }
+      const resolvedIndex = resolveSessionPath(reportsDir, safeSid);
+      if (!resolvedIndex) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
+      const sessionDir = path.dirname(resolvedIndex);
       const body = JSON.parse(await readBody(req));
       if (!body || typeof body.context !== "string") {
         return errorResponse(res, "Missing required field: context", "VALIDATION_ERROR", 400);
@@ -127,10 +125,9 @@ export function registerSessionRoutes(router, reportsDir) {
   router.post("/api/sessions/:id/review-notes", async (req, res, params) => {
     try {
       const safeSid = sanitizePath(params.id);
-      const sessionDir = path.join(reportsDir, safeSid);
-      if (!fs.existsSync(path.join(sessionDir, "index.yaml"))) {
-        return errorResponse(res, "Session not found", "NOT_FOUND", 404);
-      }
+      const resolvedIndex = resolveSessionPath(reportsDir, safeSid);
+      if (!resolvedIndex) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
+      const sessionDir = path.dirname(resolvedIndex);
       const body = JSON.parse(await readBody(req));
       if (!body || typeof body.notes !== "string") {
         return errorResponse(res, "Missing required field: notes", "VALIDATION_ERROR", 400);

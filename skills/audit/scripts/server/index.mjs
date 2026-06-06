@@ -13,6 +13,7 @@ import { registerReviewRoutes } from "./handlers/reviews.mjs";
 import { registerProjectScanRoutes } from "./handlers/project-scan.mjs";
 import { registerSettingsRoutes } from "./handlers/settings.mjs";
 import { registerWaitRoutes, cancelAllWaiters } from "./handlers/wait.mjs";
+import { registerRoundRoutes } from "./handlers/rounds.mjs";
 import { AppError } from "../lib/errors.mjs";
 import { resolveReportsDir } from "../lib/paths.mjs";
 
@@ -60,6 +61,7 @@ export function startServer(projectDir, port = 3456) {
   registerProjectScanRoutes(router, reportsDir, projectDir);
   registerSettingsRoutes(router);
   registerWaitRoutes(router);
+  registerRoundRoutes(router, projectDir);
 
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, `http://localhost:${port}`);

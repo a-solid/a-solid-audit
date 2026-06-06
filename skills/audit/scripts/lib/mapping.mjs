@@ -1,16 +1,35 @@
 // skills/audit/scripts/lib/mapping.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { sanitizePath, updateSessionStatus } from "./session.mjs";
+import { sanitizePath, updateSessionStatus, resolveSessionPath } from "./session.mjs";
 import { taskFileName, runGitDiff, parseDiffByFile, detectLanguage } from "./git.mjs";
 import { readYaml, writeIndexYaml, writeCodeTaskYaml } from "./yaml.mjs";
 
 // Generate code task YAMLs from git diff scope and update index
 export function setScope(projectDir, reportsDir, sid, scopeType, scopeRef, excludeFiles = []) {
   const safeSid = sanitizePath(sid);
-  const sessionDir = path.join(reportsDir, safeSid);
-  const indexPath = path.join(sessionDir, "index.yaml");
-  if (!fs.existsSync(indexPath)) throw new Error("Session not found: " + safeSid);
+  const resolvedIndex = resolveSessionPath(reportsDir, safeSid);
+  if (!resolvedIndex) throw new Error("Session not found: " + safeSid);
+  const sessionDir = path.dirname(resolvedIndex);
+  const indexPath = resolvedIndex;
+
+  const index = readYaml(indexPath);
+  const existingType = index.session.type;
+
+  // Exclude files where all prior findings are resolved
+  const resolvedFiles = new Set();
+  if (index.session.roundId) {
+    const roundNotesPath = path.join(reportsDir, sanitizePath(index.session.roundId), "review-notes.yaml");
+    if (fs.existsSync(roundNotesPath)) {
+      const roundNotes = readYaml(roundNotesPath);
+      for (const task of roundNotes.tasks || []) {
+        const taskFindings = task.findings || [];
+        if (taskFindings.length > 0 && taskFindings.every(f => ["wont-fix", "not-an-issue", "well-done"].includes(f.status))) {
+          resolvedFiles.add(task.file);
+        }
+      }
+    }
+  }
 
   const diff = runGitDiff(scopeType, scopeRef, projectDir);
   if (!diff.trim()) throw new Error("No diff found for the selected scope");
@@ -23,6 +42,7 @@ export function setScope(projectDir, reportsDir, sid, scopeType, scopeRef, exclu
   const tasks = [];
   for (const [filePath, fileData] of Object.entries(filesMap)) {
     if (exclude.has(filePath)) continue;
+    if (resolvedFiles.has("code-tasks/" + taskFileName(filePath))) continue;
     const diffText = fileData.diff;
     const hasChanges = diffText.split("\n").some(
       l => (l.startsWith("+") && !l.startsWith("+++")) || (l.startsWith("-") && !l.startsWith("---"))
@@ -37,8 +57,6 @@ export function setScope(projectDir, reportsDir, sid, scopeType, scopeRef, exclu
     tasks.push({ file: "code-tasks/" + tf, status: "pending" });
   }
 
-  const index = readYaml(indexPath);
-  const existingType = index.session.type;
   const sessionType = existingType === "all" ? "all" : "code";
   writeIndexYaml(indexPath, {
     session: {

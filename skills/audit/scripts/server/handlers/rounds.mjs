@@ -1,12 +1,11 @@
 // skills/audit/scripts/server/handlers/rounds.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { sanitizePath } from "../../lib/session.mjs";
-import { readYaml, writeYaml } from "../../lib/yaml.mjs";
+import { sanitizePath, sessionId, createSession, resolveSessionPath, listSessions } from "../../lib/session.mjs";
+import { readYaml, writeYaml, writeIndexYaml, writeCodeTaskYaml } from "../../lib/yaml.mjs";
+import { runGitDiff, parseDiffByFile, detectLanguage, taskFileName } from "../../lib/git.mjs";
 import { jsonResponse, errorResponse, readBody } from "../index.mjs";
-import { resolveReportsDir } from "../../lib/paths.mjs";
-
-const VALID_STATUSES = ["pending", "need-fix", "wont-fix", "not-an-issue", "well-done"];
+import { resolveReportsDir, resolveProjectDir } from "../../lib/paths.mjs";
 
 function findRoundDir(projectDir, rid) {
   const reportsDir = resolveReportsDir(projectDir);
@@ -14,16 +13,6 @@ function findRoundDir(projectDir, rid) {
   const roundDir = path.join(reportsDir, safeRid);
   if (!fs.existsSync(path.join(roundDir, "round.yaml"))) return null;
   return roundDir;
-}
-
-function readRoundNotes(roundDir) {
-  const p = path.join(roundDir, "review-notes.yaml");
-  if (!fs.existsSync(p)) return { tasks: [], summary: { notes: "", signoff: { name: "", role: "", date: "" } } };
-  return readYaml(p);
-}
-
-function writeRoundNotes(roundDir, data) {
-  writeYaml(path.join(roundDir, "review-notes.yaml"), data);
 }
 
 export function registerRoundRoutes(router, projectDir) {
@@ -52,8 +41,6 @@ export function registerRoundRoutes(router, projectDir) {
       created: new Date().toISOString(),
     });
 
-    writeRoundNotes(roundDir, { tasks: [], summary: { notes: "", signoff: { name: "", role: "", date: "" } } });
-
     jsonResponse(res, { id: rid, name }, 201);
   });
 
@@ -79,6 +66,7 @@ export function registerRoundRoutes(router, projectDir) {
           sessions.push({
             id: index.session.id,
             type: index.session.type,
+            version: index.session.version || 1,
             status: index.session.status || "created",
             created: index.session.created,
           });
@@ -98,7 +86,6 @@ export function registerRoundRoutes(router, projectDir) {
     if (!roundDir) return errorResponse(res, "Round not found", "NOT_FOUND", 404);
 
     const data = readYaml(path.join(roundDir, "round.yaml"));
-    const notes = readRoundNotes(roundDir);
 
     const sessions = [];
     for (const entry of fs.readdirSync(roundDir)) {
@@ -111,6 +98,7 @@ export function registerRoundRoutes(router, projectDir) {
         sessions.push({
           id: index.session.id,
           type: index.session.type,
+          version: index.session.version || 1,
           status: index.session.status || "created",
           created: index.session.created,
           progress: { total: taskRefs.length, reviewed, percentage: taskRefs.length ? Math.round((reviewed / taskRefs.length) * 100) : 0 },
@@ -119,71 +107,203 @@ export function registerRoundRoutes(router, projectDir) {
     }
     sessions.sort((a, b) => b.created.localeCompare(a.created));
 
-    jsonResponse(res, { id: params.roundId, name: data.name, description: data.description || "", created: data.created, sessions, notes });
+    jsonResponse(res, { id: params.roundId, name: data.name, description: data.description || "", created: data.created, sessions });
   });
 
-  // GET /api/rounds/:roundId/notes
-  router.get("/api/rounds/:roundId/notes", (req, res, params) => {
-    const roundDir = findRoundDir(projectDir, params.roundId);
-    if (!roundDir) return errorResponse(res, "Round not found", "NOT_FOUND", 404);
-    jsonResponse(res, readRoundNotes(roundDir));
-  });
-
-  // POST /api/rounds/:roundId/notes — update findings
-  router.post("/api/rounds/:roundId/notes", async (req, res, params) => {
+  // POST /api/rounds/:roundId/sessions — create session within round
+  router.post("/api/rounds/:roundId/sessions", async (req, res, params) => {
     const roundDir = findRoundDir(projectDir, params.roundId);
     if (!roundDir) return errorResponse(res, "Round not found", "NOT_FOUND", 404);
 
-    const body = JSON.parse(await readBody(req));
-    if (!body || typeof body.file !== "string" || !body.file) {
-      return errorResponse(res, "Missing required field: file", "VALIDATION_ERROR", 400);
+    let body = {};
+    try { body = JSON.parse(await readBody(req)); } catch {}
+
+    const reportsDir = resolveReportsDir(projectDir);
+    const sessions = listSessions(reportsDir, params.roundId);
+    const maxVersion = sessions.reduce((max, s) => Math.max(max, s.version || 1), 0);
+    const nextVersion = maxVersion + 1;
+
+    const sid = sessionId();
+    const options = {
+      type: body.type || "code",
+      projectDir: resolveProjectDir(),
+      roundId: params.roundId,
+      version: nextVersion,
+    };
+
+    const result = createSession(reportsDir, sid, options);
+    jsonResponse(res, { id: result.id, version: nextVersion, roundId: params.roundId }, 201);
+  });
+
+  // POST /api/rounds/:roundId/re-review — create new versioned session with need-fix files
+  router.post("/api/rounds/:roundId/re-review", async (req, res, params) => {
+    const roundDir = findRoundDir(projectDir, params.roundId);
+    if (!roundDir) return errorResponse(res, "Round not found", "NOT_FOUND", 404);
+
+    let body = {};
+    try { body = JSON.parse(await readBody(req)); } catch {}
+
+    const reportsDir = resolveReportsDir(projectDir);
+    const sessions = listSessions(reportsDir, params.roundId);
+    if (sessions.length === 0) {
+      return errorResponse(res, "No sessions in this round", "NOT_FOUND", 404);
     }
-    if (body.findings !== undefined && !Array.isArray(body.findings)) {
-      return errorResponse(res, "findings must be an array", "VALIDATION_ERROR", 400);
-    }
-    if (body.findings) {
-      for (let i = 0; i < body.findings.length; i++) {
-        const s = body.findings[i]?.status;
-        if (s && !VALID_STATUSES.includes(s)) {
-          return errorResponse(res, "Invalid status at findings[" + i + "]: " + s, "VALIDATION_ERROR", 400);
+
+    // Find latest session
+    const latest = sessions.reduce((a, b) => (a.version || 1) > (b.version || 1) ? a : b);
+    const latestIndexPath = resolveSessionPath(reportsDir, latest.id);
+    if (!latestIndexPath) return errorResponse(res, "Latest session not found", "NOT_FOUND", 404);
+    const latestDir = path.dirname(latestIndexPath);
+
+    // Read latest session's review-notes to find need-fix files
+    const notesPath = path.join(latestDir, "review-notes.yaml");
+    const needFixFiles = new Set();
+    if (fs.existsSync(notesPath)) {
+      const notes = readYaml(notesPath);
+      for (const task of notes.tasks || []) {
+        const hasNeedFix = (task.findings || []).some(f => f.status === "need-fix");
+        if (hasNeedFix) {
+          for (const f of task.findings || []) {
+            if (f.file) needFixFiles.add(f.file);
+          }
         }
       }
     }
 
-    const safeFile = body.file;
-    const notes = readRoundNotes(roundDir);
-    let entry = notes.tasks.find(t => t.file === safeFile);
-    if (!entry) {
-      entry = { file: safeFile, findings: [] };
-      notes.tasks.push(entry);
+    // Merge with user-specified files
+    if (Array.isArray(body.files)) {
+      for (const f of body.files) needFixFiles.add(f);
     }
 
-    if (body.findings !== undefined) entry.findings = body.findings;
+    if (needFixFiles.size === 0) {
+      return errorResponse(res, "No files to re-review", "VALIDATION_ERROR", 400);
+    }
 
-    writeRoundNotes(roundDir, notes);
-    jsonResponse(res, { ok: true });
+    // Create new session
+    const maxVersion = sessions.reduce((max, s) => Math.max(max, s.version || 1), 0);
+    const nextVersion = maxVersion + 1;
+    const sid = sessionId();
+    const result = createSession(reportsDir, sid, {
+      type: "code",
+      projectDir: resolveProjectDir(),
+      roundId: params.roundId,
+      version: nextVersion,
+    });
+
+    // Generate task YAMLs from uncommitted diff for the need-fix files
+    const diff = runGitDiff("uncommitted", "", projectDir);
+    const filesMap = parseDiffByFile(diff);
+    const tasksDir = path.join(result.dir, "code-tasks");
+    fs.mkdirSync(tasksDir, { recursive: true });
+    const tasks = [];
+
+    for (const filePath of needFixFiles) {
+      const fileData = filesMap[filePath];
+      if (!fileData) continue;
+      const diffText = fileData.diff;
+      const hasChanges = diffText.split("\n").some(
+        l => (l.startsWith("+") && !l.startsWith("+++")) || (l.startsWith("-") && !l.startsWith("---"))
+      );
+      if (!hasChanges) continue;
+
+      const tf = taskFileName(filePath);
+      const task = {
+        name: filePath, status: "pending", language: detectLanguage(filePath),
+        diff: diffText, review: { score: 0, summary: "", findings: [], positives: [] },
+      };
+      writeCodeTaskYaml(path.join(tasksDir, tf), task);
+      tasks.push({ file: "code-tasks/" + tf, name: filePath, status: "pending" });
+    }
+
+    // Update index.yaml with tasks
+    const indexPath = path.join(result.dir, "index.yaml");
+    const index = readYaml(indexPath);
+    writeIndexYaml(indexPath, {
+      session: { ...index.session, status: "ready" },
+      codeTasks: tasks,
+      storyTasks: [],
+      projectTasks: [],
+    });
+
+    jsonResponse(res, {
+      ok: true,
+      sessionId: sid,
+      version: nextVersion,
+      taskCount: tasks.length,
+      files: tasks.map(t => t.name),
+    });
   });
 
-  // POST /api/rounds/:roundId/summary — update summary + sign-off
-  router.post("/api/rounds/:roundId/summary", async (req, res, params) => {
+  // GET /api/rounds/:roundId/summary — round-level summary
+  router.get("/api/rounds/:roundId/summary", (req, res, params) => {
     const roundDir = findRoundDir(projectDir, params.roundId);
     if (!roundDir) return errorResponse(res, "Round not found", "NOT_FOUND", 404);
 
-    const body = JSON.parse(await readBody(req));
-    if (!body) return errorResponse(res, "Empty request body", "VALIDATION_ERROR", 400);
+    const reportsDir = resolveReportsDir(projectDir);
+    const sessions = listSessions(reportsDir, params.roundId);
+    if (sessions.length === 0) {
+      return jsonResponse(res, { files: [], stats: { totalFiles: 0, totalFindings: 0, needFix: 0, wontFix: 0, notAnIssue: 0, wellDone: 0, pending: 0 } });
+    }
 
-    const notes = readRoundNotes(roundDir);
-    if (!notes.summary) notes.summary = { notes: "", signoff: { name: "", role: "", date: "" } };
-    if (body.notes !== undefined) notes.summary.notes = body.notes;
-    if (body.signoff !== undefined) {
-      if (body.signoff === null) {
-        notes.summary.signoff = { name: "", role: "", date: "" };
-      } else {
-        Object.assign(notes.summary.signoff, body.signoff);
+    // For each file, find latest session that has it
+    const fileMap = new Map();
+
+    // Process sessions from oldest to newest so later versions overwrite
+    const sorted = [...sessions].sort((a, b) => (a.version || 1) - (b.version || 1));
+
+    for (const session of sorted) {
+      const indexPath = resolveSessionPath(reportsDir, session.id);
+      if (!indexPath) continue;
+      const sessionDir = path.dirname(indexPath);
+      const index = readYaml(indexPath);
+
+      // Read tasks
+      const allTaskRefs = [...(index.codeTasks || []), ...(index.storyTasks || []), ...(index.projectTasks || [])];
+      for (const ref of allTaskRefs) {
+        const taskPath = path.join(sessionDir, ref.file);
+        if (!fs.existsSync(taskPath)) continue;
+        const task = readYaml(taskPath);
+
+        fileMap.set(ref.name || ref.file, {
+          name: ref.name || ref.file,
+          latestVersion: session.version || 1,
+          sessionId: session.id,
+          review: task.review || { score: 0, summary: "", findings: [] },
+        });
+      }
+
+      // Read review-notes for this session
+      const notesPath = path.join(sessionDir, "review-notes.yaml");
+      if (fs.existsSync(notesPath)) {
+        const notes = readYaml(notesPath);
+        for (const noteTask of notes.tasks || []) {
+          const matchingRef = allTaskRefs.find(r => r.file === noteTask.file);
+          if (matchingRef) {
+            const name = matchingRef.name || matchingRef.file;
+            const existing = fileMap.get(name);
+            if (existing && existing.sessionId === session.id) {
+              existing.findings = noteTask.findings || [];
+            }
+          }
+        }
       }
     }
 
-    writeRoundNotes(roundDir, notes);
-    jsonResponse(res, { ok: true });
+    const files = [...fileMap.values()];
+    const stats = { totalFiles: files.length, totalFindings: 0, needFix: 0, wontFix: 0, notAnIssue: 0, wellDone: 0, pending: 0 };
+
+    for (const f of files) {
+      for (const finding of f.findings || []) {
+        stats.totalFindings++;
+        const s = finding.status || "pending";
+        if (s === "need-fix") stats.needFix++;
+        else if (s === "wont-fix") stats.wontFix++;
+        else if (s === "not-an-issue") stats.notAnIssue++;
+        else if (s === "well-done") stats.wellDone++;
+        else stats.pending++;
+      }
+    }
+
+    jsonResponse(res, { files, stats });
   });
 }

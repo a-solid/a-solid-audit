@@ -2,9 +2,9 @@
 import fs from "node:fs";
 import path from "node:path";
 import { updateTask, getTask, appendReview } from "../../lib/task.mjs";
-import { sanitizePath, sanitizeFilePath } from "../../lib/session.mjs";
+import { sanitizePath, sanitizeFilePath, resolveSessionPath } from "../../lib/session.mjs";
 import { AppError } from "../../lib/errors.mjs";
-import { readYaml, parseYaml } from "../../lib/yaml.mjs";
+import { readYaml, parseYaml, writeYaml } from "../../lib/yaml.mjs";
 import { jsonResponse, errorResponse, readBody } from "../index.mjs";
 
 const ALLOWED_TRANSITIONS = {
@@ -91,8 +91,9 @@ export function registerReviewRoutes(router, reportsDir) {
 
       const safeSid = sanitizePath(params.id);
       const safeFile = sanitizeFilePath(rawFile);
-      const sessionDir = path.join(reportsDir, safeSid);
-      const indexPath = path.join(sessionDir, "index.yaml");
+      const indexPath = resolveSessionPath(reportsDir, safeSid);
+      if (!indexPath) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
+      const sessionDir = path.dirname(indexPath);
       const index = readYaml(indexPath);
       const allRefs = [
         ...(index.codeTasks || []),
@@ -110,6 +111,37 @@ export function registerReviewRoutes(router, reportsDir) {
       }
 
       const result = appendReview(reportsDir, safeSid, safeFile, raw.trim());
+
+      // Auto-populate round-level review-notes.yaml with finding descriptions
+      if (index.session.roundId) {
+        const roundNotesPath = path.resolve(path.dirname(indexPath), "..", "review-notes.yaml");
+        let roundNotes;
+        if (fs.existsSync(roundNotesPath)) {
+          roundNotes = readYaml(roundNotesPath);
+        } else {
+          roundNotes = { tasks: [], summary: { notes: "", signoff: { name: "", role: "", date: "" } } };
+        }
+
+        const findings = parsed.review?.findings || [];
+        let entry = roundNotes.tasks.find(t => t.file === safeFile);
+        if (!entry) {
+          entry = { file: safeFile, findings: [] };
+          roundNotes.tasks.push(entry);
+        }
+
+        for (const f of findings) {
+          entry.findings.push({
+            status: "pending",
+            reason: "",
+            description: f.description || "",
+            severity: f.severity || "",
+            file: f.file || "",
+            line: f.line || null,
+          });
+        }
+
+        writeYaml(roundNotesPath, roundNotes);
+      }
 
       jsonResponse(res, { ok: true, file: result.file, status: result.status, sessionStatus: index.session.status });
     } catch (e) {

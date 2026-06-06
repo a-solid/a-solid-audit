@@ -34,20 +34,21 @@ export function registerSessionRoutes(router, reportsDir) {
   // POST /api/sessions — create new session (requires roundId)
   router.post("/api/sessions", async (req, res, params) => {
     const sid = sessionId();
-    let options = { type: "code", projectDir: null, roundId: null };
+    let options = { type: "code", projectDir: null, roundId: null, version: undefined };
     try {
       const body = JSON.parse(await readBody(req));
       options = {
         type: body.type || "code",
         projectDir: body.projectDir || null,
         roundId: body.roundId || null,
+        version: body.version || undefined,
       };
     } catch { /* use defaults */ }
     if (!options.roundId) {
       return errorResponse(res, "Missing required field: roundId", "VALIDATION_ERROR", 400);
     }
     const result = createSession(reportsDir, sid, options);
-    jsonResponse(res, { id: result.id, projectDir: resolveProjectDir(), roundId: options.roundId }, 201);
+    jsonResponse(res, { id: result.id, projectDir: resolveProjectDir(), roundId: options.roundId, version: options.version || 1 }, 201);
   });
 
   // GET /api/sessions/:id — single session detail

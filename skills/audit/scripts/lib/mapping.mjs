@@ -16,21 +16,6 @@ export function setScope(projectDir, reportsDir, sid, scopeType, scopeRef, exclu
   const index = readYaml(indexPath);
   const existingType = index.session.type;
 
-  // Exclude files where all prior findings are resolved
-  const resolvedFiles = new Set();
-  if (index.session.roundId) {
-    const roundNotesPath = path.join(reportsDir, sanitizePath(index.session.roundId), "review-notes.yaml");
-    if (fs.existsSync(roundNotesPath)) {
-      const roundNotes = readYaml(roundNotesPath);
-      for (const task of roundNotes.tasks || []) {
-        const taskFindings = task.findings || [];
-        if (taskFindings.length > 0 && taskFindings.every(f => ["wont-fix", "not-an-issue", "well-done"].includes(f.status))) {
-          resolvedFiles.add(task.file);
-        }
-      }
-    }
-  }
-
   const diff = runGitDiff(scopeType, scopeRef, projectDir);
   if (!diff.trim()) throw new Error("No diff found for the selected scope");
 
@@ -42,7 +27,6 @@ export function setScope(projectDir, reportsDir, sid, scopeType, scopeRef, exclu
   const tasks = [];
   for (const [filePath, fileData] of Object.entries(filesMap)) {
     if (exclude.has(filePath)) continue;
-    if (resolvedFiles.has("code-tasks/" + taskFileName(filePath))) continue;
     const diffText = fileData.diff;
     const hasChanges = diffText.split("\n").some(
       l => (l.startsWith("+") && !l.startsWith("+++")) || (l.startsWith("-") && !l.startsWith("---"))

@@ -42,13 +42,12 @@ export function registerReviewRoutes(router, reportsDir) {
       }
 
       const safeSid = sanitizePath(params.id);
-      const sessionDir = path.join(reportsDir, safeSid);
+      const indexPath = resolveSessionPath(reportsDir, safeSid);
+      if (!indexPath) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
+      const sessionDir = path.dirname(indexPath);
       const safeTaskFile = sanitizeFilePath(body.file);
       const taskPath = path.join(sessionDir, safeTaskFile);
 
-      if (!fs.existsSync(path.join(sessionDir, "index.yaml"))) {
-        return errorResponse(res, "Session not found", "NOT_FOUND", 404);
-      }
       if (!fs.existsSync(taskPath)) {
         return errorResponse(res, "Task not found", "NOT_FOUND", 404);
       }
@@ -59,7 +58,7 @@ export function registerReviewRoutes(router, reportsDir) {
 
       const result = updateTask(reportsDir, safeSid, safeTaskFile, status, score, review, overview);
 
-      const index = readYaml(path.join(sessionDir, "index.yaml"));
+      const index = readYaml(indexPath);
       jsonResponse(res, { ok: true, file: result.file, status: result.status, sessionStatus: index.session.status });
     } catch (e) {
       throw e;

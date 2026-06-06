@@ -4,44 +4,50 @@ import { jsonResponse, errorResponse, readBody } from "../index.mjs";
 
 const WAIT_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
-const waiters = new Map(); // sessionId -> { resolve, timer }
+let signal = null; // { sessionId, action } or null
+let signalResolve = null; // () => void — resolves the pending /wait Promise
 
 export function registerWaitRoutes(router) {
-  // POST /api/sessions/:id/wait
-  // Blocks until /advance is called or timeout.
-  router.post("/api/sessions/:id/wait", async (req, res, params) => {
-    let body;
-    try {
-      body = JSON.parse(await readBody(req));
-    } catch {
-      return errorResponse(res, "Invalid JSON", "PARSE_ERROR", 400);
+  // GET /wait
+  // Blocks until /advance is called or timeout. Returns plain text.
+  router.get("/wait", async (req, res) => {
+    // If signal already set (advance arrived before /wait), return immediately
+    if (signal) {
+      const { sessionId, action } = signal;
+      signal = null;
+      res.writeHead(200, { "Content-Type": "text/plain" });
+      res.end(`Session ${sessionId} ready.\nAction: ${action}`);
+      return;
     }
 
-    const reason = body.reason;
-    if (!reason || !["ready", "grouping"].includes(reason)) {
-      return errorResponse(res, "Invalid reason: must be 'ready' or 'grouping'", "VALIDATION_ERROR", 400);
-    }
-
-    const sid = sanitizePath(params.id);
-
-    if (waiters.has(sid)) {
-      return errorResponse(res, "Already waiting for this session", "CONFLICT", 409);
-    }
-
+    // Block until advance arrives or timeout
     const result = await new Promise((resolve) => {
       const timer = setTimeout(() => {
-        waiters.delete(sid);
-        resolve({ action: "timeout" });
+        signalResolve = null;
+        resolve(null);
       }, WAIT_TIMEOUT_MS);
 
-      waiters.set(sid, { resolve, timer });
+      signalResolve = () => {
+        clearTimeout(timer);
+        const s = signal;
+        signal = null;
+        signalResolve = null;
+        resolve(s);
+      };
     });
 
-    jsonResponse(res, result);
+    if (!result) {
+      res.writeHead(200, { "Content-Type": "text/plain" });
+      res.end("Timeout: no signal received within 600s.");
+      return;
+    }
+
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    res.end(`Session ${result.sessionId} ready.\nAction: ${result.action}`);
   });
 
   // POST /api/sessions/:id/advance
-  // Resolves a pending /wait call.
+  // Writes signal and resolves pending /wait if any.
   router.post("/api/sessions/:id/advance", async (req, res, params) => {
     let body;
     try {
@@ -55,25 +61,22 @@ export function registerWaitRoutes(router) {
       return errorResponse(res, "Invalid action: must be 'start' or 'confirm-groups'", "VALIDATION_ERROR", 400);
     }
 
-    const sid = sanitizePath(params.id);
-    const waiter = waiters.get(sid);
+    const sessionId = sanitizePath(params.id);
 
-    if (!waiter) {
-      return errorResponse(res, "No one waiting for this session", "NOT_FOUND", 404);
+    signal = { sessionId, action };
+
+    if (signalResolve) {
+      signalResolve();
     }
 
-    clearTimeout(waiter.timer);
-    waiters.delete(sid);
-    waiter.resolve({ action, data: {} });
     jsonResponse(res, { ok: true });
   });
 }
 
-// Cancel all waiters (for server shutdown)
+// Cancel pending waiter (for server shutdown)
 export function cancelAllWaiters() {
-  for (const [sid, waiter] of waiters) {
-    clearTimeout(waiter.timer);
-    waiter.resolve({ action: "cancelled" });
+  if (signalResolve) {
+    signal = null;
+    signalResolve();
   }
-  waiters.clear();
 }

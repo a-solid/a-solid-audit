@@ -78,6 +78,7 @@ export function listSessions(reportsDir, roundId) {
       status: index.session.status || "created",
       created: index.session.created,
       roundId: index.session.roundId || null,
+      version: index.session.version || 1,
       progress: {
         total: taskRefs.length,
         reviewed,
@@ -212,6 +213,7 @@ export function createSession(reportsDir, sid, options = {}) {
       id: safeSid,
       type: options.type || "code",
       status: "created",
+      version: options.version || 1,
       scope: options.type === "project" ? null : { method: "", ref: "" },
       projectDir: options.projectDir || null,
       roundId: options.roundId || null,

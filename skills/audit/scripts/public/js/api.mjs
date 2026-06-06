@@ -38,11 +38,12 @@ export const api = {
   listRounds: () => request("GET", "/api/rounds"),
   getRound: (id) => request("GET", `/api/rounds/${encodeURIComponent(id)}`),
   createRound: (data) => request("POST", "/api/rounds", data),
-  getRoundNotes: (id) => request("GET", `/api/rounds/${encodeURIComponent(id)}/notes`),
-  updateRoundNote: (id, data) =>
-    request("POST", `/api/rounds/${encodeURIComponent(id)}/notes`, data),
-  updateRoundSummary: (id, data) =>
-    request("POST", `/api/rounds/${encodeURIComponent(id)}/summary`, data),
+  createRoundSession: (roundId, options = {}) =>
+    request("POST", `/api/rounds/${encodeURIComponent(roundId)}/sessions`, options),
+  reReview: (roundId, data = {}) =>
+    request("POST", `/api/rounds/${encodeURIComponent(roundId)}/re-review`, data),
+  getRoundSummary: (roundId) =>
+    request("GET", `/api/rounds/${encodeURIComponent(roundId)}/summary`),
 
   // Git
   getCommits: () => request("GET", "/api/git/commits"),

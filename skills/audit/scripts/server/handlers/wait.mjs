@@ -76,7 +76,7 @@ export function registerWaitRoutes(router) {
 // Cancel pending waiter (for server shutdown)
 export function cancelAllWaiters() {
   if (signalResolve) {
-    signal = null;
+    signal = { sessionId: "_server", action: "cancelled" };
     signalResolve();
   }
 }

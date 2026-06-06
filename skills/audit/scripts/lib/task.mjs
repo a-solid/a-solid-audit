@@ -1,7 +1,7 @@
 // skills/audit/scripts/lib/task.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { sanitizePath, sanitizeFilePath, updateSessionStatus } from "./session.mjs";
+import { sanitizePath, sanitizeFilePath, updateSessionStatus, resolveSessionPath } from "./session.mjs";
 import { readYaml, writeYaml, writeIndexYaml } from "./yaml.mjs";
 import { AppError } from "./errors.mjs";
 
@@ -13,13 +13,13 @@ export function updateTask(reportsDir, sid, taskFile, status, score, reviewData,
   }
 
   const safeSid = sanitizePath(sid);
-  const sessionDir = path.join(reportsDir, safeSid);
   const safeTaskFile = sanitizeFilePath(taskFile);
+  const indexPath = resolveSessionPath(reportsDir, safeSid);
+  if (!indexPath) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
+  const sessionDir = path.dirname(indexPath);
   const taskPath = path.join(sessionDir, safeTaskFile);
-  const indexPath = path.join(sessionDir, "index.yaml");
 
   if (!fs.existsSync(taskPath)) throw new AppError("Task file not found", "NOT_FOUND", 404);
-  if (!fs.existsSync(indexPath)) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
 
   // Update task file (review data only, no status)
   const task = readYaml(taskPath);
@@ -57,13 +57,13 @@ export function updateTask(reportsDir, sid, taskFile, status, score, reviewData,
 
 export function appendReview(reportsDir, sid, taskFile, yamlText) {
   const safeSid = sanitizePath(sid);
-  const sessionDir = path.join(reportsDir, safeSid);
   const safeTaskFile = sanitizeFilePath(taskFile);
+  const indexPath = resolveSessionPath(reportsDir, safeSid);
+  if (!indexPath) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
+  const sessionDir = path.dirname(indexPath);
   const taskPath = path.join(sessionDir, safeTaskFile);
-  const indexPath = path.join(sessionDir, "index.yaml");
 
   if (!fs.existsSync(taskPath)) throw new AppError("Task file not found", "NOT_FOUND", 404);
-  if (!fs.existsSync(indexPath)) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
 
   fs.appendFileSync(taskPath, "\n\n" + yamlText);
 
@@ -93,9 +93,9 @@ export function appendReview(reportsDir, sid, taskFile, yamlText) {
 // Get all tasks for a session
 export function getTasks(reportsDir, sid) {
   const safeSid = sanitizePath(sid);
-  const sessionDir = path.join(reportsDir, safeSid);
-  const indexPath = path.join(sessionDir, "index.yaml");
-  if (!fs.existsSync(indexPath)) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
+  const indexPath = resolveSessionPath(reportsDir, safeSid);
+  if (!indexPath) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
+  const sessionDir = path.dirname(indexPath);
 
   const index = readYaml(indexPath);
   const result = [];
@@ -122,9 +122,9 @@ export function getTasks(reportsDir, sid) {
 // Lightweight task list from index.yaml only — no per-task YAML reads
 export function getTasksSummary(reportsDir, sid) {
   const safeSid = sanitizePath(sid);
-  const sessionDir = path.join(reportsDir, safeSid);
-  const indexPath = path.join(sessionDir, "index.yaml");
-  if (!fs.existsSync(indexPath)) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
+  const indexPath = resolveSessionPath(reportsDir, safeSid);
+  if (!indexPath) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
+  const sessionDir = path.dirname(indexPath);
 
   const index = readYaml(indexPath);
   const result = [];
@@ -147,9 +147,9 @@ export function getTasksSummary(reportsDir, sid) {
 // Get single task detail
 export function getTask(reportsDir, sid, taskFile) {
   const safeSid = sanitizePath(sid);
-  const sessionDir = path.join(reportsDir, safeSid);
-  const indexPath = path.join(sessionDir, "index.yaml");
-  if (!fs.existsSync(indexPath)) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
+  const indexPath = resolveSessionPath(reportsDir, safeSid);
+  if (!indexPath) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
+  const sessionDir = path.dirname(indexPath);
 
   const index = readYaml(indexPath);
   const allRefs = [

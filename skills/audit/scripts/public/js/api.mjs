@@ -30,7 +30,7 @@ export const api = {
   updateSessionStatus: (id, status) =>
     request("PUT", `/api/sessions/${encodeURIComponent(id)}/status`, { status }),
   advance: (id, body) =>
-    request("POST", `/api/sessions/${encodeURIComponent(id)}/advance`, body),
+    request("POST", `/api/sessions/${encodeURIComponent(id)}/advance`, { sessionId: id, ...body }),
   patchSession: (id, data) =>
     request("PATCH", `/api/sessions/${encodeURIComponent(id)}`, data),
 

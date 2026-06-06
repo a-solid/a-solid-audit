@@ -18,7 +18,7 @@ All commands run via `node scripts/cli.mjs <command>`. Scripts are located in th
 
 ## Autonomy
 
-This skill operates with **high autonomy**. Do not ask for permission between individual task reviews. Only pause at defined checkpoints: startup (wait for user), begin review (wait for `start review`), and project grouping (wait for user to confirm groups).
+This skill operates with **high autonomy**. Do not ask for permission between individual task reviews. The AI drives the entire flow — use `/wait` to block at checkpoints until the user acts in the browser. No manual text input from the user is needed.
 
 ## Process
 
@@ -30,24 +30,27 @@ This skill operates with **high autonomy**. Do not ask for permission between in
    curl -s http://localhost:3456/api/sessions
    ```
    If this fails, the server didn't start.
-3. Tell the user: "A-Solid Audit server running at http://localhost:3456 — open this URL in your browser. When you finish configuring scope and stories, come back here and type `start review <session-id>`."
-4. **Stop and wait.** Do NOT poll.
+3. Tell the user: "A-Solid Audit server running at http://localhost:3456 — open this URL in your browser to configure the audit."
+4. Create a session via the API or let the user create one in the browser. If creating via API:
+   ```bash
+   curl -s -X POST http://localhost:3456/api/sessions -H 'Content-Type: application/json' -d '{"type":"code"}'
+   ```
+   Note the `id` from the response.
+5. **Wait for user to finish configuring** by calling the long-poll endpoint:
+   ```bash
+   curl -s -X POST http://localhost:3456/api/sessions/<session-id>/wait -H 'Content-Type: application/json' -d '{"reason":"ready"}'
+   ```
+   This blocks until the user clicks "Start Review" in the browser, or times out after 10 minutes.
+6. When the response arrives with `{"action":"start"}`, proceed to the review loop.
 
-### 2. Begin Review (triggered by user saying `start review <session-id>`)
+### 2. Begin Review (after /wait resolves with action "start")
 
-1. Parse `<session-id>` from the user's message.
-2. Confirm the session exists and has status `ready` (or `reviewing` for resume):
+1. The session should now have status `reviewing` (the browser sets this when the user clicks Start Review).
+2. Confirm the session status:
    ```bash
    curl -s http://localhost:3456/api/sessions/<session-id>
    ```
-3. If not found or wrong status, tell user to finish configuring in the browser first.
-4. Transition to reviewing:
-   ```bash
-   curl -s -X PUT http://localhost:3456/api/sessions/<session-id>/status \
-     -H 'Content-Type: application/json' \
-     -d '{"status":"reviewing"}'
-   ```
-5. Get the task list:
+3. Get the task list:
    ```bash
    curl -s http://localhost:3456/api/sessions/<session-id>/tasks/summary
    ```
@@ -85,27 +88,27 @@ For each story task with status `pending`, same parallel pattern (up to 2):
 
 ### 5. Project Grouping (if type === "project" and status === "scanned")
 
-When user types "group <session-id>":
+When the scan completes and status is `scanned`:
 
-1. Confirm status is `scanned`:
-   ```bash
-   curl -s http://localhost:3456/api/sessions/<session-id>
-   ```
-2. Transition to grouping:
+1. Transition to grouping:
    ```bash
    curl -s -X PUT http://localhost:3456/api/sessions/<session-id>/status \
      -H 'Content-Type: application/json' \
      -d '{"status":"grouping"}'
    ```
-3. Dispatch a sub-agent with `prompts/project-group.md`, passing session-id as context. The sub-agent:
-   - Reads `.audit/<session-id>/graph-data.json`
+2. Dispatch a sub-agent with `prompts/project-group.md`, passing session-id as context. The sub-agent:
+   - Reads the session's `graph-data.json`
    - Analyzes the dependency graph
    - Groups files into logical modules
-   - Writes `.audit/<session-id>/groups.json`
-4. After sub-agent completes, the web UI will poll and detect `groups.json`
-5. User reviews and adjusts groups in the browser UI
-6. User clicks "Confirm Groups" which triggers task generation
-7. Tell user: "Grouping complete. Review and adjust groups at http://localhost:3456."
+   - Writes `groups.json`
+3. After sub-agent completes, **wait for the user to confirm groups**:
+   ```bash
+   curl -s -X POST http://localhost:3456/api/sessions/<session-id>/wait \
+     -H 'Content-Type: application/json' \
+     -d '{"reason":"grouping"}'
+   ```
+   This blocks until the user reviews and confirms groups in the browser.
+4. When the response arrives with `{"action":"confirm-groups"}`, the groups are confirmed and tasks are generated. Proceed to the review loop.
 
 ### 6. Project Scan Review Loop (if `type === "project"` session)
 

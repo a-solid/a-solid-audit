@@ -1,41 +1,46 @@
 // skills/audit/scripts/server/handlers/notes.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { sanitizePath, sanitizeFilePath } from "../../lib/session.mjs";
+import { sanitizePath, resolveSessionPath } from "../../lib/session.mjs";
 import { readYaml, writeYaml } from "../../lib/yaml.mjs";
 import { jsonResponse, readBody, errorResponse } from "../index.mjs";
 
-const NOTES_FILE = "review-notes.yaml";
 const VALID_STATUSES = ["pending", "need-fix", "wont-fix", "not-an-issue", "well-done"];
 
-function readNotes(sessionDir) {
-  const p = path.join(sessionDir, NOTES_FILE);
+function resolveRoundDirFromSession(reportsDir, sid) {
+  const safeSid = sanitizePath(sid);
+  const indexPath = resolveSessionPath(reportsDir, safeSid);
+  if (!indexPath) return null;
+  const index = readYaml(indexPath);
+  if (index.session.roundId) {
+    return path.join(reportsDir, sanitizePath(index.session.roundId));
+  }
+  // Fallback: session lives at top level, notes are in session dir
+  return path.dirname(indexPath);
+}
+
+function readRoundNotes(roundDir) {
+  const p = path.join(roundDir, "review-notes.yaml");
   if (!fs.existsSync(p)) return { tasks: [], summary: { notes: "", signoff: { name: "", role: "", date: "" } } };
   return readYaml(p);
 }
 
-function writeNotes(sessionDir, data) {
-  writeYaml(path.join(sessionDir, NOTES_FILE), data);
+function writeRoundNotes(roundDir, data) {
+  writeYaml(path.join(roundDir, "review-notes.yaml"), data);
 }
 
 export function registerNoteRoutes(router, reportsDir) {
-  // GET /api/sessions/:id/notes
+  // GET /api/sessions/:id/notes — delegates to round-level notes
   router.get("/api/sessions/:id/notes", (req, res, params) => {
-    const safeSid = sanitizePath(params.id);
-    const sessionDir = path.join(reportsDir, safeSid);
-    if (!fs.existsSync(path.join(sessionDir, "index.yaml"))) {
-      return errorResponse(res, "Session not found", "NOT_FOUND", 404);
-    }
-    jsonResponse(res, readNotes(sessionDir));
+    const roundDir = resolveRoundDirFromSession(reportsDir, params.id);
+    if (!roundDir) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
+    jsonResponse(res, readRoundNotes(roundDir));
   });
 
-  // POST /api/sessions/:id/notes — update task review
+  // POST /api/sessions/:id/notes — delegates to round-level notes
   router.post("/api/sessions/:id/notes", async (req, res, params) => {
-    const safeSid = sanitizePath(params.id);
-    const sessionDir = path.join(reportsDir, safeSid);
-    if (!fs.existsSync(path.join(sessionDir, "index.yaml"))) {
-      return errorResponse(res, "Session not found", "NOT_FOUND", 404);
-    }
+    const roundDir = resolveRoundDirFromSession(reportsDir, params.id);
+    if (!roundDir) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
 
     const body = JSON.parse(await readBody(req));
     if (!body || typeof body.file !== "string" || !body.file) {
@@ -53,36 +58,29 @@ export function registerNoteRoutes(router, reportsDir) {
       }
     }
 
-    const safeFile = sanitizeFilePath(body.file);
-    const notes = readNotes(sessionDir);
+    const safeFile = body.file;
+    const notes = readRoundNotes(roundDir);
     let entry = notes.tasks.find(t => t.file === safeFile);
     if (!entry) {
-      const taskPath = path.join(sessionDir, safeFile);
-      const task = fs.existsSync(taskPath) ? readYaml(taskPath) : null;
-      const findingCount = (task?.review?.findings || []).length;
-      const findings = Array.from({ length: findingCount }, () => ({ status: "pending", reason: "" }));
-      entry = { file: safeFile, findings };
+      entry = { file: safeFile, findings: [] };
       notes.tasks.push(entry);
     }
 
     if (body.findings !== undefined) entry.findings = body.findings;
 
-    writeNotes(sessionDir, notes);
+    writeRoundNotes(roundDir, notes);
     jsonResponse(res, { ok: true });
   });
 
-  // POST /api/sessions/:id/summary — update summary + sign-off
+  // POST /api/sessions/:id/summary — delegates to round-level summary
   router.post("/api/sessions/:id/summary", async (req, res, params) => {
-    const safeSid = sanitizePath(params.id);
-    const sessionDir = path.join(reportsDir, safeSid);
-    if (!fs.existsSync(path.join(sessionDir, "index.yaml"))) {
-      return errorResponse(res, "Session not found", "NOT_FOUND", 404);
-    }
+    const roundDir = resolveRoundDirFromSession(reportsDir, params.id);
+    if (!roundDir) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
 
     const body = JSON.parse(await readBody(req));
     if (!body) return errorResponse(res, "Empty request body", "VALIDATION_ERROR", 400);
 
-    const notes = readNotes(sessionDir);
+    const notes = readRoundNotes(roundDir);
     if (!notes.summary) notes.summary = { notes: "", signoff: { name: "", role: "", date: "" } };
     if (body.notes !== undefined) notes.summary.notes = body.notes;
     if (body.signoff !== undefined) {
@@ -93,7 +91,7 @@ export function registerNoteRoutes(router, reportsDir) {
       }
     }
 
-    writeNotes(sessionDir, notes);
+    writeRoundNotes(roundDir, notes);
     jsonResponse(res, { ok: true });
   });
 }

@@ -13,6 +13,7 @@ import { registerReviewRoutes } from "./handlers/reviews.mjs";
 import { registerProjectScanRoutes } from "./handlers/project-scan.mjs";
 import { registerSettingsRoutes } from "./handlers/settings.mjs";
 import { AppError } from "../lib/errors.mjs";
+import { resolveReportsDir } from "../lib/paths.mjs";
 
 export function jsonResponse(res, data, status = 200) {
   res.writeHead(status, { "Content-Type": "application/json" });
@@ -46,7 +47,7 @@ export function readBody(req, maxBytes = 1024 * 1024) {
 }
 
 export function startServer(projectDir, port = 3456) {
-  const reportsDir = path.join(projectDir, ".audit");
+  const reportsDir = resolveReportsDir(projectDir);
 
   const router = createRouter();
   registerSessionRoutes(router, reportsDir);
@@ -87,7 +88,7 @@ export function startServer(projectDir, port = 3456) {
 
   server.listen(port, () => {
     console.log("A-Solid Audit server running at http://localhost:" + port);
-    console.log("Project: " + projectDir);
+    console.log("Reports: " + reportsDir);
   });
 
   return server;

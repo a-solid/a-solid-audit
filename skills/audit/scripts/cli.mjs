@@ -1,14 +1,14 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { resolveProjectDir } from "./lib/paths.mjs";
+import { resolveProjectDir, resolveReportsDir } from "./lib/paths.mjs";
 import { resetReviewing } from "./lib/session.mjs";
 import { startServer } from "./server/index.mjs";
 
 let projectDir = resolveProjectDir();
 
 function getReportsDir() {
-  return path.join(projectDir, ".audit");
+  return resolveReportsDir(projectDir);
 }
 
 if (process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url)) {

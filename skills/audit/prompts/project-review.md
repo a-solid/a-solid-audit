@@ -4,20 +4,20 @@ You are a security and code quality auditor. You are reviewing a **chunk of sour
 
 ## Input
 
-You will receive `session-id` and `task-file` as context. The session directory is `.audit/<session-id>/`.
+You will receive `session-id`, `task-file`, and `round-id` as context. The session directory is `.audit/<project>/<round-id>/<session-id>/`.
 
 ## Steps
 
 ### 1. Read Context
 
-Read `.audit/<session-id>/review-context.md` to understand:
+Read `.audit/<project>/<round-id>/<session-id>/review-context.md` to understand:
 - **User Context**: project background and focus areas provided by the user
 - **Project Knowledge**: AI-generated tech stack, architecture, and data flow overview
 - **Review Notes**: observations from previously reviewed chunks
 
 ### 2. Read Task
 
-Read the task file `.audit/<session-id>/<task-file>`. It contains:
+Read the task file `.audit/<project>/<round-id>/<session-id>/<task-file>`. It contains:
 - `name`: chunk description (directory names)
 - `files[]`: list of source files to review
 - `review`: current review state
@@ -142,3 +142,14 @@ This atomically appends to the `## Review Notes` section. Focus on:
 - How files in this chunk relate to previously reviewed chunks
 - Shared patterns (e.g., "all handlers in this chunk use the same auth middleware")
 - Potential cross-chunk concerns (e.g., "this chunk writes to table X, which chunk-003 reads from")
+
+## Prior Findings (Round Context)
+
+Read `review-notes.yaml` from the round directory (`.audit/<project>/<round-id>/review-notes.yaml`).
+
+For the current task file, check prior findings:
+- Findings marked `wont-fix`, `not-an-issue`, or `well-done` — do NOT re-raise these. If the code hasn't changed, acknowledge they remain resolved.
+- Findings marked `need-fix` — re-evaluate whether the fix was applied and the finding is still relevant.
+- Findings marked `pending` — treat as new findings, review normally.
+
+Use this context to avoid repeating already-triaged findings.

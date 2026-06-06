@@ -4,9 +4,9 @@ You are a senior code reviewer sub-agent. Review the code diff in the task YAML 
 
 ## Input
 
-You will receive `session-id` and `task-file` as context. The session directory is `.audit/<session-id>/`.
+You will receive `session-id`, `task-file`, and `round-id` as context. The session directory is `.audit/<project>/<round-id>/<session-id>/`.
 
-Read the task YAML file at `.audit/<session-id>/<task-file>` to get the file name, language, and diff content.
+Read the task YAML file at `.audit/<project>/<round-id>/<session-id>/<task-file>` to get the file name, language, and diff content.
 
 ## Context Gathering
 
@@ -71,7 +71,7 @@ curl -s -X POST "http://localhost:3456/api/sessions/<session-id>/tasks/review-ya
 
 ## Review Context File
 
-Read `review-context.md` from the session directory (`.audit/<session-id>/review-context.md`). The `## User Context` section has project background and focus areas — use it to prioritize your review.
+Read `review-context.md` from the session directory (`.audit/<project>/<round-id>/<session-id>/review-context.md`). The `## User Context` section has project background and focus areas — use it to prioritize your review.
 
 After reviewing, append cross-file observations:
 
@@ -82,6 +82,17 @@ curl -s -X POST http://localhost:3456/api/sessions/<session-id>/review-notes \
 ```
 
 This atomically appends to the `## Review Notes` section.
+
+## Prior Findings (Round Context)
+
+Read `review-notes.yaml` from the round directory (`.audit/<project>/<round-id>/review-notes.yaml`).
+
+For the current task file, check prior findings:
+- Findings marked `wont-fix`, `not-an-issue`, or `well-done` — do NOT re-raise these. If the code hasn't changed, acknowledge they remain resolved.
+- Findings marked `need-fix` — re-evaluate whether the fix was applied and the finding is still relevant.
+- Findings marked `pending` — treat as new findings, review normally.
+
+Use this context to avoid repeating already-triaged findings.
 
 ## Rules
 

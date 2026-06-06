@@ -1,6 +1,6 @@
 // skills/audit/scripts/public/js/views/wizard.mjs
 import { api } from "../api.mjs";
-import { showToast, setBreadcrumb, icon, escapeHtml, initTabKeyboard, onNavigateCleanup, renderTerminalCard } from "../app.mjs";
+import { showToast, setBreadcrumb, icon, escapeHtml, initTabKeyboard, onNavigateCleanup } from "../app.mjs";
 import { renderFileTree } from "../components/file-tree.mjs";
 import { renderScopeFileTree } from "../components/scope-file-tree.mjs";
 import { renderScopeStep } from "./wizard-scope.mjs";
@@ -414,35 +414,35 @@ export async function renderWizard(container, params) {
     }
 
     document.getElementById("step4-back").addEventListener("click", () => {
-      pollCancelled = true;
       clearPoll();
       goBack(reviewType === "code" ? 2 : 3, "step4-back");
     });
 
-    // Poll for session status change — auto-redirect when review starts
-    let pollCancelled = false;
-    function pollReadyStatus() {
-      api.getSession(sessionId).then(session => {
-        if (pollCancelled) return;
-        if (session.status === "reviewing" || session.status === "completed") {
-          location.hash = `#/progress/${sessionId}`;
-          return;
-        }
-        schedulePoll(pollReadyStatus, 3000);
-      }).catch(() => {
-        if (pollCancelled) return;
-        schedulePoll(pollReadyStatus, 5000);
-      });
-    }
-    pollReadyStatus();
+    // Start Review button
+    const termEl = document.getElementById("step4-terminal");
+    termEl.innerHTML = `
+      <div style="text-align:center;padding:var(--space-4)">
+        <button id="start-review-btn" class="btn btn-primary">${icon("zap", 14)} Start Review</button>
+      </div>`;
+
+    document.getElementById("start-review-btn").addEventListener("click", async () => {
+      const btn = document.getElementById("start-review-btn");
+      const originalHTML = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner spinner-sm"></span> Starting...';
+      try {
+        await api.advance(sessionId, { action: "start" });
+        await api.updateSessionStatus(sessionId, "reviewing");
+        location.hash = `#/progress/${sessionId}`;
+      } catch (e) {
+        showToast("Failed to start review: " + e.message);
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+      }
+    });
 
     setDirty(false);
     localStorage.removeItem(`audit-wizard-${sessionId}`);
-
-    const termEl = document.getElementById("step4-terminal");
-    renderTerminalCard(termEl, `start review ${sessionId}`, {
-      viewProgressHref: `#/progress/${sessionId}`,
-    });
   }
 
   render();

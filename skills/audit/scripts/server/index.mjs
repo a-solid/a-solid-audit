@@ -12,6 +12,7 @@ import { registerNoteRoutes } from "./handlers/notes.mjs";
 import { registerReviewRoutes } from "./handlers/reviews.mjs";
 import { registerProjectScanRoutes } from "./handlers/project-scan.mjs";
 import { registerSettingsRoutes } from "./handlers/settings.mjs";
+import { registerWaitRoutes, cancelAllWaiters } from "./handlers/wait.mjs";
 import { AppError } from "../lib/errors.mjs";
 import { resolveReportsDir } from "../lib/paths.mjs";
 
@@ -58,6 +59,7 @@ export function startServer(projectDir, port = 3456) {
   registerReviewRoutes(router, reportsDir);
   registerProjectScanRoutes(router, reportsDir, projectDir);
   registerSettingsRoutes(router);
+  registerWaitRoutes(router);
 
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, `http://localhost:${port}`);
@@ -89,6 +91,10 @@ export function startServer(projectDir, port = 3456) {
   server.listen(port, () => {
     console.log("A-Solid Audit server running at http://localhost:" + port);
     console.log("Reports: " + reportsDir);
+  });
+
+  server.on("close", () => {
+    cancelAllWaiters();
   });
 
   return server;

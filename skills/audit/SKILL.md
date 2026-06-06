@@ -31,17 +31,22 @@ This skill operates with **high autonomy**. Do not ask for permission between in
    ```
    If this fails, the server didn't start.
 3. Tell the user: "A-Solid Audit server running at http://localhost:3456 — open this URL in your browser to configure the audit."
-4. Create a session via the API or let the user create one in the browser. If creating via API:
+4. Create a round:
    ```bash
-   curl -s -X POST http://localhost:3456/api/sessions -H 'Content-Type: application/json' -d '{"type":"code"}'
+   curl -s -X POST http://localhost:3456/api/rounds -H 'Content-Type: application/json' -d '{"name":"<round-name>"}'
+   ```
+   Note the `id` from the response. This is the `round-id`.
+5. Create a session within the round:
+   ```bash
+   curl -s -X POST http://localhost:3456/api/sessions -H 'Content-Type: application/json' -d '{"type":"code","roundId":"<round-id>"}'
    ```
    Note the `id` from the response.
-5. **Wait for user to finish configuring** by calling:
+6. **Wait for user to finish configuring** by calling:
    ```bash
    curl http://localhost:3456/wait
    ```
    This blocks until the user clicks "Start Review" in the browser, or times out after 10 minutes.
-6. When the response arrives with the session ID and action, proceed to the review loop.
+7. When the response arrives with the session ID and action, proceed to the review loop.
 
 ### 2. Begin Review (after /wait resolves)
 
@@ -65,7 +70,7 @@ For each task with `type === "code"` and status `pending`, dispatch up to **3 su
      -H 'Content-Type: application/json' \
      -d '{"file":"<task-file>","status":"reviewing"}'
    ```
-2. Dispatch each as a sub-agent with `prompts/code-review.md` as its prompt, passing `session-id` and `task-file` as context
+2. Dispatch each as a sub-agent with `prompts/code-review.md` as its prompt, passing `session-id`, `task-file`, and `round-id` as context
 3. Sub-agent reads the task YAML, performs the review, and POSTs results via the review endpoint
 4. Sub-agent appends cross-file observations via review-notes endpoint (atomic append)
 5. As each sub-agent completes, dispatch the next pending task (maintaining up to 3 in flight)
@@ -81,7 +86,7 @@ For each story task with status `pending`, same parallel pattern (up to 2):
      -H 'Content-Type: application/json' \
      -d '{"file":"<task-file>","status":"reviewing"}'
    ```
-2. Dispatch sub-agent with `prompts/story-review.md`, passing `session-id` and `task-file` as context
+2. Dispatch sub-agent with `prompts/story-review.md`, passing `session-id`, `task-file`, and `round-id` as context
 3. Sub-agent reads the story task YAML, reads referenced code task YAMLs for diffs, performs the review, and POSTs results
 4. Sub-agent appends cross-file observations via review-notes endpoint
 5. **If a sub-agent fails**: mark the task back to `pending`, log the error, and continue
@@ -118,7 +123,7 @@ For each project task with status `pending`, same parallel pattern (up to 2):
      -H 'Content-Type: application/json' \
      -d '{"file":"<task-file>","status":"reviewing"}'
    ```
-2. Dispatch sub-agent with `prompts/project-review.md`, passing `session-id` and `task-file` as context
+2. Dispatch sub-agent with `prompts/project-review.md`, passing `session-id`, `task-file`, and `round-id` as context
 3. Sub-agent reads the task YAML (contains `files[]`, `type`, `entry`), reads source files from the project directory, performs security and quality review, and POSTs results
 4. Sub-agent generates an `overview` with a Mermaid diagram of the call chain and a description of execution flow
 5. Sub-agent appends cross-file observations via review-notes endpoint

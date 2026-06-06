@@ -111,36 +111,34 @@ export function registerReviewRoutes(router, reportsDir) {
 
       const result = appendReview(reportsDir, safeSid, safeFile, raw.trim());
 
-      // Auto-populate round-level review-notes.yaml with finding descriptions
-      if (index.session.roundId) {
-        const roundNotesPath = path.resolve(path.dirname(indexPath), "..", "review-notes.yaml");
-        let roundNotes;
-        if (fs.existsSync(roundNotesPath)) {
-          roundNotes = readYaml(roundNotesPath);
-        } else {
-          roundNotes = { tasks: [], summary: { notes: "", signoff: { name: "", role: "", date: "" } } };
-        }
-
-        const findings = parsed.review?.findings || [];
-        let entry = roundNotes.tasks.find(t => t.file === safeFile);
-        if (!entry) {
-          entry = { file: safeFile, findings: [] };
-          roundNotes.tasks.push(entry);
-        }
-
-        for (const f of findings) {
-          entry.findings.push({
-            status: "pending",
-            reason: "",
-            description: f.description || "",
-            severity: f.severity || "",
-            file: f.file || "",
-            line: f.line || null,
-          });
-        }
-
-        writeYaml(roundNotesPath, roundNotes);
+      // Auto-populate session-level review-notes.yaml with finding descriptions
+      const notesPath = path.join(sessionDir, "review-notes.yaml");
+      let sessionNotes;
+      if (fs.existsSync(notesPath)) {
+        sessionNotes = readYaml(notesPath);
+      } else {
+        sessionNotes = { tasks: [], summary: { notes: "", signoff: { name: "", role: "", date: "" } } };
       }
+
+      const reviewFindings = parsed.review?.findings || [];
+      let noteEntry = sessionNotes.tasks.find(t => t.file === safeFile);
+      if (!noteEntry) {
+        noteEntry = { file: safeFile, findings: [] };
+        sessionNotes.tasks.push(noteEntry);
+      }
+
+      for (const f of reviewFindings) {
+        noteEntry.findings.push({
+          status: "pending",
+          reason: "",
+          description: f.description || "",
+          severity: f.severity || "",
+          file: f.file || "",
+          line: f.line || null,
+        });
+      }
+
+      writeYaml(notesPath, sessionNotes);
 
       jsonResponse(res, { ok: true, file: result.file, status: result.status, sessionStatus: index.session.status });
     } catch (e) {

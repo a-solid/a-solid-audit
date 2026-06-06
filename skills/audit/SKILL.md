@@ -36,14 +36,14 @@ This skill operates with **high autonomy**. Do not ask for permission between in
    curl -s -X POST http://localhost:3456/api/sessions -H 'Content-Type: application/json' -d '{"type":"code"}'
    ```
    Note the `id` from the response.
-5. **Wait for user to finish configuring** by calling the long-poll endpoint:
+5. **Wait for user to finish configuring** by calling:
    ```bash
-   curl -s -X POST http://localhost:3456/api/sessions/<session-id>/wait -H 'Content-Type: application/json' -d '{"reason":"ready"}'
+   curl http://localhost:3456/wait
    ```
    This blocks until the user clicks "Start Review" in the browser, or times out after 10 minutes.
-6. When the response arrives with `{"action":"start"}`, proceed to the review loop.
+6. When the response arrives with the session ID and action, proceed to the review loop.
 
-### 2. Begin Review (after /wait resolves with action "start")
+### 2. Begin Review (after /wait resolves)
 
 1. The session should now have status `reviewing` (the browser sets this when the user clicks Start Review).
 2. Confirm the session status:
@@ -103,12 +103,10 @@ When the scan completes and status is `scanned`:
    - Writes `groups.json`
 3. After sub-agent completes, **wait for the user to confirm groups**:
    ```bash
-   curl -s -X POST http://localhost:3456/api/sessions/<session-id>/wait \
-     -H 'Content-Type: application/json' \
-     -d '{"reason":"grouping"}'
+   curl http://localhost:3456/wait
    ```
    This blocks until the user reviews and confirms groups in the browser.
-4. When the response arrives with `{"action":"confirm-groups"}`, the groups are confirmed and tasks are generated. Proceed to the review loop.
+4. When the response arrives with the session ID and action, the groups are confirmed and tasks are generated. Proceed to the review loop.
 
 ### 6. Project Scan Review Loop (if `type === "project"` session)
 

@@ -34,6 +34,16 @@ export const api = {
   patchSession: (id, data) =>
     request("PATCH", `/api/sessions/${encodeURIComponent(id)}`, data),
 
+  // Rounds
+  listRounds: () => request("GET", "/api/rounds"),
+  getRound: (id) => request("GET", `/api/rounds/${encodeURIComponent(id)}`),
+  createRound: (data) => request("POST", "/api/rounds", data),
+  getRoundNotes: (id) => request("GET", `/api/rounds/${encodeURIComponent(id)}/notes`),
+  updateRoundNote: (id, data) =>
+    request("POST", `/api/rounds/${encodeURIComponent(id)}/notes`, data),
+  updateRoundSummary: (id, data) =>
+    request("POST", `/api/rounds/${encodeURIComponent(id)}/summary`, data),
+
   // Git
   getCommits: () => request("GET", "/api/git/commits"),
   getBranches: () => request("GET", "/api/git/branches"),

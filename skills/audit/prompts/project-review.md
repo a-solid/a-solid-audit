@@ -67,7 +67,7 @@ Analyze every file in the chunk for:
 Submit your review via curl:
 
 ```bash
-curl -s -X POST "http://localhost:3456/api/rounds/<round-name>/sessions/<version>/tasks/review-yaml?file=<task-file>" \
+curl -s -X POST "http://localhost:12345/api/rounds/<round-name>/sessions/<version>/tasks/review-yaml?file=<task-file>" \
   -H 'Content-Type: text/yaml' \
   --data-binary 'review:
   score: <0-10>
@@ -133,7 +133,7 @@ If the task has `type: unknown` (no clear entry point), describe the general pur
 Append cross-file observations:
 
 ```bash
-curl -s -X POST http://localhost:3456/api/rounds/<round-name>/sessions/<version>/review-notes \
+curl -s -X POST http://localhost:12345/api/rounds/<round-name>/sessions/<version>/review-notes \
   -H 'Content-Type: application/json' \
   -d '{"notes": "- <your observation>"}'
 ```

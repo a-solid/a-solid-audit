@@ -1,5 +1,6 @@
 // skills/audit/scripts/server/index.mjs
 import http from "node:http";
+import { execSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRouter } from "./router.mjs";
@@ -49,7 +50,22 @@ export function readBody(req, maxBytes = 1024 * 1024) {
   });
 }
 
-export function startServer(projectDir, port = 3456) {
+function killPortOccupant(port) {
+  try {
+    const out = execSync(`lsof -ti :${port}`, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim();
+    if (!out) return false;
+    for (const pid of out.split("\n").map(Number)) {
+      if (pid && pid !== process.pid) {
+        try { process.kill(pid, "SIGKILL"); } catch {}
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function startServer(projectDir, port = 12345) {
   const reportsDir = resolveReportsDir(projectDir);
 
   const router = createRouter();
@@ -91,6 +107,23 @@ export function startServer(projectDir, port = 3456) {
     serveStatic(req, res, url.pathname);
   });
 
+  server.on("error", (e) => {
+    if (e.code === "EADDRINUSE") {
+      console.log(`Port ${port} in use, killing occupant...`);
+      const killed = killPortOccupant(port);
+      if (killed) {
+        setTimeout(() => {
+          server.listen(port);
+        }, 200);
+      } else {
+        console.error(`Cannot free port ${port}`);
+        process.exit(1);
+      }
+    } else {
+      throw e;
+    }
+  });
+
   server.listen(port, () => {
     console.log("A-Solid Audit server running at http://localhost:" + port);
     console.log("Reports: " + reportsDir);
@@ -108,7 +141,7 @@ export function startServer(projectDir, port = 3456) {
 if (process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url)) {
   import("../lib/paths.mjs").then(({ resolveProjectDir }) => {
     const projectDir = resolveProjectDir(process.argv[2]);
-    const port = parseInt(process.argv[3], 10) || 3456;
+    const port = parseInt(process.argv[3], 10) || 12345;
     startServer(projectDir, port);
   });
 }

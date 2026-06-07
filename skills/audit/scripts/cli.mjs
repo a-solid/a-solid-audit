@@ -32,12 +32,12 @@ if (process.argv[1] && process.argv[1] === fileURLToPath(import.meta.url)) {
           console.log("Reset reviewing tasks for session: " + args[0]);
           break;
         case "server":
-          startServer(projectDir, args[0] ? parseInt(args[0], 10) : 3456);
+          startServer(projectDir, args[0] ? parseInt(args[0], 10) : 12345);
           break;
         default:
           console.log("Usage: node scripts/cli.mjs [--project-dir <path>] <command> [args]");
           console.log("Commands:");
-          console.log("  server [port]            Start the web server (default port: 3456)");
+          console.log("  server [port]            Start the web server (default port: 12345)");
           console.log("  reset-reviewing <sid>    Reset reviewing tasks to pending");
           break;
       }

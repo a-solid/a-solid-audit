@@ -2316,3 +2316,203 @@ code {
   .md\:grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
   .md\:grid-cols-5 { grid-template-columns: repeat(5, 1fr); }
 }
+
+/* ─── Round Cards ─── */
+.round-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4);
+}
+.round-card:hover {
+  background: var(--surface-hover);
+}
+.round-name {
+  font-weight: 600;
+  font-size: var(--text-base);
+  margin-bottom: var(--space-1);
+}
+.round-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  margin-top: var(--space-1);
+}
+
+/* ─── Version Badge ─── */
+.version-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  background: var(--surface-elevated);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+/* ─── Session Timeline ─── */
+.session-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.session-timeline-item {
+  display: flex;
+  align-items: stretch;
+  gap: var(--space-3);
+  border-radius: var(--radius-lg);
+  transition: background 150ms;
+}
+.session-timeline-item:hover {
+  background: var(--surface-hover);
+}
+.session-timeline-connector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 48px;
+  flex-shrink: 0;
+  padding-top: var(--space-3);
+}
+.session-timeline-connector .version-badge {
+  margin-bottom: var(--space-1);
+}
+.session-timeline-line {
+  flex: 1;
+  width: 2px;
+  background: var(--border);
+  min-height: 8px;
+}
+.session-timeline-item:last-child .session-timeline-line {
+  display: none;
+}
+.session-timeline-content {
+  flex: 1;
+  padding: var(--space-3) var(--space-3) var(--space-3) 0;
+  min-width: 0;
+}
+
+/* ─── Create Round Modal ─── */
+.create-round-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: var(--space-4);
+}
+.create-round-dialog {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  width: 100%;
+  max-width: 440px;
+  box-shadow: var(--shadow-lg);
+}
+.create-round-dialog h2 {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  margin-bottom: var(--space-4);
+}
+.create-round-dialog label {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  margin-bottom: var(--space-1);
+  color: var(--text-secondary);
+}
+.create-round-dialog input,
+.create-round-dialog textarea {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-elevated);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-3);
+  font-family: var(--font-sans);
+}
+.create-round-dialog input:focus,
+.create-round-dialog textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-alpha);
+}
+.create-round-dialog textarea {
+  resize: vertical;
+  min-height: 60px;
+}
+.create-round-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+/* ─── Re-review Panel ─── */
+.re-review-panel h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.re-review-file-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  cursor: pointer;
+  font-size: var(--text-sm);
+}
+.re-review-file-item input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+
+/* ─── Round Summary Table ─── */
+.round-summary-table {
+  overflow-x: auto;
+}
+.round-summary-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.round-summary-table th {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 2px solid var(--border);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.round-summary-table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.round-summary-table tr:last-child td {
+  border-bottom: none;
+}
+.round-summary-table tr:hover td {
+  background: var(--surface-hover);
+}
+
+/* ─── Responsive: Round Summary Stats ─── */
+@media (min-width: 1024px) {
+  .lg\:grid-cols-6 { grid-template-columns: repeat(6, 1fr); }
+}

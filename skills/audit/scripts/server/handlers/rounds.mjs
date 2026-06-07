@@ -241,29 +241,26 @@ export function registerRoundRoutes(router, projectDir) {
       if (taskData.name) newCodeTaskFiles.set(taskData.name, "code-tasks/" + path.basename(tf));
     }
 
-    // Copy story tasks from original session, updating file references
+    // Copy story tasks — selected stories get full files[] preserved
     const storyTasks = [];
-    const originalStoryTasks = latestIndex.storyTasks || [];
     const storyTasksDir = path.join(result.dir, "story-tasks");
-    for (const stRef of originalStoryTasks) {
-      const origStoryPath = path.join(latestDir, stRef.file);
+    for (const tf of selectedTaskFiles) {
+      if (!tf.startsWith("story-tasks/")) continue;
+      const origStoryPath = path.join(latestDir, tf);
       if (!fs.existsSync(origStoryPath)) continue;
 
       const storyData = readYaml(origStoryPath);
-      // Filter files to only those with new code tasks
-      const filteredFiles = (storyData.files || []).filter(f => newCodeTaskFiles.has(f.name));
-      if (filteredFiles.length === 0) continue;
-
-      // Update taskFile references
-      storyData.files = filteredFiles.map(f => ({
-        ...f,
-        taskFile: newCodeTaskFiles.get(f.name) || f.taskFile,
-      }));
+      // Reset review state but preserve files[] with original taskFile refs
+      // (story review sub-agent reads code task diffs from original session via API)
+      if (storyData.review) {
+        storyData.review = { score: 0, summary: "", findings: [], positives: [] };
+      }
+      storyData.status = "pending";
 
       fs.mkdirSync(storyTasksDir, { recursive: true });
-      const destPath = path.join(storyTasksDir, path.basename(stRef.file));
+      const destPath = path.join(storyTasksDir, path.basename(tf));
       writeYaml(destPath, storyData);
-      storyTasks.push({ file: stRef.file, name: stRef.name || storyData.name, status: "pending" });
+      storyTasks.push({ file: tf, name: storyData.name || tf, status: "pending" });
     }
 
     // Auto-include stories if none were explicitly selected but session type is "all"

@@ -16,6 +16,23 @@ All commands run via `node scripts/cli.mjs <command>`. Scripts are located in th
 - `reset-reviewing <round-name> <version>` — Reset reviewing tasks to pending (for resume after interruption)
 - `server [port]` — Start the web server (default: 12345)
 
+## Manual Recovery
+
+If the AI's `/wait` loop is interrupted (timeout, crash, restart) and a session needs reviewing, the user can type:
+
+```
+start review <round-name>/<version>
+```
+
+When you receive this instruction:
+1. Set the session status to reviewing:
+   ```bash
+   curl -s -X PUT http://localhost:12345/api/rounds/<round-name>/sessions/<version>/status \
+     -H 'Content-Type: application/json' \
+     -d '{"status":"reviewing"}'
+   ```
+2. Go directly to **step 2** (Begin Review) and run the review loop.
+
 ## Autonomy
 
 This skill operates with **high autonomy**. Do not ask for permission between individual task reviews. The AI drives the entire flow — use `/wait` to block at checkpoints until the user acts in the browser. No manual text input from the user is needed.
@@ -36,7 +53,7 @@ This skill operates with **high autonomy**. Do not ask for permission between in
    curl http://localhost:12345/wait
    ```
    This blocks until the user clicks "Start Review" in the browser, or times out after 10 minutes.
-5. **If /wait times out**: stop here. Tell the user "Wait timed out. Type `resume` to continue waiting, or configure the round in the browser first." Do not proceed with any further actions until the user responds with `resume`.
+5. **If /wait times out**: stop here. Tell the user "Wait timed out. Type `resume` to continue waiting, or configure the round in the browser first." Do not proceed with any further actions until the user responds with `resume`. When the user responds with `resume`, re-call `curl http://localhost:12345/wait` to continue waiting.
 6. When the response arrives with the roundName and version, proceed to the review loop.
 
 ### 2. Begin Review (after /wait resolves)
@@ -120,27 +137,25 @@ For each project task with status `pending`, same parallel pattern (up to 2):
 5. Sub-agent appends cross-file observations via review-notes endpoint
 6. **If a sub-agent fails**: mark the task back to `pending`, log the error, and continue
 
-### 7. Completion
+### 7. Completion & Loop
 
-When all tasks are reviewed, the review API automatically sets session status to `completed`. Tell the user: "Review complete. Findings at http://localhost:12345." If any tasks failed and remain `pending`, report them: "N tasks failed to review. You can retry with `start review <round-name>/<version>`."
+When all tasks are reviewed, the review API automatically sets session status to `completed`. Tell the user: "Review complete. Findings at http://localhost:12345." If any tasks failed and remain `pending`, report them: "N tasks failed to review. You can retry by typing `start review <round-name>/<version>` in your AI terminal."
 
-### 8. Re-Review (if findings need fixes)
+Then **loop back to /wait** to detect the user's next action (new review, re-review, resume of another session, etc.):
 
-If the user marks findings as `need-fix` and wants to re-review after code changes:
+```bash
+curl http://localhost:12345/wait
+```
 
-1. The user clicks "Re-review" in the browser (on the round detail page)
-2. The browser calls `POST /api/rounds/<round-name>/re-review` with selected files
-3. A new session is created with `version = previous + 1` containing only the need-fix files
-4. Wait for the new session to be ready: `curl http://localhost:12345/wait`
-5. Proceed with the review loop on the new session's tasks
-6. After completion, the round summary aggregates the latest review per file
+When the response arrives with a new roundName and version, go back to **step 2** (Begin Review) and run the review loop for the new session. This repeats indefinitely — each completion triggers another `/wait`.
+
+**If /wait times out**: stop here. Tell the user "Wait timed out. Type `resume` to continue waiting." Do not proceed until the user responds with `resume`. When the user responds with `resume`, re-call `curl http://localhost:12345/wait` to continue waiting.
+
+### 8. Re-Review (reference)
+
+Re-review is triggered from the browser. When the user clicks "Re-review" on a round detail page and selects tasks, a new session is created. The `/wait` loop in step 7 detects it automatically — no special handling needed.
 
 Alternatively, trigger via API:
 ```bash
-curl -s -X POST http://localhost:12345/api/rounds/audit-round-1/re-review -H 'Content-Type: application/json' -d '{}'
-```
-
-To include additional files beyond need-fix ones:
-```bash
-curl -s -X POST http://localhost:12345/api/rounds/audit-round-1/re-review -H 'Content-Type: application/json' -d '{"files":["src/extra-file.ts"]}'
+curl -s -X POST http://localhost:12345/api/rounds/audit-round-1/re-review -H 'Content-Type: application/json' -d '{"tasks":["code-tasks/foo.yaml"]}'
 ```

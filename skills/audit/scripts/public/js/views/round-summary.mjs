@@ -125,10 +125,29 @@ export async function renderRoundSummary(container, params) {
     const sevLabel = f.severity.toUpperCase();
     const sevColor = `var(--${f.severity === "critical" ? "danger" : f.severity === "high" || f.severity === "major" ? "danger" : f.severity === "medium" || f.severity === "minor" ? "warning" : "info"})`;
     const statusCfg = FINDING_STATUS_CONFIG[f.status || "pending"];
-    const priorityClass = isHighPriority ? "summary-finding-high-priority" : "summary-finding-low-priority";
-    const hiddenClass = !isHighPriority ? "summary-finding-hidden" : "";
+
+    if (!isHighPriority) {
+      // Resolved/low-priority: use accordion
+      return `
+        <div class="finding-accordion summary-finding-hidden">
+          <details>
+            <summary>
+              <span class="accordion-chevron">${icon("chevronRight", 14)}</span>
+              <span class="finding-severity-badge" style="background:${sevColor}">${sevLabel}</span>
+              <span class="accordion-desc-trunc">${escapeHtml(f.description)}</span>
+              ${statusCfg ? `<span class="finding-status-pill finding-status-pill-${f.status || "pending"}">${statusCfg.label}</span>` : ""}
+            </summary>
+            <div class="finding-accordion-body">
+              <div class="finding-description">${escapeHtml(f.description)}</div>
+              ${statusCfg ? `<span class="badge ${statusCfg.badge}" style="font-size:10px">${statusCfg.label}</span>` : ""}
+            </div>
+          </details>
+        </div>`;
+    }
+
+    // High-priority: keep existing flat row style
     return `
-      <div class="summary-finding-row ${priorityClass} ${hiddenClass}">
+      <div class="summary-finding-row summary-finding-high-priority">
         <span class="finding-severity-badge" style="background:${sevColor}">${sevLabel}</span>
         <span class="summary-finding-desc">${escapeHtml(f.description)}</span>
         ${statusCfg ? `<span class="badge ${statusCfg.badge}" style="font-size:10px">${statusCfg.label}</span>` : ""}
@@ -190,7 +209,7 @@ export async function renderRoundSummary(container, params) {
                 const scoreVal = f.review?.score ?? 0;
                 const sc = scoreColor(scoreVal);
                 const findings = f.findings || [];
-                const statuses = new Set(findings.map(fi => fi.status || "pending"));
+                const statuses = new Set(findings.filter(fi => fi).map(fi => fi.status || "pending"));
                 return `
                   <tr>
                     <td class="font-mono text-sm">${escapeHtml(f.name)}</td>
@@ -201,7 +220,7 @@ export async function renderRoundSummary(container, params) {
                       <div class="flex items-center gap-1 flex-wrap">
                         ${[...statuses].map(st => {
                           const cfg = FINDING_STATUS_CONFIG[st] || FINDING_STATUS_CONFIG.pending;
-                          const count = findings.filter(fi => (fi.status || "pending") === st).length;
+                          const count = findings.filter(fi => fi && (fi.status || "pending") === st).length;
                           return `<span class="badge ${cfg.badge}" style="font-size:11px">${count} ${cfg.label}</span>`;
                         }).join("")}
                       </div>

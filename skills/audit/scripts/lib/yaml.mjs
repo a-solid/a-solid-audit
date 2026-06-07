@@ -296,10 +296,12 @@ export function writeIndexYaml(filePath, data) {
     id: data.session.id,
     type: data.session.type,
     status: data.session.status || "created",
+    version: data.session.version || 1,
     scope: data.session.scope,
     created: data.session.created,
   };
   if (data.session.projectDir) session.projectDir = data.session.projectDir;
+  if (data.session.roundId) session.roundId = data.session.roundId;
   writeYaml(filePath, {
     session,
     codeTasks: (data.codeTasks || data.tasks || []).map(t => {

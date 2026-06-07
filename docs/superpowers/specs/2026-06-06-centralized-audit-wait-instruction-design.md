@@ -1,3 +1,6 @@
+> **Superseded by** [simplified-wait-endpoint-design.md](./2026-06-06-simplified-wait-endpoint-design.md).
+> The per-session `POST /wait` with JSON body described here was replaced by a simpler `GET /wait` endpoint.
+
 # Centralized Audit Directory + Wait-Instruction Mechanism
 
 **Date:** 2026-06-06

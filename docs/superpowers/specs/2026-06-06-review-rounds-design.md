@@ -1,3 +1,6 @@
+> **Superseded by** [versioned-sessions-within-rounds-design.md](./2026-06-06-versioned-sessions-within-rounds-design.md).
+> The round-level `review-notes.yaml` model described here was replaced by session-level notes in the versioned-sessions design.
+
 # Review Rounds — Iterative Code Review with Finding Persistence
 
 ## Problem

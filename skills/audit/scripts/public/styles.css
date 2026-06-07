@@ -2404,10 +2404,6 @@ code {
   outline-offset: 2px;
 }
 /* ─── Finding Accordion (resolved findings) ─── */
-.finding-card-muted {
-  /* kept as class but opacity removed — accordion handles compact display */
-}
-
 .finding-accordion {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -2917,7 +2913,7 @@ code {
   }
 
   /* Hide low-priority findings that were hidden by toggle */
-  .summary-finding-low-priority.summary-finding-hidden {
+  .finding-accordion.summary-finding-hidden {
     display: none !important;
   }
 }

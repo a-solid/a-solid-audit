@@ -12,6 +12,72 @@ import { initTheme } from "./theme.mjs";
 
 initTheme();
 
+// ─── Project Switcher ───
+let currentProjectName = "";
+let switcherOpen = false;
+
+async function initProjectSwitcher() {
+  const nameEl = document.getElementById("project-switcher-name");
+  const btnEl = document.getElementById("project-switcher-btn");
+  const dropdownEl = document.getElementById("project-switcher-dropdown");
+  if (!nameEl || !btnEl || !dropdownEl) return;
+
+  try {
+    const data = await api.listProjects();
+    currentProjectName = data.currentProject;
+    nameEl.textContent = currentProjectName;
+  } catch {
+    nameEl.textContent = "Unknown";
+  }
+
+  btnEl.addEventListener("click", (e) => {
+    e.stopPropagation();
+    switcherOpen = !switcherOpen;
+    btnEl.setAttribute("aria-expanded", switcherOpen);
+    if (switcherOpen) {
+      renderProjectDropdown(dropdownEl);
+      dropdownEl.classList.remove("hidden");
+    } else {
+      dropdownEl.classList.add("hidden");
+    }
+  });
+
+  document.addEventListener("click", () => {
+    if (switcherOpen) {
+      switcherOpen = false;
+      btnEl.setAttribute("aria-expanded", false);
+      dropdownEl.classList.add("hidden");
+    }
+  });
+
+  dropdownEl.addEventListener("click", (e) => e.stopPropagation());
+}
+
+async function renderProjectDropdown(dropdownEl) {
+  let data;
+  try {
+    data = await api.listProjects();
+  } catch {
+    dropdownEl.innerHTML = '<div class="project-dropdown-item text-sm text-muted">Failed to load projects</div>';
+    return;
+  }
+
+  dropdownEl.innerHTML = `
+    <div class="project-dropdown-header">Projects</div>
+    ${data.projects.map(p => `
+      <a href="${p.isCurrent ? "#/home" : `#/project/${encodeURIComponent(p.name)}`}"
+         class="project-dropdown-item ${p.isCurrent ? "active" : ""}"
+         role="menuitem">
+        <span class="project-dropdown-name">${escapeHtml(p.name)}</span>
+        ${p.isCurrent ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>` : ""}
+        <span class="text-xs text-muted">${p.roundCount} round${p.roundCount !== 1 ? "s" : ""}</span>
+      </a>
+    `).join("")}
+  `;
+}
+
+initProjectSwitcher();
+
 const container = document.getElementById("app");
 const breadcrumbEl = document.getElementById("breadcrumb");
 let cleanupFns = [];

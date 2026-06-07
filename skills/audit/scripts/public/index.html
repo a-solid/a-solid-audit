@@ -21,6 +21,14 @@
       audit
     </a>
     <div class="app-logo-sep"></div>
+    <div id="project-switcher" class="project-switcher">
+      <button id="project-switcher-btn" class="btn btn-ghost btn-sm" aria-label="Switch project" aria-haspopup="true" aria-expanded="false">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        <span id="project-switcher-name">Loading...</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div id="project-switcher-dropdown" class="project-dropdown hidden" role="menu"></div>
+    </div>
     <nav id="breadcrumb" class="breadcrumb" aria-label="Breadcrumb"></nav>
     <div class="header-spacer"></div>
     <a href="#/settings" class="btn btn-ghost btn-sm" aria-label="Settings" id="header-settings-btn"></a>

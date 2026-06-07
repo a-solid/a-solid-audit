@@ -118,4 +118,10 @@ export const api = {
     request("GET", `/api/codegraph/status?dir=${e(projectDir)}`),
   initCodegraph: (projectDir) =>
     request("POST", "/api/codegraph/init", { projectDir }),
+
+  // Projects
+  listProjects: () => request("GET", "/api/projects"),
+  getProjectRounds: (projectName) => request("GET", `/api/projects/${e(projectName)}/rounds`),
+  getProjectRoundSummary: (projectName, roundName) =>
+    request("GET", `/api/projects/${e(projectName)}/rounds/${e(roundName)}/summary`),
 };

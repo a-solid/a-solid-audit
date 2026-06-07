@@ -166,8 +166,89 @@ export async function renderReview(container, params) {
     }
   }
 
+  function renderDashboardStrip(stats) {
+    const sevColors = {
+      critical: "var(--danger)",
+      high: "var(--danger)",
+      major: "var(--danger)",
+      medium: "var(--warning)",
+      minor: "var(--warning)",
+      low: "var(--info)",
+      info: "var(--info)",
+      met: "var(--accent)",
+      positive: "var(--accent)",
+      "partially-met": "var(--warning)",
+      "not-met": "var(--danger)",
+    };
+    const sevLabels = ["critical", "high", "major", "medium", "minor", "low", "info"];
+    const sevPills = sevLabels.map(s => {
+      const count = stats.bySeverity[s] || 0;
+      const bg = sevColors[s] || "var(--text-muted)";
+      return `<span class="findings-pill findings-pill-severity ${count === 0 ? "findings-pill-zero" : ""}" style="background:${bg}">${s.toUpperCase()} ${count}</span>`;
+    }).join("");
+
+    const statusDefs = [
+      { key: "needFix", label: "NEED FIX", cls: "pill-need-fix" },
+      { key: "wontFix", label: "WON'T FIX", cls: "pill-wont-fix" },
+      { key: "notAnIssue", label: "NOT AN ISSUE", cls: "pill-not-an-issue" },
+      { key: "wellDone", label: "WELL DONE", cls: "pill-well-done" },
+      { key: "pendingCount", label: "PENDING", cls: "pill-pending" },
+    ];
+    const statusPills = statusDefs.map(d => {
+      const count = stats[d.key] || 0;
+      return `<span class="findings-pill findings-pill-status ${d.cls} ${count === 0 ? "findings-pill-zero" : ""}">${d.label} ${count}</span>`;
+    }).join("");
+
+    return `
+      <div class="findings-dashboard mb-4">
+        <div class="findings-dashboard-group">
+          <span class="findings-dashboard-label">Severity</span>
+          ${sevPills}
+        </div>
+        <div class="findings-dashboard-group">
+          <span class="findings-dashboard-label">Status</span>
+          ${statusPills}
+        </div>
+      </div>`;
+  }
+
+  function renderAllClearCard(findings, autoResolvedCount, manualResolvedCount) {
+    const total = findings.items.length;
+    const parts = [];
+    if (autoResolvedCount > 0) parts.push(`${autoResolvedCount} auto-resolved`);
+    if (manualResolvedCount > 0) parts.push(`${manualResolvedCount} manual`);
+    const subtitle = parts.join(" · ") || `${total} resolved`;
+
+    return `
+      <div class="findings-all-clear">
+        ${icon("check", 32)}
+        <h2>All Findings Resolved</h2>
+        <p>${subtitle}</p>
+        <a href="#/round/${encodeURIComponent(roundName)}" class="btn btn-primary btn-sm">${icon("arrowLeft", 14)} Back to Round</a>
+      </div>
+      ${total > 0 ? `
+        <details class="findings-resolved-list">
+          <summary>Show resolved findings (${total})</summary>
+          ${findings.items.map(f => {
+            const sevLabel = f.severity.toUpperCase();
+            const sevColor = `var(--${f.severity === "critical" ? "danger" : f.severity === "high" || f.severity === "major" ? "danger" : "warning"})`;
+            const statusLabel = f.status === "need-fix" ? "Need Fix" : f.status === "wont-fix" ? "Won't Fix" : f.status === "not-an-issue" ? "Not an Issue" : f.status === "well-done" ? "Well Done" : "";
+            const reasonText = f.reason ? ` — ${escapeHtml(f.reason)}` : "";
+            return `
+              <div class="findings-resolved-card">
+                <span class="finding-severity-badge" style="background:${sevColor}">${sevLabel}</span>
+                <span class="finding-file-ref">${escapeHtml(f.fileName)}${f.line ? `:${f.line}` : ""}</span>
+                <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(f.description)}</span>
+                <span class="finding-status-badge finding-status-${f.status}">${statusLabel}</span>
+                <span class="text-xs text-muted">${reasonText}</span>
+              </div>`;
+          }).join("")}
+        </details>
+      ` : ""}`;
+  }
+
   function render() {
-    const { items, dismissedCount } = findings;
+    const { items, autoResolvedCount, manualResolvedCount } = findings;
     const stats = aggregateFindings(tasks, notes);
     const allDone = items.length > 0 && items.every(f => f.status);
     const pendingItems = items.filter(f => !f.status);
@@ -185,11 +266,13 @@ export async function renderReview(container, params) {
       ${items.length === 0 ? `
         <div class="empty-state">
           <div class="empty-state-icon">${icon("check", 48)}</div>
-          <h2>No action needed</h2>
-          <p>${dismissedCount > 0 ? `All findings were low severity and auto-dismissed.` : "No findings were identified in this review."}</p>
+          <h2>No findings</h2>
+          <p>No findings were identified in this review.</p>
           <a href="#/round/${encodeURIComponent(roundName)}" class="btn btn-primary mt-4">${icon("arrowLeft", 14)} Back to Round</a>
         </div>
       ` : `
+        ${renderDashboardStrip(stats)}
+
         <div class="findings-progress mb-4">
           <div class="findings-progress-bar">
             ${stats.needFix > 0 ? `<div class="review-progress-seg seg-need-fix" style="flex:${stats.needFix}"></div>` : ""}
@@ -206,27 +289,13 @@ export async function renderReview(container, params) {
           </div>
         </div>
 
-        ${allDone ? `
-          <div class="card mb-4" style="border-color:var(--accent);text-align:center;padding:var(--space-4)">
-            <div class="flex items-center justify-center gap-2">
-              ${icon("check", 18)}
-              <span class="font-medium">All findings reviewed</span>
-            </div>
-            <a href="#/round/${encodeURIComponent(roundName)}" class="btn btn-primary btn-sm mt-3">${icon("arrowLeft", 14)} Back to Round</a>
-          </div>
-        ` : ""}
+        ${allDone ? renderAllClearCard(findings, autoResolvedCount, manualResolvedCount) : ""}
 
         <div id="findings-list">
           ${pendingItems.map((f, idx) => renderFindingCard(f, idx, false)).join("")}
           ${triagedItems.length > 0 && pendingItems.length > 0 ? `<div class="findings-section-label">Reviewed</div>` : ""}
-          ${triagedItems.map((f, idx) => renderFindingCard(f, pendingItems.length + idx, true)).join("")}
+          ${!allDone ? triagedItems.map((f, idx) => renderFindingCard(f, pendingItems.length + idx, true)).join("") : ""}
         </div>
-
-        ${dismissedCount > 0 ? `
-          <div class="findings-dismissed-banner">
-            ${dismissedCount} minor/info finding${dismissedCount !== 1 ? "s" : ""} auto-dismissed as Won't Fix
-          </div>
-        ` : ""}
       `}
     `;
 

@@ -16,6 +16,7 @@ import { registerWaitRoutes, cancelAllWaiters } from "./handlers/wait.mjs";
 import { registerRoundRoutes } from "./handlers/rounds.mjs";
 import { AppError } from "../lib/errors.mjs";
 import { resolveReportsDir } from "../lib/paths.mjs";
+import { pauseStaleSessions } from "../lib/session.mjs";
 
 export function jsonResponse(res, data, status = 200) {
   res.writeHead(status, { "Content-Type": "application/json" });
@@ -93,6 +94,7 @@ export function startServer(projectDir, port = 3456) {
   server.listen(port, () => {
     console.log("A-Solid Audit server running at http://localhost:" + port);
     console.log("Reports: " + reportsDir);
+    pauseStaleSessions(reportsDir);
   });
 
   server.on("close", () => {

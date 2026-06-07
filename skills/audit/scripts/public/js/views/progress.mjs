@@ -29,7 +29,6 @@ export async function renderProgress(container, params) {
       <div class="flex items-center gap-2">
         <div id="session-badge"></div>
         <button id="view-findings-btn" class="btn btn-ghost btn-sm hidden" aria-label="View findings">${icon("eye", 14)} Findings</button>
-        <button id="view-summary-btn" class="btn btn-ghost btn-sm hidden" aria-label="View summary">${icon("barChart", 14)} Summary</button>
         <button id="cancel-scan-btn" class="btn btn-ghost btn-sm hidden" style="color:var(--danger);border-color:rgba(239,68,68,0.3)" aria-label="Cancel scan">${icon("x", 14)} Cancel</button>
       </div>
     </div>
@@ -218,12 +217,10 @@ export async function renderProgress(container, params) {
       document.getElementById("progress-pct").textContent = pct + "%";
       document.getElementById("session-badge").innerHTML = `<span class="badge badge-${escapeHtml(session.status)}">${escapeHtml(session.status)}</span>`;
 
-      // Show findings/summary buttons once tasks are reviewed
+      // Show findings button once tasks are reviewed
       const findingsBtn = document.getElementById("view-findings-btn");
-      const summaryBtn = document.getElementById("view-summary-btn");
       if (reviewed > 0) {
         findingsBtn.classList.remove("hidden");
-        summaryBtn.classList.remove("hidden");
       }
 
       document.getElementById("task-list").innerHTML = tasks.map(t => {
@@ -348,10 +345,6 @@ export async function renderProgress(container, params) {
   document.getElementById("view-findings-btn").addEventListener("click", () => {
     if (pollTimer) clearTimeout(pollTimer);
     location.hash = `#/review/${sessionId}`;
-  });
-  document.getElementById("view-summary-btn").addEventListener("click", () => {
-    if (pollTimer) clearTimeout(pollTimer);
-    location.hash = `#/summary/${sessionId}`;
   });
   document.getElementById("cancel-scan-btn").addEventListener("click", async () => {
     const cancelBtn = document.getElementById("cancel-scan-btn");

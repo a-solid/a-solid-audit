@@ -6,6 +6,8 @@ import { renderProgress } from "./views/progress.mjs";
 import { renderReview } from "./views/review.mjs";
 import { renderSummary } from "./views/summary.mjs";
 import { renderSettings } from "./views/settings.mjs";
+import { renderRoundDetail } from "./views/round-detail.mjs";
+import { renderRoundSummary } from "./views/round-summary.mjs";
 import { initNotesPanel } from "./components/notes-panel.mjs";
 import { initTheme } from "./theme.mjs";
 
@@ -56,6 +58,9 @@ const ICONS = {
   help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
   undo2: '<path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>',
   pencil: '<path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>',
+  refreshCw: '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
+  layers: '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>',
+  "git-pull-request": '<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/>',
 };
 
 export function icon(name, size = 16) {
@@ -161,6 +166,8 @@ const routes = {
   review: renderReview,
   summary: renderSummary,
   settings: renderSettings,
+  rounds: renderRoundDetail,
+  "round-summary": renderRoundSummary,
 };
 
 function parseHash() {

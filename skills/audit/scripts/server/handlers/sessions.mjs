@@ -2,12 +2,17 @@
 import fs from "node:fs";
 import path from "node:path";
 import {
-  listSessions, getSession, createSession, updateSessionStatus, updateSession, sessionId, sanitizePath, resolveSessionPath,
+  getSession, updateSessionStatus, updateSession, resolveSessionPath,
 } from "../../lib/session.mjs";
 import { jsonResponse, readBody, errorResponse } from "../index.mjs";
-import { resolveProjectDir } from "../../lib/paths.mjs";
 
 const CONTEXT_FILE = "review-context.md";
+
+function resolveSession(reportsDir, params) {
+  const indexPath = resolveSessionPath(reportsDir, params.roundName, params.version);
+  if (!indexPath) return null;
+  return { roundName: params.roundName, version: params.version, indexPath, sessionDir: path.dirname(indexPath) };
+}
 
 function readContextFile(sessionDir) {
   const p = path.join(sessionDir, CONTEXT_FILE);
@@ -25,36 +30,10 @@ function writeContextFile(sessionDir, userContext) {
 }
 
 export function registerSessionRoutes(router, reportsDir) {
-  // GET /api/sessions — list all sessions
-  router.get("/api/sessions", (req, res, params) => {
-    const sessions = listSessions(reportsDir);
-    jsonResponse(res, sessions);
-  });
-
-  // POST /api/sessions — create new session (requires roundId)
-  router.post("/api/sessions", async (req, res, params) => {
-    const sid = sessionId();
-    let options = { type: "code", projectDir: null, roundId: null, version: undefined };
+  // GET /api/rounds/:roundName/sessions/:version — single session detail
+  router.get("/api/rounds/:roundName/sessions/:version", (req, res, params) => {
     try {
-      const body = JSON.parse(await readBody(req));
-      options = {
-        type: body.type || "code",
-        projectDir: body.projectDir || null,
-        roundId: body.roundId || null,
-        version: body.version || undefined,
-      };
-    } catch { /* use defaults */ }
-    if (!options.roundId) {
-      return errorResponse(res, "Missing required field: roundId", "VALIDATION_ERROR", 400);
-    }
-    const result = createSession(reportsDir, sid, options);
-    jsonResponse(res, { id: result.id, projectDir: resolveProjectDir(), roundId: options.roundId, version: options.version || 1 }, 201);
-  });
-
-  // GET /api/sessions/:id — single session detail
-  router.get("/api/sessions/:id", (req, res, params) => {
-    try {
-      const session = getSession(reportsDir, params.id);
+      const session = getSession(reportsDir, params.roundName, params.version);
       if (!session) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
       jsonResponse(res, session);
     } catch (e) {
@@ -62,79 +41,73 @@ export function registerSessionRoutes(router, reportsDir) {
     }
   });
 
-  // PUT /api/sessions/:id/status — update session status
-  router.put("/api/sessions/:id/status", async (req, res, params) => {
+  // PUT /api/rounds/:roundName/sessions/:version/status — update session status
+  router.put("/api/rounds/:roundName/sessions/:version/status", async (req, res, params) => {
     try {
       const body = JSON.parse(await readBody(req));
       if (!body || !body.status) {
         return errorResponse(res, "Missing required field: status", "VALIDATION_ERROR", 400);
       }
-      const session = updateSessionStatus(reportsDir, params.id, body.status);
+      const session = updateSessionStatus(reportsDir, params.roundName, params.version, body.status);
       jsonResponse(res, session);
     } catch (e) {
       throw e;
     }
   });
 
-  // PATCH /api/sessions/:id — update mutable session fields
-  router.patch("/api/sessions/:id", async (req, res, params) => {
+  // PATCH /api/rounds/:roundName/sessions/:version — update mutable session fields
+  router.patch("/api/rounds/:roundName/sessions/:version", async (req, res, params) => {
     try {
       const body = JSON.parse(await readBody(req));
       if (!body || Object.keys(body).length === 0) {
         return errorResponse(res, "No fields to update", "VALIDATION_ERROR", 400);
       }
-      const session = updateSession(reportsDir, params.id, body);
+      const session = updateSession(reportsDir, params.roundName, params.version, body);
       jsonResponse(res, session);
     } catch (e) {
       throw e;
     }
   });
 
-  // GET /api/sessions/:id/review-context
-  router.get("/api/sessions/:id/review-context", (req, res, params) => {
+  // GET /api/rounds/:roundName/sessions/:version/review-context
+  router.get("/api/rounds/:roundName/sessions/:version/review-context", (req, res, params) => {
     try {
-      const safeSid = sanitizePath(params.id);
-      const resolvedIndex = resolveSessionPath(reportsDir, safeSid);
-      if (!resolvedIndex) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
-      const sessionDir = path.dirname(resolvedIndex);
-      const context = readContextFile(sessionDir);
+      const resolved = resolveSession(reportsDir, params);
+      if (!resolved) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
+      const context = readContextFile(resolved.sessionDir);
       jsonResponse(res, { context });
     } catch (e) {
       throw e;
     }
   });
 
-  // PUT /api/sessions/:id/review-context
-  router.put("/api/sessions/:id/review-context", async (req, res, params) => {
+  // PUT /api/rounds/:roundName/sessions/:version/review-context
+  router.put("/api/rounds/:roundName/sessions/:version/review-context", async (req, res, params) => {
     try {
-      const safeSid = sanitizePath(params.id);
-      const resolvedIndex = resolveSessionPath(reportsDir, safeSid);
-      if (!resolvedIndex) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
-      const sessionDir = path.dirname(resolvedIndex);
+      const resolved = resolveSession(reportsDir, params);
+      if (!resolved) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
       const body = JSON.parse(await readBody(req));
       if (!body || typeof body.context !== "string") {
         return errorResponse(res, "Missing required field: context", "VALIDATION_ERROR", 400);
       }
-      writeContextFile(sessionDir, body.context);
+      writeContextFile(resolved.sessionDir, body.context);
       jsonResponse(res, { ok: true });
     } catch (e) {
       throw e;
     }
   });
 
-  // POST /api/sessions/:id/review-notes — atomically append to Review Notes section
-  router.post("/api/sessions/:id/review-notes", async (req, res, params) => {
+  // POST /api/rounds/:roundName/sessions/:version/review-notes — atomically append to Review Notes section
+  router.post("/api/rounds/:roundName/sessions/:version/review-notes", async (req, res, params) => {
     try {
-      const safeSid = sanitizePath(params.id);
-      const resolvedIndex = resolveSessionPath(reportsDir, safeSid);
-      if (!resolvedIndex) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
-      const sessionDir = path.dirname(resolvedIndex);
+      const resolved = resolveSession(reportsDir, params);
+      if (!resolved) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
       const body = JSON.parse(await readBody(req));
       if (!body || typeof body.notes !== "string") {
         return errorResponse(res, "Missing required field: notes", "VALIDATION_ERROR", 400);
       }
 
-      const contextPath = path.join(sessionDir, CONTEXT_FILE);
+      const contextPath = path.join(resolved.sessionDir, CONTEXT_FILE);
       let existing = "";
       if (fs.existsSync(contextPath)) {
         existing = fs.readFileSync(contextPath, "utf-8");

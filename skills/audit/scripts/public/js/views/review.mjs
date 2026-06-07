@@ -81,7 +81,7 @@ export async function renderReview(container, params) {
       const existing = noteTask?.findings || [];
       let changed = false;
       const saveFindings = findings.map((f, i) => {
-        if (existing[i]) return existing[i];
+        if (existing[i]?.status) return existing[i];
         if (LOW_SEVERITIES.includes(f.severity)) {
           changed = true;
           return { status: "wont-fix", reason: "Auto-dismissed: low severity" };
@@ -102,7 +102,8 @@ export async function renderReview(container, params) {
 
   function buildFindingsList(taskList, notesData) {
     const list = [];
-    let dismissedCount = 0;
+    let autoResolvedCount = 0;
+    let manualResolvedCount = 0;
     for (const task of taskList) {
       if (task.status !== "reviewed") continue;
       const findings = task.review?.findings || [];
@@ -110,9 +111,12 @@ export async function renderReview(container, params) {
       for (let i = 0; i < findings.length; i++) {
         const f = findings[i];
         const triageStatus = noteTask?.findings?.[i]?.status || null;
-        if (LOW_SEVERITIES.includes(f.severity) && (!triageStatus || triageStatus === "wont-fix")) {
-          dismissedCount++;
-          continue;
+        const reason = noteTask?.findings?.[i]?.reason || null;
+        const isAuto = (f.severity === "met" || f.severity === "positive") ||
+                       (LOW_SEVERITIES.includes(f.severity) && triageStatus === "wont-fix");
+        if (triageStatus) {
+          if (isAuto) autoResolvedCount++;
+          else manualResolvedCount++;
         }
         list.push({
           file: task.file,
@@ -123,6 +127,7 @@ export async function renderReview(container, params) {
           code: f.code || null,
           suggestion: f.suggestion || null,
           status: triageStatus,
+          reason: reason,
           findingIdx: i,
         });
       }
@@ -131,7 +136,7 @@ export async function renderReview(container, params) {
     const sevOrder = { critical: 0, high: 1, major: 2, medium: 3, minor: 4, info: 5, low: 6, positive: 7, met: 8 };
     const statusOrder = (s) => s === null ? 0 : s === "need-fix" ? 1 : 2;
     list.sort((a, b) => statusOrder(a.status) - statusOrder(b.status) || (sevOrder[a.severity] ?? 9) - (sevOrder[b.severity] ?? 9));
-    return { items: list, dismissedCount };
+    return { items: list, autoResolvedCount, manualResolvedCount };
   }
 
   async function updateStatus(taskFile, findingIdx, status, reason) {

@@ -4,7 +4,8 @@ import { showToast, setBreadcrumb, icon, escapeHtml, onNavigateCleanup, renderTe
 import { ENTRY_TYPES } from "../constants.mjs";
 
 export async function renderProgress(container, params) {
-  const sessionId = params[0];
+  const roundName = params[0];
+  const version = params[1];
   let pollFailures = 0;
   let pollTimer = null;
   let pollInterval = 3000;
@@ -13,10 +14,10 @@ export async function renderProgress(container, params) {
   let scanStarted = false;
   let logEventSource = null;
 
-  const shortId = sessionId ? sessionId.slice(0, 7) : "";
   setBreadcrumb([
     { label: "Rounds", href: "#/home" },
-    ...(shortId ? [{ label: shortId, href: `#/progress/${sessionId}` }] : []),
+    { label: roundName, href: `#/round/${encodeURIComponent(roundName)}` },
+    { label: `v${version}` },
     { label: "Progress" },
   ]);
 
@@ -95,13 +96,15 @@ export async function renderProgress(container, params) {
     }
   }
 
+  const scanLogUrl = `/api/rounds/${encodeURIComponent(roundName)}/sessions/${encodeURIComponent(version)}/scan/logs`;
+
   function startLogStream() {
     if (logEventSource) return;
     const logPanel = document.getElementById("scan-log-panel");
     const logToggle = document.getElementById("scan-log-toggle");
     if (!logPanel) return;
 
-    logEventSource = new EventSource(`/api/sessions/${sessionId}/scan/logs`);
+    logEventSource = new EventSource(scanLogUrl);
 
     logEventSource.onmessage = (e) => {
       try {
@@ -135,7 +138,7 @@ export async function renderProgress(container, params) {
 
   async function poll() {
     try {
-      const session = await api.getSession(sessionId);
+      const session = await api.getSession(roundName, version);
       pollFailures = 0;
       document.getElementById("poll-warning").classList.add("hidden");
 
@@ -187,7 +190,7 @@ export async function renderProgress(container, params) {
         const scanStatusEl = document.getElementById("scan-status");
         scanStatusEl.classList.remove("hidden");
         scanStatusEl.innerHTML = "";
-        const cmd = session.status === "scanned" ? `group ${escapeHtml(sessionId)}` : `start review ${escapeHtml(sessionId)}`;
+        const cmd = session.status === "scanned" ? `group ${escapeHtml(roundName)}/${escapeHtml(version)}` : `start review ${escapeHtml(roundName)}/${escapeHtml(version)}`;
         renderTerminalCard(scanStatusEl, cmd);
         pollTimer = setTimeout(poll, 5000);
         return;
@@ -203,7 +206,7 @@ export async function renderProgress(container, params) {
       }
 
       let tasks = [];
-      try { tasks = await api.getTasksSummary(sessionId); } catch (e) {
+      try { tasks = await api.getTasksSummary(roundName, version); } catch (e) {
         document.getElementById("task-list").innerHTML = `<div class="text-sm text-muted" style="padding:var(--space-4)">Failed to load tasks. Retrying...</div>`;
       }
 
@@ -246,7 +249,7 @@ export async function renderProgress(container, params) {
       if (reviewed === total && total > 0 && session.status === "completed") {
         const cancelBtn2 = document.getElementById("cancel-scan-btn");
         if (cancelBtn2) cancelBtn2.classList.add("hidden");
-        location.hash = `#/review/${sessionId}`;
+        location.hash = `#/round/${encodeURIComponent(roundName)}/${version}/review`;
         return; // Stop polling
       }
 
@@ -262,7 +265,7 @@ export async function renderProgress(container, params) {
           cardDiv.id = "ready-terminal-card";
           cardDiv.className = "card";
           cardDiv.style.cssText = "text-align:center;padding:var(--space-8) var(--space-6);margin-top:var(--space-4)";
-          renderTerminalCard(cardDiv, `start review ${escapeHtml(sessionId)}`);
+          renderTerminalCard(cardDiv, `start review ${escapeHtml(roundName)}/${escapeHtml(version)}`);
           const taskList = document.getElementById("task-list");
           if (taskList) taskList.before(cardDiv);
         }
@@ -321,7 +324,7 @@ export async function renderProgress(container, params) {
     scanStatusEl.classList.remove("hidden");
     scanStatusEl.textContent = "Initiating scan...";
     try {
-      await api.startScan(sessionId);
+      await api.startScan(roundName, version);
       scanStatusEl.textContent = "Scanning in progress...";
       startLogStream();
       pollInterval = 3000;
@@ -344,17 +347,17 @@ export async function renderProgress(container, params) {
 
   document.getElementById("view-findings-btn").addEventListener("click", () => {
     if (pollTimer) clearTimeout(pollTimer);
-    location.hash = `#/review/${sessionId}`;
+    location.hash = `#/round/${encodeURIComponent(roundName)}/${version}/review`;
   });
   document.getElementById("cancel-scan-btn").addEventListener("click", async () => {
     const cancelBtn = document.getElementById("cancel-scan-btn");
     if (cancelBtn.dataset.confirmPending === "true") {
       cancelBtn.dataset.confirmPending = "";
       try {
-        await api.patchSession(sessionId, { status: "created" });
+        await api.patchSession(roundName, version, { status: "created" });
         if (pollTimer) clearTimeout(pollTimer);
         showToast("Scan cancelled", "success");
-        location.hash = `#/wizard/${sessionId}`;
+        location.hash = `#/round/${encodeURIComponent(roundName)}/${version}/wizard`;
       } catch (e) {
         showToast("Failed to cancel: " + e.message);
         cancelBtn.innerHTML = `${icon("x", 14)} Cancel`;

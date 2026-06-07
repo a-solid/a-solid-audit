@@ -19,11 +19,9 @@ function formatScopeDisplay(method, ref) {
 }
 
 export async function renderWizard(container, params) {
-  let sessionId = params[0]?.split("?")[0];
-  const isNew = !sessionId || sessionId === "new";
-  const urlParams = new URLSearchParams(window.location.hash.split("?")[1] || "");
-  let preselectType = urlParams.get("type");
-  const roundId = urlParams.get("roundId");
+  const roundName = params[0];
+  const version = params[1];
+  const isNew = !version || version === "new";
   let step = 1;
   let prevStep = 0;
   let reviewType = "code";
@@ -41,7 +39,7 @@ export async function renderWizard(container, params) {
 
   // For "new" wizard, skip session restore — no session exists yet
   if (!isNew) {
-    const savedKey = `audit-wizard-${sessionId}`;
+    const savedKey = `audit-wizard-${roundName}-${version}`;
     const saved = localStorage.getItem(savedKey);
     if (saved) {
       const state = JSON.parse(saved);
@@ -58,7 +56,7 @@ export async function renderWizard(container, params) {
     // If no localStorage data, try to restore from server for ready sessions
     if (!saved) {
       try {
-        const session = await api.getSession(sessionId);
+        const session = await api.getSession(roundName, version);
         if (session?.status === "ready" && session.type !== "project") {
           reviewType = session.type || "code";
           if (session.scope) {
@@ -69,7 +67,7 @@ export async function renderWizard(container, params) {
           step = reviewType === "all" ? 4 : 4;
           // Load stories from server
           try {
-            const serverStories = await api.getStories(sessionId);
+            const serverStories = await api.getStories(roundName, version);
             stories = serverStories.map(s => ({
               name: s.name,
               description: s.description || "",
@@ -108,7 +106,7 @@ export async function renderWizard(container, params) {
 
   function save() {
     if (isNew) return;
-    const savedKey = `audit-wizard-${sessionId}`;
+    const savedKey = `audit-wizard-${roundName}-${version}`;
     localStorage.setItem(savedKey, JSON.stringify({
       step, reviewType, scopeMethod, scopeRef, stories, storyMappings, contextExpanded, excludedFiles,
     }));
@@ -158,8 +156,8 @@ export async function renderWizard(container, params) {
 
   // State object shared with sub-modules
   const state = {
-    get sessionId() { return sessionId; },
-    set sessionId(v) { sessionId = v; },
+    get roundName() { return roundName; },
+    get version() { return version; },
     get isNew() { return isNew; },
     get step() { return step; },
     set step(v) { step = v; },
@@ -194,10 +192,11 @@ export async function renderWizard(container, params) {
   };
 
   function render() {
-    const shortId = sessionId && !isNew ? sessionId.slice(0, 7) : "";
+    const versionLabel = !isNew ? `v${version}` : "";
     setBreadcrumb([
       { label: "Rounds", href: "#/home" },
-      ...(shortId ? [{ label: shortId, href: `#/wizard/${sessionId}` }] : []),
+      ...(roundName && !isNew ? [{ label: roundName, href: `#/round/${encodeURIComponent(roundName)}` }] : []),
+      ...(versionLabel ? [{ label: versionLabel, href: `#/round/${encodeURIComponent(roundName)}/${version}/wizard` }] : []),
       { label: isNew ? "New Audit" : "Configure" },
     ]);
 
@@ -246,10 +245,6 @@ export async function renderWizard(container, params) {
   }
 
   function renderStep1(content) {
-    if (preselectType && isNew) {
-      reviewType = preselectType;
-      preselectType = null;
-    }
     content.innerHTML = `
       <div class="card mb-4">
         <h2 class="font-semibold mb-4">Choose Review Type</h2>
@@ -303,16 +298,14 @@ export async function renderWizard(container, params) {
         nextBtn.disabled = true;
         nextBtn.innerHTML = '<span class="spinner spinner-sm"></span> Creating...';
         try {
-          if (!roundId) {
+          if (!roundName) {
             showToast("No round specified. Start from the home page.");
             nextBtn.disabled = false;
             nextBtn.innerHTML = originalHTML;
             return;
           }
-          const { id, projectDir } = await api.createRoundSession(roundId, { type: reviewType });
-          sessionId = id;
-          defaultProjectDir = projectDir || "";
-          location.hash = `#/wizard/${id}`;
+          const result = await api.createRoundSession(roundName, { type: reviewType });
+          location.hash = `#/round/${encodeURIComponent(roundName)}/v${result.version}/wizard`;
         } catch (e) {
           showToast("Failed to create session: " + e.message);
           nextBtn.disabled = false;
@@ -324,11 +317,11 @@ export async function renderWizard(container, params) {
       if (reviewType === "project" && !isNew) {
         // Check if current session is already project type
         try {
-          const session = await api.getSession(sessionId);
+          const session = await api.getSession(roundName, version);
           if (session?.type !== "project") {
-            const { id } = await api.createRoundSession(roundId, { type: "project" });
-            localStorage.removeItem(`audit-wizard-${sessionId}`);
-            location.hash = `#/wizard/${id}`;
+            const result = await api.createRoundSession(roundName, { type: "project" });
+            localStorage.removeItem(`audit-wizard-${roundName}-${version}`);
+            location.hash = `#/round/${encodeURIComponent(roundName)}/v${result.version}/wizard`;
             return;
           }
         } catch {}
@@ -342,7 +335,7 @@ export async function renderWizard(container, params) {
   function renderStep4(content) {
     // For "all" sessions, ensure status is "ready" (setScope only marks "code" sessions as ready)
     if (reviewType === "all") {
-      api.updateSessionStatus(sessionId, "ready").catch(e => {
+      api.updateSessionStatus(roundName, version, "ready").catch(e => {
         showToast("Failed to update session status: " + e.message, "warning");
       });
     }
@@ -388,7 +381,7 @@ export async function renderWizard(container, params) {
       </div>`;
 
     // Load existing context (extract only User Context section)
-    api.getReviewContext(sessionId).then(data => {
+    api.getReviewContext(roundName, version).then(data => {
       const input = document.getElementById("review-context-input");
       if (input && data.context) {
         const match = data.context.match(/## User Context\n([\s\S]*?)(?=\n## Review Notes|$)/);
@@ -414,7 +407,7 @@ export async function renderWizard(container, params) {
         clearTimeout(contextSaveTimer);
         contextSaveTimer = setTimeout(async () => {
           try {
-            await api.setReviewContext(sessionId, contextInput.value);
+            await api.setReviewContext(roundName, version, contextInput.value);
           } catch { /* silent fail — context is optional */ }
         }, 300);
       });
@@ -438,9 +431,9 @@ export async function renderWizard(container, params) {
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner spinner-sm"></span> Starting...';
       try {
-        await api.advance(sessionId, { action: "start" });
-        await api.updateSessionStatus(sessionId, "reviewing");
-        location.hash = `#/progress/${sessionId}`;
+        await api.advance(roundName, version, { action: "start" });
+        await api.updateSessionStatus(roundName, version, "reviewing");
+        location.hash = `#/round/${encodeURIComponent(roundName)}/${version}/progress`;
       } catch (e) {
         showToast("Failed to start review: " + e.message);
         btn.disabled = false;
@@ -449,7 +442,7 @@ export async function renderWizard(container, params) {
     });
 
     setDirty(false);
-    localStorage.removeItem(`audit-wizard-${sessionId}`);
+    localStorage.removeItem(`audit-wizard-${roundName}-${version}`);
   }
 
   render();

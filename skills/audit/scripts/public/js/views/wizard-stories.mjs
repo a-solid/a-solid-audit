@@ -67,7 +67,7 @@ export async function renderStoriesStep(content, state) {
     const acceptance = document.getElementById("story-ac").value.trim();
     if (!name) { showToast("Story name is required"); return; }
     try {
-      await api.createStory(state.sessionId, { name, description, acceptance });
+      await api.createStory(state.roundName, state.version, { name, description, acceptance });
       state.stories.push({ name, description, acceptance });
       state.pendingExpandIndex = state.stories.length - 1;
       state.save();
@@ -136,14 +136,14 @@ export async function renderStoriesStep(content, state) {
   document.getElementById("step3-back").addEventListener("click", () => { state.goBack(2, "step3-back"); });
   document.getElementById("step3-next").addEventListener("click", () => { state.step = 4; state.save(); state.render(); });
 
-  if (state.stories.length > 0) loadAccordionFileTree(state.sessionId);
+  if (state.stories.length > 0) loadAccordionFileTree();
 
-  async function loadAccordionFileTree(sid) {
+  async function loadAccordionFileTree() {
     const container = document.getElementById("accordion-container");
     if (!container) return;
     container.innerHTML = `<span class="text-sm text-muted">Loading files...</span>`;
     try {
-      const tasks = await api.getTasks(sid);
+      const tasks = await api.getTasks(state.roundName, state.version);
       const files = tasks.filter(t => t.type === "code").map(t => t.name);
       if (files.length === 0) {
         container.innerHTML = `<span class="text-sm text-muted">No files found. Confirm scope first.</span>`;
@@ -196,7 +196,7 @@ export async function renderStoriesStep(content, state) {
       function syncMappingsToServer() {
         if (syncing) return;
         syncing = true;
-        api.mapStories(sid, state.stories.map(s => ({
+        api.mapStories(state.roundName, state.version, state.stories.map(s => ({
           storyName: s.name,
           files: (state.storyMappings.find(m => m.storyName === s.name)?.files || []),
         }))).catch(e => showToast("Failed to save mapping: " + e.message))
@@ -306,14 +306,14 @@ export async function renderStoriesStep(content, state) {
             saveBtn.disabled = true;
             saveBtn.innerHTML = '<span class="spinner spinner-sm"></span>';
             const safeName = story.name.replace(/[^a-zA-Z0-9\-_.]/g, "-");
-            await api.updateStory(state.sessionId, safeName, { description, acceptance });
+            await api.updateStory(state.roundName, state.version, safeName, { description, acceptance });
             state.stories[idx].description = description;
             state.stories[idx].acceptance = acceptance;
             state.save();
             document.getElementById(`story-edit-form-${idx}`).classList.add("hidden");
             showToast("Story updated", "success");
             // Re-render accordion to update description preview
-            loadAccordionFileTree(sid);
+            loadAccordionFileTree();
           } catch (err) {
             showToast("Failed to update story: " + err.message);
           } finally {
@@ -344,11 +344,11 @@ export async function renderStoriesStep(content, state) {
             if (btn._confirmTimer) clearTimeout(btn._confirmTimer);
             try {
               const safeName = name.replace(/[^a-zA-Z0-9\-_.]/g, "-");
-              await api.deleteStory(sid, safeName);
+              await api.deleteStory(state.roundName, state.version, safeName);
               state.stories = state.stories.filter(s => s.name !== name);
               state.storyMappings = state.storyMappings.filter(m => m.storyName !== name);
               state.save();
-              loadAccordionFileTree(sid);
+              loadAccordionFileTree();
             } catch (err) { showToast("Failed to delete story: " + err.message); }
           } else {
             btn.dataset.confirmPending = "true";

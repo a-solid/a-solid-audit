@@ -4,7 +4,8 @@ import { icon, showToast } from "../app.mjs";
 
 export function initNotesPanel(root) {
   let panelOpen = false;
-  let sessionId = null;
+  let roundName = null;
+  let version = null;
   let loadedContent = "";
 
   root.innerHTML = `
@@ -42,11 +43,11 @@ export function initNotesPanel(root) {
 
   // Auto-save on blur
   textarea.addEventListener("blur", async () => {
-    if (!sessionId) return;
+    if (!roundName || !version) return;
     const content = textarea.value;
     if (content === loadedContent) return;
     try {
-      await api.setReviewContext(sessionId, content);
+      await api.setReviewContext(roundName, version, content);
       loadedContent = content;
       status.textContent = "Saved";
       status.style.color = "var(--accent)";
@@ -60,12 +61,12 @@ export function initNotesPanel(root) {
     panelOpen = open;
     panel.style.display = open ? "flex" : "none";
     fab.style.display = open ? "none" : "flex";
-    if (open && sessionId) loadContent();
+    if (open && roundName && version) loadContent();
   }
 
   async function loadContent() {
     try {
-      const data = await api.getReviewContext(sessionId);
+      const data = await api.getReviewContext(roundName, version);
       const match = (data.context || "").match(/## User Context\n([\s\S]*?)(?=\n## Review Notes|$)/);
       loadedContent = match ? match[1].trim() : (data.context || "").trim();
       textarea.value = loadedContent;
@@ -77,11 +78,17 @@ export function initNotesPanel(root) {
 
   // Public API for app.mjs to call on route change
   return {
-    updateSession(newSessionId) {
-      sessionId = newSessionId;
-      root.style.display = newSessionId ? "" : "none";
+    updateSession(ref) {
+      if (ref) {
+        roundName = ref.roundName;
+        version = ref.version;
+      } else {
+        roundName = null;
+        version = null;
+      }
+      root.style.display = ref ? "" : "none";
       if (panelOpen) {
-        if (newSessionId) loadContent();
+        if (ref) loadContent();
         else togglePanel(false);
       }
     },

@@ -26,8 +26,8 @@ const FINDING_STATUS_CONFIG = {
 };
 
 export async function renderRoundSummary(container, params) {
-  const roundId = params[0];
-  if (!roundId) { location.hash = "#/home"; return; }
+  const roundName = params[0];
+  if (!roundName) { location.hash = "#/home"; return; }
 
   setBreadcrumb([{ label: "Rounds", href: "#/home" }]);
 
@@ -38,8 +38,8 @@ export async function renderRoundSummary(container, params) {
 
   try {
     [round, summary] = await Promise.all([
-      api.getRound(roundId),
-      api.getRoundSummary(roundId),
+      api.getRound(roundName),
+      api.getRoundSummary(roundName),
     ]);
   } catch (e) {
     container.innerHTML = `
@@ -54,7 +54,7 @@ export async function renderRoundSummary(container, params) {
 
   setBreadcrumb([
     { label: "Rounds", href: "#/home" },
-    { label: round.name, href: `#/rounds/${encodeURIComponent(roundId)}` },
+    { label: round.name, href: `#/round/${encodeURIComponent(roundName)}` },
     { label: "Summary" },
   ]);
 
@@ -76,7 +76,7 @@ export async function renderRoundSummary(container, params) {
         <h1 class="text-2xl">Round Summary</h1>
         <p class="text-sm text-muted mt-1">${escapeHtml(round.name)} &middot; Aggregated across ${files.length} file${files.length !== 1 ? "s" : ""}</p>
       </div>
-      <a href="#/rounds/${encodeURIComponent(roundId)}" class="btn btn-ghost">
+      <a href="#/round/${encodeURIComponent(roundName)}" class="btn btn-ghost">
         ${icon("arrowLeft", 14)} Back to Round
       </a>
     </div>

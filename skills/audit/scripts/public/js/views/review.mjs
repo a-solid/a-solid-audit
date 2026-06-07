@@ -9,14 +9,16 @@ const WONT_FIX_REASONS = ["Acceptable risk", "Out of scope", "Will address later
 const NOT_ISSUE_REASONS = ["False positive", "Already handled", "By design"];
 
 export async function renderReview(container, params) {
-  const sessionId = params[0];
+  const roundName = params[0];
+  const version = params[1];
   let tasks = [];
   let notes = null;
   let currentIdx = 0;
 
   setBreadcrumb([
     { label: "Rounds", href: "#/home" },
-    { label: sessionId ? sessionId.slice(0, 7) : "", href: `#/review/${sessionId}` },
+    { label: roundName, href: `#/round/${encodeURIComponent(roundName)}` },
+    { label: `v${version}` },
     { label: "Findings" },
   ]);
 
@@ -24,8 +26,8 @@ export async function renderReview(container, params) {
 
   try {
     const [taskRes, notesRes] = await Promise.allSettled([
-      api.getTasks(sessionId),
-      api.getNotes(sessionId),
+      api.getTasks(roundName, version),
+      api.getNotes(roundName, version),
     ]);
     if (taskRes.status === "fulfilled") tasks = taskRes.value;
     else { showToast("Failed to load tasks: " + taskRes.reason?.message); return; }
@@ -59,7 +61,7 @@ export async function renderReview(container, params) {
       });
       if (findings.length === 0 && !noteTask) changed = true;
       if (changed) {
-        await api.updateTaskNote(sessionId, task.file, { findings: saveFindings });
+        await api.updateTaskNote(roundName, version, task.file, { findings: saveFindings });
         let existing = notes?.tasks?.find(nt => nt.file === task.file);
         if (!existing) {
           if (!notes) notes = { tasks: [] };
@@ -87,7 +89,7 @@ export async function renderReview(container, params) {
         return null;
       });
       if (changed) {
-        await api.updateTaskNote(sessionId, task.file, { findings: saveFindings });
+        await api.updateTaskNote(roundName, version, task.file, { findings: saveFindings });
         if (!noteTask) {
           if (!notes) notes = { tasks: [] };
           notes.tasks.push({ file: task.file, findings: saveFindings });
@@ -142,7 +144,7 @@ export async function renderReview(container, params) {
     });
     noteFindings[findingIdx] = status ? { status, reason: reason || "" } : null;
     try {
-      await api.updateTaskNote(sessionId, taskFile, { findings: noteFindings });
+      await api.updateTaskNote(roundName, version, taskFile, { findings: noteFindings });
       if (!noteTask) {
         if (!notes) notes = { tasks: [] };
         const nt = { file: taskFile, findings: noteFindings };
@@ -169,7 +171,7 @@ export async function renderReview(container, params) {
     container.innerHTML = `
       <div class="flex items-center justify-between mb-4">
         <div class="flex items-center gap-3">
-          <a href="#/home" class="btn btn-ghost" aria-label="Back to round">${icon("arrowLeft", 14)} Back to Round</a>
+          <a href="#/round/${encodeURIComponent(roundName)}" class="btn btn-ghost" aria-label="Back to round">${icon("arrowLeft", 14)} Back to Round</a>
           <h1 class="text-2xl">Findings</h1>
         </div>
         <button id="kb-hint-btn" class="btn btn-ghost btn-sm" title="Keyboard shortcuts">?</button>
@@ -180,7 +182,7 @@ export async function renderReview(container, params) {
           <div class="empty-state-icon">${icon("check", 48)}</div>
           <h2>No action needed</h2>
           <p>${dismissedCount > 0 ? `All findings were low severity and auto-dismissed.` : "No findings were identified in this review."}</p>
-          <a href="#/home" class="btn btn-primary mt-4">${icon("arrowLeft", 14)} Back to Round</a>
+          <a href="#/round/${encodeURIComponent(roundName)}" class="btn btn-primary mt-4">${icon("arrowLeft", 14)} Back to Round</a>
         </div>
       ` : `
         <div class="findings-progress mb-4">
@@ -205,7 +207,7 @@ export async function renderReview(container, params) {
               ${icon("check", 18)}
               <span class="font-medium">All findings reviewed</span>
             </div>
-            <a href="#/home" class="btn btn-primary btn-sm mt-3">${icon("arrowLeft", 14)} Back to Round</a>
+            <a href="#/round/${encodeURIComponent(roundName)}" class="btn btn-primary btn-sm mt-3">${icon("arrowLeft", 14)} Back to Round</a>
           </div>
         ` : ""}
 

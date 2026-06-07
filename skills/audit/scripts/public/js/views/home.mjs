@@ -78,8 +78,8 @@ function renderModal(container) {
     createBtn.disabled = true;
     createBtn.textContent = "Creating...";
     try {
-      const round = await api.createRound({ name, description });
-      location.hash = `#/wizard/new?roundId=${encodeURIComponent(round.id)}`;
+      await api.createRound({ name, description });
+      location.hash = `#/round/${encodeURIComponent(name)}`;
     } catch (e) {
       showToast("Failed to create round: " + e.message);
       createBtn.disabled = false;
@@ -151,7 +151,7 @@ export async function renderHome(container) {
         const sessionCount = r.sessions ? r.sessions.length : 0;
         const latestVersion = latest ? latest.version : null;
         return `
-          <div class="session-card card card-clickable ${cfg.accent}" data-id="${r.id}" tabindex="0" role="button" aria-label="${escapeHtml(r.name)}, ${status}">
+          <div class="session-card card card-clickable ${cfg.accent}" data-name="${escapeHtml(r.name)}" tabindex="0" role="button" aria-label="${escapeHtml(r.name)}, ${status}">
             <div class="flex items-center justify-between">
               <div style="min-width:0;flex:1">
                 <h3 class="text-base font-semibold truncate">${escapeHtml(r.name)}</h3>
@@ -172,8 +172,8 @@ export async function renderHome(container) {
 
     listEl.querySelectorAll(".card-clickable").forEach(card => {
       card.addEventListener("click", () => {
-        const id = card.dataset.id;
-        location.hash = `#/rounds/${id}`;
+        const name = card.dataset.name;
+        location.hash = `#/round/${encodeURIComponent(name)}`;
       });
       card.addEventListener("keydown", (e) => {
         if (e.key === "Enter" || e.key === " ") {

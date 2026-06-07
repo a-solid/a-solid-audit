@@ -146,7 +146,7 @@ export function renderProjectConfigure(content, state) {
       <button id="project-next" class="btn btn-primary">Next ${icon("chevronRight", 14)}</button>
     </div>`;
 
-  api.getSession(state.sessionId).then(session => {
+  api.getSession(state.roundName, state.version).then(session => {
     const dirInput = document.getElementById("project-dir");
     if (dirInput) {
       dirInput.value = session.projectDir || state.defaultProjectDir || "";
@@ -154,7 +154,7 @@ export function renderProjectConfigure(content, state) {
     renderCodegraphStatus("codegraph-status", session.projectDir || state.defaultProjectDir || "");
   }).catch(() => {});
 
-  api.getReviewContext(state.sessionId).then(data => {
+  api.getReviewContext(state.roundName, state.version).then(data => {
     const input = document.getElementById("project-context-input");
     if (input && data.context) {
       const match = data.context.match(/## User Context\n([\s\S]*?)(?=\n## Review Notes|$)/);
@@ -175,7 +175,7 @@ export function renderProjectConfigure(content, state) {
     ctxInput.addEventListener("blur", () => {
       clearTimeout(ctxTimer);
       ctxTimer = setTimeout(async () => {
-        try { await api.setReviewContext(state.sessionId, ctxInput.value); } catch {}
+        try { await api.setReviewContext(state.roundName, state.version, ctxInput.value); } catch {}
       }, 300);
     });
   }
@@ -202,10 +202,10 @@ export function renderProjectConfigure(content, state) {
       // Save project directory to session
       const dirInput = document.getElementById("project-dir");
       if (dirInput) {
-        try { await api.patchSession(state.sessionId, { projectDir: dirInput.value.trim() || null }); } catch {}
+        try { await api.patchSession(state.roundName, state.version, { projectDir: dirInput.value.trim() || null }); } catch {}
       }
       if (ctxInput) {
-        try { await api.setReviewContext(state.sessionId, ctxInput.value); } catch {}
+        try { await api.setReviewContext(state.roundName, state.version, ctxInput.value); } catch {}
       }
       state.step = 3;
       state.save();
@@ -242,6 +242,8 @@ export function renderGroupStep(content, state) {
 
   onNavigateCleanup(() => { window.onbeforeunload = null; closeEventSource(); state.clearPoll(); });
 
+  const scanLogUrl = `/api/rounds/${encodeURIComponent(state.roundName)}/sessions/${encodeURIComponent(state.version)}/scan/logs`;
+
   function renderScanning() {
     closeEventSource();
 
@@ -270,7 +272,7 @@ export function renderGroupStep(content, state) {
     }
 
     try {
-      activeEs = new EventSource(`/api/sessions/${state.sessionId}/scan/logs`);
+      activeEs = new EventSource(scanLogUrl);
       activeEs.onmessage = (e) => {
         try {
           const entry = JSON.parse(e.data);
@@ -292,7 +294,7 @@ export function renderGroupStep(content, state) {
   }
 
   function pollScanStatus() {
-    api.getScanStatus(state.sessionId).then(data => {
+    api.getScanStatus(state.roundName, state.version).then(data => {
       if (data.status === "scanned") {
         renderPending();
       } else if (data.status === "done") {
@@ -311,7 +313,7 @@ export function renderGroupStep(content, state) {
 
   function triggerScan() {
     renderScanning();
-    api.startScan(state.sessionId).then(() => {
+    api.startScan(state.roundName, state.version).then(() => {
       state.schedulePoll(pollScanStatus, 2000);
     }).catch(e => {
       const el = document.getElementById("group-step-content");
@@ -332,7 +334,7 @@ export function renderGroupStep(content, state) {
   }
 
   function pollForGroups() {
-    api.getGroups(state.sessionId).then(data => {
+    api.getGroups(state.roundName, state.version).then(data => {
       if (data.status === "ready" && data.groups && data.groups.length > 0) {
         groups = data.groups;
         renderGroupsLoaded();
@@ -345,7 +347,7 @@ export function renderGroupStep(content, state) {
   function renderPending() {
     state.clearPoll();
     const el = document.getElementById("group-step-content");
-    api.getGraphData(state.sessionId).then(graphData => {
+    api.getGraphData(state.roundName, state.version).then(graphData => {
       const entryList = (graphData.entryFiles || []).slice(0, 8);
       const moreCount = Math.max(0, (graphData.entryFiles || []).length - 8);
       el.innerHTML = `
@@ -370,7 +372,7 @@ export function renderGroupStep(content, state) {
         </div>`;
 
       const termEl = document.getElementById("group-terminal-card");
-      renderTerminalCard(termEl, `group ${escapeHtml(state.sessionId)}`);
+      renderTerminalCard(termEl, `group ${state.roundName}/${state.version}`);
     }).catch(() => {
       el.innerHTML = `
         <div class="space-y-4">
@@ -381,7 +383,7 @@ export function renderGroupStep(content, state) {
         </div>`;
 
       const termEl = document.getElementById("group-terminal-card-fallback");
-      renderTerminalCard(termEl, `group ${escapeHtml(state.sessionId)}`);
+      renderTerminalCard(termEl, `group ${state.roundName}/${state.version}`);
     });
 
     state.schedulePoll(pollForGroups, 3000);
@@ -444,8 +446,8 @@ export function renderGroupStep(content, state) {
       confirmBtn.disabled = true;
       confirmBtn.innerHTML = '<span class="spinner spinner-sm"></span> Confirming...';
       try {
-        await api.confirmGroups(state.sessionId);
-        await api.advance(state.sessionId, { action: "confirm-groups" }).catch(() => {});
+        await api.confirmGroups(state.roundName, state.version);
+        await api.advance(state.roundName, state.version, { action: "confirm-groups" }).catch(() => {});
         const stepContent = document.getElementById("group-step-content");
         if (stepContent) {
           stepContent.innerHTML = `<div style="text-align:center;padding:var(--space-8)">
@@ -463,7 +465,7 @@ export function renderGroupStep(content, state) {
   }
 
   // Entry point: check scan status and decide what to show
-  api.getScanStatus(state.sessionId).then(data => {
+  api.getScanStatus(state.roundName, state.version).then(data => {
     if (data.status === "scanned") {
       pollForGroups();
     } else if (data.status === "done") {
@@ -483,9 +485,9 @@ export function renderGroupStep(content, state) {
         <div class="text-sm text-danger">${icon("alertTriangle", 14)} Failed to check scan status: ${escapeHtml(e.message)}</div>
         <button id="retry-scan-btn" class="btn btn-sm">Retry</button>
       </div>`;
-    document.getElementById("retry-scan-btn")?.addEventListener("click", () => {
+    document.getElementById("retry-scan-btn").addEventListener("click", () => {
       el.innerHTML = `<div class="text-sm text-secondary"><span class="spinner spinner-sm"></span> Checking scan status...</div>`;
-      api.getScanStatus(state.sessionId).then(data => {
+      api.getScanStatus(state.roundName, state.version).then(data => {
         if (data.status === "scanned") pollForGroups();
         else triggerScan();
       }).catch(() => triggerScan());
@@ -500,7 +502,7 @@ export function renderProjectReady(content, state) {
     <div id="project-ready-terminal"></div>`;
 
   // Load group summary
-  api.getTasks(state.sessionId).then(tasks => {
+  api.getTasks(state.roundName, state.version).then(tasks => {
     const summary = document.getElementById("project-ready-summary");
     if (summary) {
       const groupCount = tasks.length;
@@ -522,7 +524,7 @@ export function renderProjectReady(content, state) {
   }).catch(() => {});
 
   state.setDirty(false);
-  localStorage.removeItem(`audit-wizard-${state.sessionId}`);
+  localStorage.removeItem(`audit-wizard-${state.roundName}-${state.version}`);
 
   const termEl = document.getElementById("project-ready-terminal");
   termEl.innerHTML = `
@@ -536,9 +538,9 @@ export function renderProjectReady(content, state) {
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner spinner-sm"></span> Starting...';
     try {
-      await api.advance(state.sessionId, { action: "start" });
-      await api.updateSessionStatus(state.sessionId, "reviewing");
-      location.hash = `#/progress/${state.sessionId}`;
+      await api.advance(state.roundName, state.version, { action: "start" });
+      await api.updateSessionStatus(state.roundName, state.version, "reviewing");
+      location.hash = `#/round/${encodeURIComponent(state.roundName)}/${state.version}/progress`;
     } catch (e) {
       showToast("Failed to start review: " + e.message);
       btn.disabled = false;
@@ -548,9 +550,9 @@ export function renderProjectReady(content, state) {
 
   // Poll for session status change — auto-redirect when review starts
   function pollProjectReadyStatus() {
-    api.getSession(state.sessionId).then(session => {
+    api.getSession(state.roundName, state.version).then(session => {
       if (session.status === "reviewing" || session.status === "completed") {
-        location.hash = `#/progress/${state.sessionId}`;
+        location.hash = `#/round/${encodeURIComponent(state.roundName)}/${state.version}/progress`;
         return;
       }
       state.schedulePoll(pollProjectReadyStatus, 3000);

@@ -26,10 +26,10 @@ const STATUS_CONFIG = {
   grouping:   { color: "text-info",    badge: "badge-reviewing" },
 };
 
-function sessionTarget(status, id) {
-  if (status === "completed") return `#/review/${id}`;
-  if (["reviewing", "scanning", "grouping"].includes(status)) return `#/progress/${id}`;
-  return `#/wizard/${id}`;
+function sessionTarget(status, roundName, version) {
+  if (status === "completed") return `#/round/${encodeURIComponent(roundName)}/${version}/review`;
+  if (["reviewing", "scanning", "grouping"].includes(status)) return `#/round/${encodeURIComponent(roundName)}/${version}/progress`;
+  return `#/round/${encodeURIComponent(roundName)}/${version}/wizard`;
 }
 
 const TYPE_ICONS = {
@@ -39,8 +39,8 @@ const TYPE_ICONS = {
 };
 
 export async function renderRoundDetail(container, params) {
-  const roundId = params[0];
-  if (!roundId) { location.hash = "#/home"; return; }
+  const roundName = params[0];
+  if (!roundName) { location.hash = "#/home"; return; }
 
   setBreadcrumb([{ label: "Rounds", href: "#/home" }]);
 
@@ -51,7 +51,7 @@ export async function renderRoundDetail(container, params) {
   let pollTimer = null;
 
   try {
-    round = await api.getRound(roundId);
+    round = await api.getRound(roundName);
   } catch (e) {
     container.innerHTML = `
       <div class="empty-state">
@@ -73,7 +73,7 @@ export async function renderRoundDetail(container, params) {
     if (completedSessions.length > 0) {
       const latest = completedSessions[completedSessions.length - 1];
       try {
-        latestNotes = await api.getNotes(latest.id);
+        latestNotes = await api.getNotes(roundName, latest.id);
       } catch { latestNotes = null; }
     }
   }
@@ -101,7 +101,7 @@ export async function renderRoundDetail(container, params) {
           <p class="text-xs text-muted mt-1">${sessions.length} session${sessions.length !== 1 ? "s" : ""} &middot; Created ${relativeTime(round.created)}</p>
         </div>
         <div class="flex items-center gap-2">
-          <a href="#/round-summary/${encodeURIComponent(roundId)}" class="btn btn-ghost">
+          <a href="#/round/${encodeURIComponent(roundName)}/summary" class="btn btn-ghost">
             ${icon("barChart", 14)} Round Summary
           </a>
           ${showReReview ? `
@@ -129,8 +129,9 @@ export async function renderRoundDetail(container, params) {
               const pct = s.progress?.percentage ?? 0;
               const typeIcon = TYPE_ICONS[s.type] || "code";
               const typeLabel = s.type === "project" ? "Project Scan" : s.type === "all" ? "Code + Story" : "Code Review";
+              const version = s.id; // s.id is "v1", "v2", etc.
               return `
-                <div class="session-timeline-item card card-clickable" data-id="${s.id}" data-status="${s.status}" data-version="${s.version || 1}" tabindex="0" role="button" aria-label="v${s.version || 1} ${s.status}">
+                <div class="session-timeline-item card card-clickable" data-version="${version}" data-status="${s.status}" tabindex="0" role="button" aria-label="v${s.version || 1} ${s.status}">
                   <div class="session-timeline-connector">
                     <div class="version-badge">v${s.version || 1}</div>
                     <div class="session-timeline-line"></div>
@@ -180,9 +181,9 @@ export async function renderRoundDetail(container, params) {
     // Session card click handlers
     container.querySelectorAll(".session-timeline-item").forEach(item => {
       const handler = () => {
-        const id = item.dataset.id;
+        const version = item.dataset.version;
         const status = item.dataset.status;
-        location.hash = sessionTarget(status, id);
+        location.hash = sessionTarget(status, roundName, version);
       };
       item.addEventListener("click", handler);
       item.addEventListener("keydown", (e) => {
@@ -197,8 +198,8 @@ export async function renderRoundDetail(container, params) {
         newSessionBtn.disabled = true;
         newSessionBtn.innerHTML = '<span class="spinner spinner-sm"></span> Creating...';
         try {
-          const { id } = await api.createRoundSession(roundId, { type: "code" });
-          location.hash = `#/wizard/${id}`;
+          const { version } = await api.createRoundSession(roundName, { type: "code" });
+          location.hash = `#/round/${encodeURIComponent(roundName)}/v${version}/wizard`;
         } catch (e) {
           showToast("Failed to create session: " + e.message);
           newSessionBtn.disabled = false;
@@ -292,8 +293,8 @@ export async function renderRoundDetail(container, params) {
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner spinner-sm"></span> Creating session...';
       try {
-        const result = await api.reReview(roundId, { files });
-        location.hash = `#/progress/${result.sessionId}`;
+        const result = await api.reReview(roundName, { files });
+        location.hash = `#/round/${encodeURIComponent(roundName)}/v${result.version}/progress`;
       } catch (e) {
         showToast("Failed to start re-review: " + e.message);
         btn.disabled = false;
@@ -305,7 +306,7 @@ export async function renderRoundDetail(container, params) {
   function startPolling() {
     pollTimer = setInterval(async () => {
       try {
-        round = await api.getRound(roundId);
+        round = await api.getRound(roundName);
         const hasActive = round.sessions.some(s => ["reviewing", "scanning", "grouping"].includes(s.status));
         if (hasActive) {
           render();

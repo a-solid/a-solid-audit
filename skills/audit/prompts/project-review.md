@@ -143,9 +143,14 @@ This atomically appends to the `## Review Notes` section. Focus on:
 - Shared patterns (e.g., "all handlers in this chunk use the same auth middleware")
 - Potential cross-chunk concerns (e.g., "this chunk writes to table X, which chunk-003 reads from")
 
-## Prior Findings (Round Context)
+## Prior Findings (Prior Session Context)
 
-Read `review-notes.yaml` from the round directory (`.audit/<project>/<round-id>/review-notes.yaml`).
+If `round-id` is provided and this is not version 1, read the prior session's `review-notes.yaml`.
+
+1. Find the session directory for the current session (`.audit/<project>/<round-id>/<session-id>/`)
+2. Look at the session's `version` in `index.yaml`
+3. If version > 1, find another session in the same round directory with version = current - 1
+4. Read that prior session's `review-notes.yaml`
 
 For the current task file, check prior findings:
 - Findings marked `wont-fix`, `not-an-issue`, or `well-done` — do NOT re-raise these. If the code hasn't changed, acknowledge they remain resolved.

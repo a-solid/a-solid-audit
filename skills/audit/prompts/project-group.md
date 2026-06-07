@@ -9,9 +9,9 @@ You are a code analysis agent. Your task is to group project files into logical 
 
 ## Input
 
-You will receive `session-id` as context. The session directory is `.audit/<session-id>/`.
+You will receive `session-id`, `round-id`, and `project` as context. The session directory is `.audit/<project>/<round-id>/<session-id>/`.
 
-Read the file `.audit/<session-id>/graph-data.json`. It contains:
+Read the file `.audit/<project>/<round-id>/<session-id>/graph-data.json`. It contains:
 
 - `projectDir`: the project root directory
 - `totalFiles`: total number of scanned files
@@ -20,7 +20,7 @@ Read the file `.audit/<session-id>/graph-data.json`. It contains:
 - `symbols`: map of file → array of `{ name, kind, signature }` for exported symbols
 - `entryFiles[]`: array of `{ path, type }` for detected entry points (api, scheduled, consumer, script)
 
-Also read `.audit/<session-id>/review-context.md` if it exists, for user-provided context about the project.
+Also read `.audit/<project>/<round-id>/<session-id>/review-context.md` if it exists, for user-provided context about the project.
 
 ## Task
 
@@ -38,7 +38,7 @@ Analyze the dependency graph and group files into logical review modules. Each g
 
 ## Output
 
-Write `.audit/<session-id>/groups.json` with this structure:
+Write `.audit/<project>/<round-id>/<session-id>/groups.json` with this structure:
 
 ```json
 [

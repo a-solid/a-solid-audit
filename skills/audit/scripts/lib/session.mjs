@@ -4,19 +4,21 @@ import path from "node:path";
 import { readYaml, writeYaml, writeIndexYaml } from "./yaml.mjs";
 import { AppError } from "./errors.mjs";
 
-const VALID_STATUSES = ["created", "scanned", "ready", "scanning", "grouping", "reviewing", "completed"];
+const VALID_STATUSES = ["created", "scanned", "ready", "scanning", "grouping", "reviewing", "paused", "completed"];
 
 const TRANSITIONS = {
   code: {
     created: ["ready"],
     ready: ["reviewing"],
-    reviewing: ["completed"],
+    reviewing: ["paused", "completed"],
+    paused: ["reviewing"],
     completed: [],
   },
   all: {
     created: ["ready"],
     ready: ["reviewing"],
-    reviewing: ["completed"],
+    reviewing: ["paused", "completed"],
+    paused: ["reviewing"],
     completed: [],
   },
   project: {
@@ -25,7 +27,8 @@ const TRANSITIONS = {
     scanned: ["grouping"],
     grouping: ["ready"],
     ready: ["reviewing"],
-    reviewing: ["completed"],
+    reviewing: ["paused", "completed"],
+    paused: ["reviewing"],
     completed: [],
   },
 };

@@ -1166,8 +1166,9 @@ code {
 .finding-card {
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
   border-left: 4px solid;
   transition: border-color 200ms ease-out, background 200ms ease-out, opacity 200ms ease-out;
 }
@@ -2326,7 +2327,7 @@ code {
   padding: var(--space-4);
 }
 .round-card:hover {
-  background: var(--surface-hover);
+  background: var(--bg-hover);
 }
 .round-name {
   font-weight: 600;
@@ -2352,7 +2353,7 @@ code {
   font-size: 11px;
   font-weight: 600;
   font-family: var(--font-mono);
-  background: var(--surface-elevated);
+  background: var(--bg-elevated);
   color: var(--text-secondary);
   border: 1px solid var(--border);
   white-space: nowrap;
@@ -2372,7 +2373,7 @@ code {
   transition: background 150ms;
 }
 .session-timeline-item:hover {
-  background: var(--surface-hover);
+  background: var(--bg-hover);
 }
 .session-timeline-connector {
   display: flex;
@@ -2412,7 +2413,7 @@ code {
   padding: var(--space-4);
 }
 .create-round-dialog {
-  background: var(--surface);
+  background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: var(--space-6);
@@ -2438,17 +2439,17 @@ code {
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: var(--surface-elevated);
+  background: var(--bg-elevated);
   color: var(--text-primary);
   font-size: var(--text-sm);
   margin-bottom: var(--space-3);
-  font-family: var(--font-sans);
+  font-family: var(--font-ui);
 }
 .create-round-dialog input:focus,
 .create-round-dialog textarea:focus {
   outline: none;
-  border-color: var(--primary);
-  box-shadow: 0 0 0 2px var(--primary-alpha);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-dim);
 }
 .create-round-dialog textarea {
   resize: vertical;
@@ -2478,7 +2479,7 @@ code {
 .re-review-file-item input[type="checkbox"] {
   width: 16px;
   height: 16px;
-  accent-color: var(--primary);
+  accent-color: var(--accent);
 }
 
 /* ─── Round Summary Table ─── */
@@ -2509,7 +2510,7 @@ code {
   border-bottom: none;
 }
 .round-summary-table tr:hover td {
-  background: var(--surface-hover);
+  background: var(--bg-hover);
 }
 
 /* ─── Responsive: Round Summary Stats ─── */
@@ -2518,16 +2519,8 @@ code {
 }
 
 /* ─── Finding Cards ─── */
-.finding-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  padding: var(--space-4);
-  margin-bottom: var(--space-3);
-  transition: opacity 200ms ease, box-shadow 150ms ease;
-}
 .finding-card:focus {
-  outline: 2px solid var(--primary);
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 .finding-card-muted {
@@ -2581,7 +2574,7 @@ code {
   color: var(--text-secondary);
   margin-bottom: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  background: var(--surface-elevated);
+  background: var(--bg-elevated);
   border-radius: var(--radius-md);
 }
 .finding-code-details {
@@ -2594,7 +2587,7 @@ code {
   padding: var(--space-1) 0;
 }
 .finding-code-block {
-  background: var(--surface-elevated);
+  background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: var(--space-3);
@@ -2614,7 +2607,7 @@ code {
 }
 .finding-reason-content {
   padding: var(--space-3);
-  background: var(--surface-elevated);
+  background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
 }
@@ -2633,13 +2626,13 @@ code {
   padding: var(--space-1) var(--space-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  background: var(--surface);
+  background: var(--bg-surface);
   color: var(--text-primary);
   font-size: var(--text-sm);
 }
 .finding-reason-custom input:focus {
   outline: none;
-  border-color: var(--primary);
+  border-color: var(--accent);
 }
 
 /* ─── Findings Progress ─── */
@@ -2653,7 +2646,7 @@ code {
   height: 6px;
   border-radius: 3px;
   overflow: hidden;
-  background: var(--surface-elevated);
+  background: var(--bg-elevated);
 }
 .findings-progress-text {
   display: flex;

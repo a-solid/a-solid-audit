@@ -61,7 +61,7 @@ export function startServer(projectDir, port = 3456) {
   registerReviewRoutes(router, reportsDir);
   registerProjectScanRoutes(router, reportsDir, projectDir);
   registerSettingsRoutes(router);
-  registerWaitRoutes(router);
+  registerWaitRoutes(router, reportsDir);
   registerRoundRoutes(router, projectDir);
 
   const server = http.createServer((req, res) => {

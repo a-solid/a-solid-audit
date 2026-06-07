@@ -1,12 +1,13 @@
 // skills/audit/scripts/server/handlers/wait.mjs
 import { jsonResponse, errorResponse, readBody } from "../index.mjs";
+import { updateSessionStatus, resetReviewing } from "../../lib/session.mjs";
 
 const WAIT_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
 
 let signal = null; // { roundName, version, action } or null
 let signalResolve = null; // () => void — resolves the pending /wait Promise
 
-export function registerWaitRoutes(router) {
+export function registerWaitRoutes(router, reportsDir) {
   // GET /wait
   // Blocks until /advance is called or timeout. Returns plain text.
   router.get("/wait", async (req, res) => {
@@ -56,8 +57,18 @@ export function registerWaitRoutes(router) {
     }
 
     const action = body.action;
-    if (!action || !["start", "confirm-groups"].includes(action)) {
-      return errorResponse(res, "Invalid action: must be 'start' or 'confirm-groups'", "VALIDATION_ERROR", 400);
+    if (!action || !["start", "confirm-groups", "resume"].includes(action)) {
+      return errorResponse(res, "Invalid action: must be 'start', 'confirm-groups', or 'resume'", "VALIDATION_ERROR", 400);
+    }
+
+    // On resume: transition paused → reviewing and reset stale tasks
+    if (action === "resume") {
+      try {
+        updateSessionStatus(reportsDir, params.roundName, params.version, "reviewing");
+        resetReviewing(reportsDir, params.roundName, params.version);
+      } catch (e) {
+        return errorResponse(res, e.message, e.code, e.status);
+      }
     }
 
     signal = { roundName: params.roundName, version: params.version, action };

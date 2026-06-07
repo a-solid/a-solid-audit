@@ -127,7 +127,7 @@ export function registerReviewRoutes(router, reportsDir) {
 
       for (const f of reviewFindings) {
         noteEntry.findings.push({
-          status: "pending",
+          status: "",
           reason: "",
           description: f.description || "",
           severity: f.severity || "",

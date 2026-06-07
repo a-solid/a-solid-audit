@@ -88,3 +88,9 @@ export function cancelAllWaiters() {
     signalResolve();
   }
 }
+
+// Emit a signal to resolve any pending /wait (or buffer for next /wait call)
+export function emitSignal(roundName, version, action) {
+  signal = { roundName, version, action };
+  if (signalResolve) signalResolve();
+}

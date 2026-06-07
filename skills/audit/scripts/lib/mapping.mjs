@@ -1,15 +1,15 @@
 // skills/audit/scripts/lib/mapping.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { sanitizePath, updateSessionStatus, resolveSessionPath } from "./session.mjs";
+import { validateVersion, updateSessionStatus, resolveSessionPath } from "./session.mjs";
 import { taskFileName, runGitDiff, parseDiffByFile, detectLanguage } from "./git.mjs";
 import { readYaml, writeIndexYaml, writeCodeTaskYaml } from "./yaml.mjs";
 
 // Generate code task YAMLs from git diff scope and update index
-export function setScope(projectDir, reportsDir, sid, scopeType, scopeRef, excludeFiles = []) {
-  const safeSid = sanitizePath(sid);
-  const resolvedIndex = resolveSessionPath(reportsDir, safeSid);
-  if (!resolvedIndex) throw new Error("Session not found: " + safeSid);
+export function setScope(projectDir, reportsDir, roundName, version, scopeType, scopeRef, excludeFiles = []) {
+  const safeVersion = validateVersion(version);
+  const resolvedIndex = resolveSessionPath(reportsDir, roundName, safeVersion);
+  if (!resolvedIndex) throw new Error("Session not found: " + roundName + "/" + safeVersion);
   const sessionDir = path.dirname(resolvedIndex);
   const indexPath = resolvedIndex;
 
@@ -44,7 +44,8 @@ export function setScope(projectDir, reportsDir, sid, scopeType, scopeRef, exclu
   const sessionType = existingType === "all" ? "all" : "code";
   writeIndexYaml(indexPath, {
     session: {
-      id: safeSid,
+      id: safeVersion,
+      roundName,
       type: sessionType,
       status: index.session.status,
       scope: { method: scopeType, ref: scopeRef || "" },
@@ -56,7 +57,7 @@ export function setScope(projectDir, reportsDir, sid, scopeType, scopeRef, exclu
   });
   // Only mark as ready for code-only sessions; "all" type needs story configuration first
   if (sessionType !== "all") {
-    updateSessionStatus(reportsDir, safeSid, "ready");
+    updateSessionStatus(reportsDir, roundName, safeVersion, "ready");
   }
 
   return { scope: { method: scopeType, ref: scopeRef }, taskCount: tasks.length };

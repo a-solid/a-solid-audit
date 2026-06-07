@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { sanitizePath } from "./session.mjs";
+import { resolveSessionDir } from "./session.mjs";
 import { readYaml, writeYaml, writeIndexYaml, writeProjectTaskYaml } from "./yaml.mjs";
 import { parseGitignore, buildGitignoreMatcher } from "./gitignore.mjs";
 import { pushLog } from "./scan-log.mjs";
@@ -174,15 +174,16 @@ export function resetCodegraphCache() {
   _codegraphCacheDir = null;
 }
 
-export function collectGraphData(projectDir, reportsDir, sid) {
-  const safeSid = sanitizePath(sid);
-  const sessionDir = path.join(reportsDir, safeSid);
+export function collectGraphData(projectDir, reportsDir, roundName, version) {
+  const sessionKey = roundName + "/" + version;
+  const sessionDir = resolveSessionDir(reportsDir, roundName, version);
+  if (!sessionDir) throw new Error("Session not found: " + sessionKey);
   const startTime = Date.now();
-  pushLog(safeSid, "info", `collectGraphData: starting graph collection for ${projectDir}`);
+  pushLog(sessionKey, "info", `collectGraphData: starting graph collection for ${projectDir}`);
 
   // 1. Get full file list
-  const files = scanProjectDir(projectDir, {}, safeSid);
-  pushLog(safeSid, "info", `collectGraphData: scanned ${files.length} files`);
+  const files = scanProjectDir(projectDir, {}, sessionKey);
+  pushLog(sessionKey, "info", `collectGraphData: scanned ${files.length} files`);
 
   // 2. Classify entry files
   const entryFiles = [];
@@ -192,14 +193,14 @@ export function collectGraphData(projectDir, reportsDir, sid) {
       entryFiles.push({ path: f.path, type });
     }
   }
-  pushLog(safeSid, "info", `collectGraphData: ${entryFiles.length} entry files identified`);
+  pushLog(sessionKey, "info", `collectGraphData: ${entryFiles.length} entry files identified`);
 
   // 3. Collect import edges via codegraph
   const imports = {};
   try {
     const bin = codegraphBin();
     const args = ["query", "--json", "-k", "import", "-l", "2000", "", "-p", projectDir];
-    pushLog(safeSid, "info", `collectGraphData: ${bin} ${args.join(" ")}`);
+    pushLog(sessionKey, "info", `collectGraphData: ${bin} ${args.join(" ")}`);
     const raw = execFileSync(bin, args, { encoding: "utf-8", timeout: 30000 });
     const data = JSON.parse(raw);
     for (const item of data) {
@@ -210,9 +211,9 @@ export function collectGraphData(projectDir, reportsDir, sid) {
       if (!imports[src]) imports[src] = [];
       if (!imports[src].includes(target)) imports[src].push(target);
     }
-    pushLog(safeSid, "info", `collectGraphData: collected imports for ${Object.keys(imports).length} source files`);
+    pushLog(sessionKey, "info", `collectGraphData: collected imports for ${Object.keys(imports).length} source files`);
   } catch (e) {
-    pushLog(safeSid, "warn", `collectGraphData: import collection failed — ${e.message}`);
+    pushLog(sessionKey, "warn", `collectGraphData: import collection failed — ${e.message}`);
   }
 
   // 4. Collect function/method symbols via codegraph
@@ -220,7 +221,7 @@ export function collectGraphData(projectDir, reportsDir, sid) {
   try {
     const bin = codegraphBin();
     const args = ["query", "--json", "-k", "function", "-l", "2000", "", "-p", projectDir];
-    pushLog(safeSid, "info", `collectGraphData: ${bin} ${args.join(" ")}`);
+    pushLog(sessionKey, "info", `collectGraphData: ${bin} ${args.join(" ")}`);
     const raw = execFileSync(bin, args, { encoding: "utf-8", timeout: 30000 });
     const data = JSON.parse(raw);
     for (const item of data) {
@@ -233,9 +234,9 @@ export function collectGraphData(projectDir, reportsDir, sid) {
         signature: item.node.signature || "",
       });
     }
-    pushLog(safeSid, "info", `collectGraphData: collected symbols for ${Object.keys(symbols).length} files`);
+    pushLog(sessionKey, "info", `collectGraphData: collected symbols for ${Object.keys(symbols).length} files`);
   } catch (e) {
-    pushLog(safeSid, "warn", `collectGraphData: symbol collection failed — ${e.message}`);
+    pushLog(sessionKey, "warn", `collectGraphData: symbol collection failed — ${e.message}`);
   }
 
   // 5. Build graphData object
@@ -249,17 +250,17 @@ export function collectGraphData(projectDir, reportsDir, sid) {
   };
 
   // 6. Write to session directory
-  fs.mkdirSync(sessionDir, { recursive: true });
   const graphDataPath = path.join(sessionDir, "graph-data.json");
   fs.writeFileSync(graphDataPath, JSON.stringify(graphData, null, 2), "utf-8");
 
-  pushLog(safeSid, "info", `collectGraphData: completed in ${Date.now() - startTime}ms, written to ${graphDataPath}`);
+  pushLog(sessionKey, "info", `collectGraphData: completed in ${Date.now() - startTime}ms, written to ${graphDataPath}`);
   return graphData;
 }
 
-export function generateTasksFromGroups(reportsDir, sid) {
-  const safeSid = sanitizePath(sid);
-  const sessionDir = path.join(reportsDir, safeSid);
+export function generateTasksFromGroups(reportsDir, roundName, version) {
+  const sessionKey = roundName + "/" + version;
+  const sessionDir = resolveSessionDir(reportsDir, roundName, version);
+  if (!sessionDir) throw new Error("Session not found: " + sessionKey);
   const groupsPath = path.join(sessionDir, "groups.json");
   const indexPath = path.join(sessionDir, "index.yaml");
 
@@ -268,7 +269,7 @@ export function generateTasksFromGroups(reportsDir, sid) {
   }
 
   const groups = JSON.parse(fs.readFileSync(groupsPath, "utf-8"));
-  pushLog(safeSid, "info", `generateTasksFromGroups: ${groups.length} groups`);
+  pushLog(sessionKey, "info", `generateTasksFromGroups: ${groups.length} groups`);
 
   const tasksDir = path.join(sessionDir, "project-tasks");
   fs.mkdirSync(tasksDir, { recursive: true });
@@ -329,7 +330,7 @@ export function generateTasksFromGroups(reportsDir, sid) {
     projectTasks: tasks,
   });
 
-  pushLog(safeSid, "info", `generateTasksFromGroups: ${tasks.length} tasks generated`);
+  pushLog(sessionKey, "info", `generateTasksFromGroups: ${tasks.length} tasks generated`);
   return { taskCount: tasks.length };
 }
 
@@ -450,16 +451,17 @@ export function chunkFiles(files, projectDir, sid) {
   return merged;
 }
 
-export function setProjectScope(projectDir, reportsDir, sid, scanOptions = {}) {
-  const safeSid = sanitizePath(sid);
-  const sessionDir = path.join(reportsDir, safeSid);
+export function setProjectScope(projectDir, reportsDir, roundName, version, scanOptions = {}) {
+  const sessionKey = roundName + "/" + version;
+  const sessionDir = resolveSessionDir(reportsDir, roundName, version);
+  if (!sessionDir) throw new Error("Session not found: " + sessionKey);
   const indexPath = path.join(sessionDir, "index.yaml");
-  if (!fs.existsSync(indexPath)) throw new Error("Session not found: " + safeSid);
+  if (!fs.existsSync(indexPath)) throw new Error("Session not found: " + sessionKey);
 
   const mode = scanOptions.mode || "classic";
   const startTime = Date.now();
   resetCodegraphCache();
-  pushLog(safeSid, "info", `setProjectScope: starting scan of ${projectDir} (mode: ${mode})`);
+  pushLog(sessionKey, "info", `setProjectScope: starting scan of ${projectDir} (mode: ${mode})`);
 
   // Update index to mark as project type
   const index = readYaml(indexPath);
@@ -477,8 +479,8 @@ export function setProjectScope(projectDir, reportsDir, sid, scanOptions = {}) {
 
   if (mode === "scan") {
     // New flow: scan + collect graph data, return without generating tasks
-    const graphData = collectGraphData(projectDir, reportsDir, safeSid);
-    pushLog(safeSid, "info", `setProjectScope (scan): ${graphData.totalFiles} files scanned in ${Date.now() - startTime}ms`);
+    const graphData = collectGraphData(projectDir, reportsDir, roundName, version);
+    pushLog(sessionKey, "info", `setProjectScope (scan): ${graphData.totalFiles} files scanned in ${Date.now() - startTime}ms`);
     return {
       taskCount: 0,
       totalFiles: graphData.totalFiles,
@@ -489,8 +491,8 @@ export function setProjectScope(projectDir, reportsDir, sid, scanOptions = {}) {
   }
 
   // Classic flow: scan + chunk + generate tasks
-  const files = scanProjectDir(projectDir, scanOptions, safeSid);
-  const chunks = chunkFiles(files, projectDir, safeSid);
+  const files = scanProjectDir(projectDir, scanOptions, sessionKey);
+  const chunks = chunkFiles(files, projectDir, sessionKey);
   const exclude = new Set(scanOptions.excludeFiles || []);
 
   const tasksDir = path.join(sessionDir, "project-tasks");
@@ -539,13 +541,14 @@ export function setProjectScope(projectDir, reportsDir, sid, scanOptions = {}) {
     projectTasks: tasks,
   });
 
-  pushLog(safeSid, "info", `setProjectScope (classic): ${tasks.length} tasks from ${files.length} files in ${Date.now() - startTime}ms`);
+  pushLog(sessionKey, "info", `setProjectScope (classic): ${tasks.length} tasks from ${files.length} files in ${Date.now() - startTime}ms`);
   return { taskCount: tasks.length, totalFiles: files.length, chunks, mode: "classic" };
 }
 
-export function getProjectMap(reportsDir, sid) {
-  const safeSid = sanitizePath(sid);
-  const mapPath = path.join(reportsDir, safeSid, "project-map.yaml");
+export function getProjectMap(reportsDir, roundName, version) {
+  const sessionDir = resolveSessionDir(reportsDir, roundName, version);
+  if (!sessionDir) return null;
+  const mapPath = path.join(sessionDir, "project-map.yaml");
   if (!fs.existsSync(mapPath)) return null;
   return readYaml(mapPath);
 }

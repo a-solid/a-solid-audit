@@ -287,7 +287,7 @@ export function registerRoundRoutes(router, projectDir) {
   // GET /api/projects — list all projects
   router.get("/api/projects", (req, res) => {
     const settings = loadAuditSettings();
-    const rawRoot = settings.rootDir || "~/.audit";
+    const rawRoot = settings.rootDir || path.join(os.tmpdir(), "a-solid-audit");
     const rootDir = rawRoot.startsWith("~")
       ? path.join(os.homedir(), rawRoot.slice(1))
       : path.resolve(rawRoot);
@@ -327,7 +327,7 @@ export function registerRoundRoutes(router, projectDir) {
   // GET /api/projects/:projectName/rounds — read-only round listing for any project
   router.get("/api/projects/:projectName/rounds", (req, res, params) => {
     const settings = loadAuditSettings();
-    const rawRoot = settings.rootDir || "~/.audit";
+    const rawRoot = settings.rootDir || path.join(os.tmpdir(), "a-solid-audit");
     const rootDir = rawRoot.startsWith("~")
       ? path.join(os.homedir(), rawRoot.slice(1))
       : path.resolve(rawRoot);
@@ -358,7 +358,7 @@ export function registerRoundRoutes(router, projectDir) {
   // GET /api/projects/:projectName/rounds/:roundName/summary — read-only findings summary
   router.get("/api/projects/:projectName/rounds/:roundName/summary", (req, res, params) => {
     const settings = loadAuditSettings();
-    const rawRoot = settings.rootDir || "~/.audit";
+    const rawRoot = settings.rootDir || path.join(os.tmpdir(), "a-solid-audit");
     const rootDir = rawRoot.startsWith("~")
       ? path.join(os.homedir(), rawRoot.slice(1))
       : path.resolve(rawRoot);

@@ -42,7 +42,7 @@ export function resolveProjectName(projectDir, settings) {
 
 export function resolveReportsDir(projectDir) {
   const settings = loadAuditSettings();
-  const rawRoot = settings.rootDir || "~/.audit";
+  const rawRoot = settings.rootDir || path.join(os.tmpdir(), "a-solid-audit");
   const rootDir = rawRoot.startsWith("~")
     ? path.join(os.homedir(), rawRoot.slice(1))
     : path.resolve(rawRoot);

@@ -2243,7 +2243,7 @@ code {
 .session-timeline {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: var(--space-3);
 }
 .session-timeline-item {
   display: flex;

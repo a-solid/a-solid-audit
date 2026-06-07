@@ -3,27 +3,27 @@ import { getTasks, getTask, getTasksSummary } from "../../lib/task.mjs";
 import { jsonResponse, errorResponse } from "../index.mjs";
 
 export function registerTaskRoutes(router, reportsDir) {
-  // GET /api/sessions/:id/tasks — all tasks
-  // GET /api/sessions/:id/tasks?file=xxx — single task detail
-  router.get("/api/sessions/:id/tasks", (req, res, params, query) => {
+  // GET /api/rounds/:roundName/sessions/:version/tasks — all tasks
+  // GET /api/rounds/:roundName/sessions/:version/tasks?file=xxx — single task detail
+  router.get("/api/rounds/:roundName/sessions/:version/tasks", (req, res, params, query) => {
     try {
       const file = query?.get("file");
       if (file) {
-        const task = getTask(reportsDir, params.id, file);
+        const task = getTask(reportsDir, params.roundName, params.version, file);
         if (!task) return errorResponse(res, "Task not found", "NOT_FOUND", 404);
         return jsonResponse(res, task);
       }
-      const tasks = getTasks(reportsDir, params.id);
+      const tasks = getTasks(reportsDir, params.roundName, params.version);
       jsonResponse(res, tasks);
     } catch (e) {
       throw e;
     }
   });
 
-  // GET /api/sessions/:id/tasks/summary — lightweight task list
-  router.get("/api/sessions/:id/tasks/summary", (req, res, params) => {
+  // GET /api/rounds/:roundName/sessions/:version/tasks/summary — lightweight task list
+  router.get("/api/rounds/:roundName/sessions/:version/tasks/summary", (req, res, params) => {
     try {
-      const tasks = getTasksSummary(reportsDir, params.id);
+      const tasks = getTasksSummary(reportsDir, params.roundName, params.version);
       jsonResponse(res, tasks);
     } catch (e) {
       throw e;

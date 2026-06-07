@@ -1,19 +1,12 @@
 // skills/audit/scripts/server/handlers/notes.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { sanitizePath, resolveSessionPath } from "../../lib/session.mjs";
+import { resolveSessionDir } from "../../lib/session.mjs";
 import { readYaml, writeYaml } from "../../lib/yaml.mjs";
 import { jsonResponse, readBody, errorResponse } from "../index.mjs";
 
 const NOTES_FILE = "review-notes.yaml";
 const VALID_STATUSES = ["pending", "need-fix", "wont-fix", "not-an-issue", "well-done"];
-
-function resolveSessionDir(reportsDir, sid) {
-  const safeSid = sanitizePath(sid);
-  const indexPath = resolveSessionPath(reportsDir, safeSid);
-  if (!indexPath) return null;
-  return path.dirname(indexPath);
-}
 
 function readNotes(sessionDir) {
   const p = path.join(sessionDir, NOTES_FILE);
@@ -26,16 +19,16 @@ function writeNotes(sessionDir, data) {
 }
 
 export function registerNoteRoutes(router, reportsDir) {
-  // GET /api/sessions/:id/notes
-  router.get("/api/sessions/:id/notes", (req, res, params) => {
-    const sessionDir = resolveSessionDir(reportsDir, params.id);
+  // GET /api/rounds/:roundName/sessions/:version/notes
+  router.get("/api/rounds/:roundName/sessions/:version/notes", (req, res, params) => {
+    const sessionDir = resolveSessionDir(reportsDir, params.roundName, params.version);
     if (!sessionDir) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
     jsonResponse(res, readNotes(sessionDir));
   });
 
-  // POST /api/sessions/:id/notes — update task review
-  router.post("/api/sessions/:id/notes", async (req, res, params) => {
-    const sessionDir = resolveSessionDir(reportsDir, params.id);
+  // POST /api/rounds/:roundName/sessions/:version/notes — update task review
+  router.post("/api/rounds/:roundName/sessions/:version/notes", async (req, res, params) => {
+    const sessionDir = resolveSessionDir(reportsDir, params.roundName, params.version);
     if (!sessionDir) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
 
     const body = JSON.parse(await readBody(req));
@@ -68,9 +61,9 @@ export function registerNoteRoutes(router, reportsDir) {
     jsonResponse(res, { ok: true });
   });
 
-  // POST /api/sessions/:id/summary — update summary + sign-off
-  router.post("/api/sessions/:id/summary", async (req, res, params) => {
-    const sessionDir = resolveSessionDir(reportsDir, params.id);
+  // POST /api/rounds/:roundName/sessions/:version/summary — update summary + sign-off
+  router.post("/api/rounds/:roundName/sessions/:version/summary", async (req, res, params) => {
+    const sessionDir = resolveSessionDir(reportsDir, params.roundName, params.version);
     if (!sessionDir) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
 
     const body = JSON.parse(await readBody(req));

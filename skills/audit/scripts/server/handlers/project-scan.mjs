@@ -4,15 +4,14 @@ import path from "node:path";
 import { setProjectScope, getProjectMap, generateTasksFromGroups } from "../../lib/project-scan.mjs";
 import { getScanLogs, clearScanLogs } from "../../lib/scan-log.mjs";
 import { readYaml, writeIndexYaml } from "../../lib/yaml.mjs";
-import { sanitizePath, updateSessionStatus, resolveSessionPath } from "../../lib/session.mjs";
+import { updateSessionStatus, resolveSessionPath } from "../../lib/session.mjs";
 import { jsonResponse, errorResponse } from "../index.mjs";
 
 export function registerProjectScanRoutes(router, reportsDir, projectDir) {
-  // POST /api/sessions/:id/scan
-  router.post("/api/sessions/:id/scan", async (req, res, params) => {
+  // POST /api/rounds/:roundName/sessions/:version/scan
+  router.post("/api/rounds/:roundName/sessions/:version/scan", async (req, res, params) => {
     try {
-      const safeSid = sanitizePath(params.id);
-      const indexPath = resolveSessionPath(reportsDir, safeSid);
+      const indexPath = resolveSessionPath(reportsDir, params.roundName, params.version);
       if (!indexPath) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
       const sessionDir = path.dirname(indexPath);
 
@@ -27,13 +26,14 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
       }
 
       // created → scanning
-      updateSessionStatus(reportsDir, safeSid, "scanning");
+      updateSessionStatus(reportsDir, params.roundName, params.version, "scanning");
 
+      const sessionKey = params.roundName + "/" + params.version;
       let result;
       try {
-        result = setProjectScope(targetDir, reportsDir, safeSid, { mode: "scan" });
+        result = setProjectScope(targetDir, reportsDir, params.roundName, params.version, { mode: "scan" });
       } catch (e) {
-        clearScanLogs(safeSid);
+        clearScanLogs(sessionKey);
         const revert = readYaml(indexPath);
         revert.session.status = "created";
         writeIndexYaml(indexPath, revert);
@@ -41,8 +41,8 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
       }
 
       // scanning → scanned
-      updateSessionStatus(reportsDir, safeSid, "scanned");
-      clearScanLogs(safeSid);
+      updateSessionStatus(reportsDir, params.roundName, params.version, "scanned");
+      clearScanLogs(sessionKey);
 
       jsonResponse(res, { ok: true, ...result });
     } catch (e) {
@@ -50,11 +50,10 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
     }
   });
 
-  // GET /api/sessions/:id/scan/status
-  router.get("/api/sessions/:id/scan/status", (req, res, params) => {
+  // GET /api/rounds/:roundName/sessions/:version/scan/status
+  router.get("/api/rounds/:roundName/sessions/:version/scan/status", (req, res, params) => {
     try {
-      const safeSid = sanitizePath(params.id);
-      const indexPath = resolveSessionPath(reportsDir, safeSid);
+      const indexPath = resolveSessionPath(reportsDir, params.roundName, params.version);
       if (!indexPath) {
         return jsonResponse(res, { status: "none" });
       }
@@ -92,11 +91,10 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
     }
   });
 
-  // GET /api/sessions/:id/project-map
-  router.get("/api/sessions/:id/project-map", (req, res, params) => {
+  // GET /api/rounds/:roundName/sessions/:version/project-map
+  router.get("/api/rounds/:roundName/sessions/:version/project-map", (req, res, params) => {
     try {
-      const safeSid = sanitizePath(params.id);
-      const map = getProjectMap(reportsDir, safeSid);
+      const map = getProjectMap(reportsDir, params.roundName, params.version);
       if (!map) return errorResponse(res, "Project map not found", "NOT_FOUND", 404);
       jsonResponse(res, map);
     } catch (e) {
@@ -104,10 +102,10 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
     }
   });
 
-  // GET /api/sessions/:id/scan/logs (SSE)
-  router.get("/api/sessions/:id/scan/logs", (req, res, params) => {
+  // GET /api/rounds/:roundName/sessions/:version/scan/logs (SSE)
+  router.get("/api/rounds/:roundName/sessions/:version/scan/logs", (req, res, params) => {
     try {
-      const safeSid = sanitizePath(params.id);
+      const sessionKey = params.roundName + "/" + params.version;
 
       res.writeHead(200, {
         "Content-Type": "text/event-stream",
@@ -116,7 +114,7 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
       });
 
       // Send buffered logs
-      const buffered = getScanLogs(safeSid);
+      const buffered = getScanLogs(sessionKey);
       for (const entry of buffered) {
         res.write(`data: ${JSON.stringify(entry)}\n\n`);
       }
@@ -124,7 +122,7 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
       // Poll for new entries
       let lastIdx = buffered.length;
       const interval = setInterval(() => {
-        const logs = getScanLogs(safeSid);
+        const logs = getScanLogs(sessionKey);
         while (lastIdx < logs.length) {
           res.write(`data: ${JSON.stringify(logs[lastIdx])}\n\n`);
           lastIdx++;
@@ -143,11 +141,10 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
     }
   });
 
-  // GET /api/sessions/:id/graph-data
-  router.get("/api/sessions/:id/graph-data", (req, res, params) => {
+  // GET /api/rounds/:roundName/sessions/:version/graph-data
+  router.get("/api/rounds/:roundName/sessions/:version/graph-data", (req, res, params) => {
     try {
-      const safeSid = sanitizePath(params.id);
-      const indexPath = resolveSessionPath(reportsDir, safeSid);
+      const indexPath = resolveSessionPath(reportsDir, params.roundName, params.version);
       if (!indexPath) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
       const sessionDir = path.dirname(indexPath);
       const graphDataPath = path.join(sessionDir, "graph-data.json");
@@ -161,11 +158,10 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
     }
   });
 
-  // GET /api/sessions/:id/groups
-  router.get("/api/sessions/:id/groups", (req, res, params) => {
+  // GET /api/rounds/:roundName/sessions/:version/groups
+  router.get("/api/rounds/:roundName/sessions/:version/groups", (req, res, params) => {
     try {
-      const safeSid = sanitizePath(params.id);
-      const indexPath = resolveSessionPath(reportsDir, safeSid);
+      const indexPath = resolveSessionPath(reportsDir, params.roundName, params.version);
       if (!indexPath) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
       const sessionDir = path.dirname(indexPath);
       const groupsPath = path.join(sessionDir, "groups.json");
@@ -179,11 +175,10 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
     }
   });
 
-  // PUT /api/sessions/:id/groups
-  router.put("/api/sessions/:id/groups", async (req, res, params) => {
+  // PUT /api/rounds/:roundName/sessions/:version/groups
+  router.put("/api/rounds/:roundName/sessions/:version/groups", async (req, res, params) => {
     try {
-      const safeSid = sanitizePath(params.id);
-      const indexPath = resolveSessionPath(reportsDir, safeSid);
+      const indexPath = resolveSessionPath(reportsDir, params.roundName, params.version);
       if (!indexPath) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
       const sessionDir = path.dirname(indexPath);
       const groupsPath = path.join(sessionDir, "groups.json");
@@ -202,18 +197,16 @@ export function registerProjectScanRoutes(router, reportsDir, projectDir) {
     }
   });
 
-  // POST /api/sessions/:id/groups/confirm
-  router.post("/api/sessions/:id/groups/confirm", async (req, res, params) => {
+  // POST /api/rounds/:roundName/sessions/:version/groups/confirm
+  router.post("/api/rounds/:roundName/sessions/:version/groups/confirm", async (req, res, params) => {
     try {
-      const safeSid = sanitizePath(params.id);
-      const indexPath = resolveSessionPath(reportsDir, safeSid);
+      const indexPath = resolveSessionPath(reportsDir, params.roundName, params.version);
       if (!indexPath) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
-      const sessionDir = path.dirname(indexPath);
 
-      const result = generateTasksFromGroups(reportsDir, safeSid);
+      const result = generateTasksFromGroups(reportsDir, params.roundName, params.version);
 
       // grouping → ready
-      updateSessionStatus(reportsDir, safeSid, "ready");
+      updateSessionStatus(reportsDir, params.roundName, params.version, "ready");
 
       jsonResponse(res, { ok: true, ...result });
     } catch (e) {

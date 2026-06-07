@@ -49,8 +49,8 @@ export function registerAuditRoutes(router, projectDir, reportsDir) {
     }
   });
 
-  // POST /api/sessions/:id/scope — set scope, generate code task YAMLs
-  router.post("/api/sessions/:id/scope", async (req, res, params) => {
+  // POST /api/rounds/:roundName/sessions/:version/scope — set scope, generate code task YAMLs
+  router.post("/api/rounds/:roundName/sessions/:version/scope", async (req, res, params) => {
     try {
       const body = JSON.parse(await readBody(req));
       if (!body || !body.method) {
@@ -66,7 +66,7 @@ export function registerAuditRoutes(router, projectDir, reportsDir) {
         return errorResponse(res, "Invalid ref format", "VALIDATION_ERROR", 400);
       }
       const excludeFiles = Array.isArray(body.excludeFiles) ? body.excludeFiles : [];
-      const result = setScope(projectDir, reportsDir, params.id, body.method, body.ref || "", excludeFiles);
+      const result = setScope(projectDir, reportsDir, params.roundName, params.version, body.method, body.ref || "", excludeFiles);
       jsonResponse(res, result);
     } catch (e) {
       if (e.message.includes("No diff found")) return errorResponse(res, e.message, "VALIDATION_ERROR", 400);

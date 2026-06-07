@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { updateTask, getTask, appendReview } from "../../lib/task.mjs";
-import { sanitizePath, sanitizeFilePath, resolveSessionPath } from "../../lib/session.mjs";
+import { sanitizeFilePath, resolveSessionPath } from "../../lib/session.mjs";
 import { AppError } from "../../lib/errors.mjs";
 import { readYaml, parseYaml, writeYaml } from "../../lib/yaml.mjs";
 import { jsonResponse, errorResponse, readBody } from "../index.mjs";
@@ -25,8 +25,8 @@ function validateTransition(currentStatus, newStatus) {
 }
 
 export function registerReviewRoutes(router, reportsDir) {
-  // POST /api/sessions/:id/tasks/review — body: { file, status, score?, review?, overview? }
-  router.post("/api/sessions/:id/tasks/review", async (req, res, params) => {
+  // POST /api/rounds/:roundName/sessions/:version/tasks/review — body: { file, status, score?, review?, overview? }
+  router.post("/api/rounds/:roundName/sessions/:version/tasks/review", async (req, res, params) => {
     try {
       const body = JSON.parse(await readBody(req));
       if (!body || !body.status) {
@@ -41,8 +41,7 @@ export function registerReviewRoutes(router, reportsDir) {
         return errorResponse(res, "Invalid status: " + status + ". Must be reviewing or reviewed", "VALIDATION_ERROR", 400);
       }
 
-      const safeSid = sanitizePath(params.id);
-      const indexPath = resolveSessionPath(reportsDir, safeSid);
+      const indexPath = resolveSessionPath(reportsDir, params.roundName, params.version);
       if (!indexPath) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
       const sessionDir = path.dirname(indexPath);
       const safeTaskFile = sanitizeFilePath(body.file);
@@ -52,11 +51,11 @@ export function registerReviewRoutes(router, reportsDir) {
         return errorResponse(res, "Task not found", "NOT_FOUND", 404);
       }
 
-      const currentTask = getTask(reportsDir, safeSid, safeTaskFile);
+      const currentTask = getTask(reportsDir, params.roundName, params.version, safeTaskFile);
       if (!currentTask) return errorResponse(res, "Task not found", "NOT_FOUND", 404);
       validateTransition(currentTask.status, status);
 
-      const result = updateTask(reportsDir, safeSid, safeTaskFile, status, score, review, overview);
+      const result = updateTask(reportsDir, params.roundName, params.version, safeTaskFile, status, score, review, overview);
 
       const index = readYaml(indexPath);
       jsonResponse(res, { ok: true, file: result.file, status: result.status, sessionStatus: index.session.status });
@@ -65,8 +64,8 @@ export function registerReviewRoutes(router, reportsDir) {
     }
   });
 
-  // POST /api/sessions/:id/tasks/review-yaml?file=<task-file> — body: raw YAML text
-  router.post("/api/sessions/:id/tasks/review-yaml", async (req, res, params, query) => {
+  // POST /api/rounds/:roundName/sessions/:version/tasks/review-yaml?file=<task-file> — body: raw YAML text
+  router.post("/api/rounds/:roundName/sessions/:version/tasks/review-yaml", async (req, res, params, query) => {
     try {
       const raw = await readBody(req);
       if (!raw || !raw.trim()) {
@@ -88,9 +87,8 @@ export function registerReviewRoutes(router, reportsDir) {
         return errorResponse(res, "Invalid YAML: missing or non-numeric review.score", "VALIDATION_ERROR", 400);
       }
 
-      const safeSid = sanitizePath(params.id);
       const safeFile = sanitizeFilePath(rawFile);
-      const indexPath = resolveSessionPath(reportsDir, safeSid);
+      const indexPath = resolveSessionPath(reportsDir, params.roundName, params.version);
       if (!indexPath) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
       const sessionDir = path.dirname(indexPath);
       const index = readYaml(indexPath);
@@ -109,7 +107,7 @@ export function registerReviewRoutes(router, reportsDir) {
         return errorResponse(res, "Task already reviewed", "CONFLICT", 409);
       }
 
-      const result = appendReview(reportsDir, safeSid, safeFile, raw.trim());
+      const result = appendReview(reportsDir, params.roundName, params.version, safeFile, raw.trim());
 
       // Auto-populate session-level review-notes.yaml with finding descriptions
       const notesPath = path.join(sessionDir, "review-notes.yaml");

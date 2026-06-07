@@ -1,7 +1,7 @@
 // skills/audit/scripts/server/handlers/stories.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { sanitizePath } from "../../lib/session.mjs";
+import { sanitizePath, resolveSessionDir } from "../../lib/session.mjs";
 import { taskFileName } from "../../lib/git.mjs";
 import { readYaml, writeYaml, writeIndexYaml, writeStoryTaskYaml } from "../../lib/yaml.mjs";
 import { listProviders, fetchFromProvider } from "../../lib/providers.mjs";
@@ -45,13 +45,12 @@ export function registerStoryRoutes(router, reportsDir) {
     }
   });
 
-  // GET /api/sessions/:id/stories — all story tasks
-  router.get("/api/sessions/:id/stories", (req, res, params) => {
+  // GET /api/rounds/:roundName/sessions/:version/stories — all story tasks
+  router.get("/api/rounds/:roundName/sessions/:version/stories", (req, res, params) => {
     try {
-      const safeSid = sanitizePath(params.id);
-      const sessionDir = path.join(reportsDir, safeSid);
+      const sessionDir = resolveSessionDir(reportsDir, params.roundName, params.version);
+      if (!sessionDir) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
       const indexPath = path.join(sessionDir, "index.yaml");
-      if (!fs.existsSync(indexPath)) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
 
       const index = readYaml(indexPath);
       const stories = [];
@@ -67,16 +66,15 @@ export function registerStoryRoutes(router, reportsDir) {
     }
   });
 
-  // POST /api/sessions/:id/stories — create story task
-  router.post("/api/sessions/:id/stories", async (req, res, params) => {
+  // POST /api/rounds/:roundName/sessions/:version/stories — create story task
+  router.post("/api/rounds/:roundName/sessions/:version/stories", async (req, res, params) => {
     try {
       const body = JSON.parse(await readBody(req));
       if (!body || !body.name) return errorResponse(res, "Missing required field: name", "VALIDATION_ERROR", 400);
 
-      const safeSid = sanitizePath(params.id);
-      const sessionDir = path.join(reportsDir, safeSid);
+      const sessionDir = resolveSessionDir(reportsDir, params.roundName, params.version);
+      if (!sessionDir) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
       const indexPath = path.join(sessionDir, "index.yaml");
-      if (!fs.existsSync(indexPath)) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
 
       const safeName = body.name.replace(/[^a-zA-Z0-9\-_.]/g, "-");
       const storyFile = "story-tasks/" + safeName + ".yaml";
@@ -111,19 +109,18 @@ export function registerStoryRoutes(router, reportsDir) {
     }
   });
 
-  // PUT /api/sessions/:id/stories/map — replace file-story mappings
+  // PUT /api/rounds/:roundName/sessions/:version/stories/map — replace file-story mappings
   // MUST be registered before the :name param route to avoid "map" being captured as :name
-  router.put("/api/sessions/:id/stories/map", async (req, res, params) => {
+  router.put("/api/rounds/:roundName/sessions/:version/stories/map", async (req, res, params) => {
     try {
       const body = JSON.parse(await readBody(req));
       if (!body || !body.mappings || !Array.isArray(body.mappings)) {
         return errorResponse(res, "Missing required field: mappings (array)", "VALIDATION_ERROR", 400);
       }
 
-      const safeSid = sanitizePath(params.id);
-      const sessionDir = path.join(reportsDir, safeSid);
+      const sessionDir = resolveSessionDir(reportsDir, params.roundName, params.version);
+      if (!sessionDir) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
       const indexPath = path.join(sessionDir, "index.yaml");
-      if (!fs.existsSync(indexPath)) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
 
       const index = readYaml(indexPath);
       const storyTasks = index.storyTasks || [];
@@ -152,15 +149,15 @@ export function registerStoryRoutes(router, reportsDir) {
     }
   });
 
-  // PUT /api/sessions/:id/stories/:name — update story description/acceptance
-  router.put("/api/sessions/:id/stories/:name", async (req, res, params) => {
+  // PUT /api/rounds/:roundName/sessions/:version/stories/:name — update story description/acceptance
+  router.put("/api/rounds/:roundName/sessions/:version/stories/:name", async (req, res, params) => {
     try {
       const body = JSON.parse(await readBody(req));
       if (!body) return errorResponse(res, "Empty request body", "VALIDATION_ERROR", 400);
 
-      const safeSid = sanitizePath(params.id);
+      const sessionDir = resolveSessionDir(reportsDir, params.roundName, params.version);
+      if (!sessionDir) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
       const safeName = sanitizePath(params.name);
-      const sessionDir = path.join(reportsDir, safeSid);
       const storyPath = path.join(sessionDir, "story-tasks", safeName + ".yaml");
 
       if (!fs.existsSync(storyPath)) return errorResponse(res, "Story not found", "NOT_FOUND", 404);
@@ -176,11 +173,11 @@ export function registerStoryRoutes(router, reportsDir) {
     }
   });
 
-  // DELETE /api/sessions/:id/stories/:name — delete a story
-  router.delete("/api/sessions/:id/stories/:name", (req, res, params) => {
+  // DELETE /api/rounds/:roundName/sessions/:version/stories/:name — delete a story
+  router.delete("/api/rounds/:roundName/sessions/:version/stories/:name", (req, res, params) => {
     try {
-      const safeSid = sanitizePath(params.id);
-      const sessionDir = path.join(reportsDir, safeSid);
+      const sessionDir = resolveSessionDir(reportsDir, params.roundName, params.version);
+      if (!sessionDir) return errorResponse(res, "Session not found", "NOT_FOUND", 404);
       const safeName = sanitizePath(params.name);
       const storyFile = "story-tasks/" + safeName + ".yaml";
       const storyPath = path.join(sessionDir, storyFile);

@@ -2714,3 +2714,117 @@ code {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ─── Summary Findings ─── */
+.summary-finding-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-sm);
+  border-radius: var(--radius-sm);
+}
+.summary-finding-row + .summary-finding-row {
+  border-top: 1px solid var(--border);
+}
+.summary-finding-row:hover {
+  background: var(--bg-hover);
+}
+.summary-finding-hidden {
+  display: none;
+}
+.summary-finding-desc {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.4;
+}
+.summary-file-section {
+  margin-bottom: var(--space-4);
+}
+
+/* ─── Print Header ─── */
+.print-header {
+  display: none;
+}
+
+/* ─── Print Styles ─── */
+@media print {
+  .app-header,
+  .breadcrumb,
+  .btn,
+  .toast-container,
+  #notes-panel-root {
+    display: none !important;
+  }
+  .print-header {
+    display: block;
+    text-align: center;
+    margin-bottom: var(--space-6);
+  }
+  .print-header h1 {
+    font-size: 24px;
+    font-weight: 700;
+    color: #000;
+    margin-bottom: var(--space-1);
+  }
+  .print-header p {
+    font-size: 14px;
+    color: #666;
+  }
+
+  /* Force light theme */
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+  .card {
+    background: #fff !important;
+    border: 1px solid #ddd !important;
+    box-shadow: none !important;
+  }
+  * {
+    color: #000 !important;
+    border-color: #ddd !important;
+  }
+  .text-muted,
+  .text-secondary {
+    color: #666 !important;
+  }
+  .finding-severity-badge {
+    color: #fff !important;
+  }
+  .badge {
+    color: #333 !important;
+    border: 1px solid #ccc !important;
+  }
+  .version-badge {
+    color: #333 !important;
+    background: #eee !important;
+  }
+
+  /* Typography */
+  body {
+    font-family: Georgia, "Times New Roman", serif;
+  }
+  .font-mono {
+    font-family: var(--font-mono);
+  }
+
+  /* Force show high-priority findings */
+  .summary-finding-high-priority {
+    display: flex !important;
+  }
+
+  /* Page breaks */
+  .summary-file-section {
+    page-break-before: always;
+  }
+  .round-summary-table {
+    page-break-inside: avoid;
+  }
+
+  /* Hide low-priority findings that were hidden by toggle */
+  .summary-finding-low-priority.summary-finding-hidden {
+    display: none !important;
+  }
+}

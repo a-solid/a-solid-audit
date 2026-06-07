@@ -19,6 +19,7 @@ function relativeTime(dateStr) {
 const STATUS_CONFIG = {
   created:    { color: "text-muted",   accent: "",                    badge: "badge-created" },
   ready:      { color: "text-warning", accent: "card-accent-warning", badge: "badge-ready" },
+  paused:     { color: "text-warning", accent: "card-accent-warning", badge: "badge-ready" },
   reviewing:  { color: "text-info",    accent: "card-accent-info",    badge: "badge-reviewing" },
   completed:  { color: "text-success", accent: "card-accent-success", badge: "badge-completed" },
 };

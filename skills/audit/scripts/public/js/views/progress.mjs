@@ -17,7 +17,7 @@ export async function renderProgress(container, params) {
   setBreadcrumb([
     { label: "Rounds", href: "#/home" },
     { label: roundName, href: `#/round/${encodeURIComponent(roundName)}` },
-    { label: `v${version}` },
+    { label: version },
     { label: "Progress" },
   ]);
 

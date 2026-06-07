@@ -4,27 +4,41 @@ You are a security and code quality auditor. You are reviewing a **chunk of sour
 
 ## Input
 
-You will receive `round-name`, `version`, and `task-file` as context. The session directory is `.audit/<project>/<round-name>/<version>/`.
+You will receive `round-name`, `version`, and `task-file` as context.
 
 ## Steps
 
 ### 1. Read Context
 
-Read `.audit/<project>/<round-name>/<version>/review-context.md` to understand:
+Fetch the review context via the API:
+
+```bash
+curl -s "http://localhost:12345/api/rounds/<round-name>/sessions/<version>/review-context"
+```
+
+This returns:
 - **User Context**: project background and focus areas provided by the user
 - **Project Knowledge**: AI-generated tech stack, architecture, and data flow overview
 - **Review Notes**: observations from previously reviewed chunks
 
 ### 2. Read Task
 
-Read the task file `.audit/<project>/<round-name>/<version>/<task-file>`. It contains:
+Fetch the task data via the API:
+
+```bash
+curl -s "http://localhost:12345/api/rounds/<round-name>/sessions/<version>/tasks?file=<task-file>"
+```
+
+It contains:
 - `name`: chunk description (directory names)
 - `files[]`: list of source files to review
 - `review`: current review state
 
 ### 3. Read Source Files
 
-For each file in `files[]`, read the **full source code** from the project directory. If the task references files under a `projectDir` (check the session's `index.yaml` for `projectDir`), read files from that directory.
+For each file in `files[]`, read the **full source code** from the project directory. If the task references files under a `projectDir` (check the session data for `projectDir`), read files from that directory.
+
+**Important:** You may read source files from the project directory directly (the code being reviewed), but all audit data (task files, review notes, review context) must be accessed through the API endpoints. Never read or write files under `.audit/` directly.
 
 ### 4. CodeGraph (Optional)
 
@@ -145,12 +159,14 @@ This atomically appends to the `## Review Notes` section. Focus on:
 
 ## Prior Findings (Prior Session Context)
 
-If `round-name` is provided and this is not version 1, read the prior session's `review-notes.yaml`.
+If this is not version 1, fetch the prior session's review notes via the API:
 
-1. Find the session directory for the current session (`.audit/<project>/<round-name>/<version>/`)
-2. Look at the session's `version` in `index.yaml`
-3. If version > 1, find another session in the same round directory with version = current - 1
-4. Read that prior session's `review-notes.yaml`
+1. Determine the prior version number (current version - 1)
+2. Fetch prior notes:
+
+```bash
+curl -s "http://localhost:12345/api/rounds/<round-name>/sessions/v<prior-version>/notes"
+```
 
 For the current task file, check prior findings:
 - Findings marked `wont-fix`, `not-an-issue`, or `well-done` — do NOT re-raise these. If the code hasn't changed, acknowledge they remain resolved.

@@ -252,6 +252,14 @@ async function navigate() {
   const hash = location.hash.slice(1) || "/home";
   const parts = hash.split("/").filter(Boolean);
 
+  // Update project switcher name based on current route
+  const nameEl = document.getElementById("project-switcher-name");
+  if (parts[0] === "project" && parts.length >= 2) {
+    if (nameEl) nameEl.textContent = decodeURIComponent(parts[1]);
+  } else if (nameEl && currentProjectName) {
+    nameEl.textContent = currentProjectName;
+  }
+
   let render, params;
 
   // Parse round-based routes: #/round/<roundName>/...

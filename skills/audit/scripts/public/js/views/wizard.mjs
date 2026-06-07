@@ -192,7 +192,7 @@ export async function renderWizard(container, params) {
   };
 
   function render() {
-    const versionLabel = !isNew ? `v${version}` : "";
+    const versionLabel = !isNew ? version : "";
     setBreadcrumb([
       { label: "Rounds", href: "#/home" },
       ...(roundName && !isNew ? [{ label: roundName, href: `#/round/${encodeURIComponent(roundName)}` }] : []),

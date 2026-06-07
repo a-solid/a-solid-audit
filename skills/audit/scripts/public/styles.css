@@ -2555,6 +2555,106 @@ code {
   margin-top: var(--space-4);
 }
 
+/* ─── Findings Dashboard ─── */
+.findings-dashboard {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+.findings-dashboard-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: center;
+}
+.findings-dashboard-group + .findings-dashboard-group {
+  padding-left: var(--space-2);
+  border-left: 1px solid var(--border);
+}
+.findings-dashboard-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  margin-right: var(--space-1);
+}
+.findings-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.findings-pill-zero {
+  opacity: 0.4;
+}
+.findings-pill-severity {
+  color: #fff;
+}
+.findings-pill-status {
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+.findings-pill-status.pill-need-fix { border-color: rgba(239,68,68,0.4); color: var(--danger); }
+.findings-pill-status.pill-wont-fix { border-color: rgba(245,158,11,0.4); color: var(--warning); }
+.findings-pill-status.pill-not-an-issue { border-color: rgba(59,130,246,0.4); color: var(--info); }
+.findings-pill-status.pill-well-done { border-color: rgba(34,197,94,0.4); color: var(--accent); }
+.findings-pill-status.pill-pending { border-color: var(--border); color: var(--text-muted); }
+
+/* ─── All Clear Card ─── */
+.findings-all-clear {
+  border: 1px solid var(--accent);
+  background: linear-gradient(135deg, var(--accent-dim), var(--bg-surface));
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  text-align: center;
+  margin-bottom: var(--space-4);
+}
+.findings-all-clear h2 {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  color: var(--accent);
+  margin-bottom: var(--space-1);
+}
+.findings-all-clear p {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin-bottom: var(--space-4);
+}
+.findings-all-clear .btn {
+  margin-top: var(--space-2);
+}
+.findings-resolved-list {
+  margin-top: var(--space-3);
+}
+.findings-resolved-list summary {
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  padding: var(--space-2) 0;
+}
+.findings-resolved-list summary:hover {
+  color: var(--text-secondary);
+}
+.findings-resolved-card {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  opacity: 0.6;
+  font-size: var(--text-sm);
+}
+.findings-resolved-card + .findings-resolved-card {
+  border-top: 1px solid var(--border);
+}
+
 /* Project Switcher */
 .project-switcher {
   position: relative;

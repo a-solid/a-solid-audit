@@ -265,3 +265,41 @@ export function resetReviewing(reportsDir, roundName, version) {
 
   return resetCount;
 }
+
+// Pause all stale reviewing sessions (called on server startup)
+export function pauseStaleSessions(reportsDir) {
+  if (!fs.existsSync(reportsDir)) return 0;
+
+  let pausedCount = 0;
+  for (const roundEntry of fs.readdirSync(reportsDir)) {
+    const roundDir = path.join(reportsDir, roundEntry);
+    if (!fs.statSync(roundDir).isDirectory()) continue;
+    if (!fs.existsSync(path.join(roundDir, "round.yaml"))) continue;
+
+    for (const versionEntry of fs.readdirSync(roundDir)) {
+      if (!/^v\d+$/.test(versionEntry)) continue;
+      const sessionDir = path.join(roundDir, versionEntry);
+      const indexPath = path.join(sessionDir, "index.yaml");
+      if (!fs.existsSync(indexPath)) continue;
+
+      const index = readYaml(indexPath);
+      if (index.session.status !== "reviewing") continue;
+
+      let resetCount = 0;
+      for (const taskGroup of ["codeTasks", "storyTasks", "projectTasks"]) {
+        for (const ref of index[taskGroup] || []) {
+          if (ref.status === "reviewing") {
+            ref.status = "pending";
+            resetCount++;
+          }
+        }
+      }
+
+      index.session.status = "paused";
+      writeIndexYaml(indexPath, index);
+      console.log(`[resume] Paused ${roundEntry}/${versionEntry} (${resetCount} tasks reset)`);
+      pausedCount++;
+    }
+  }
+  return pausedCount;
+}

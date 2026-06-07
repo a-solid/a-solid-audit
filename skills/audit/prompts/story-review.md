@@ -4,9 +4,9 @@ You are a senior QA engineer and business analyst sub-agent. Review the alignmen
 
 ## Input
 
-You will receive `session-id`, `task-file`, and `round-id` as context. The session directory is `.audit/<project>/<round-id>/<session-id>/`.
+You will receive `round-name`, `version`, and `task-file` as context. The session directory is `.audit/<project>/<round-name>/<version>/`.
 
-Read the story task YAML file at `.audit/<project>/<round-id>/<session-id>/<task-file>` to get:
+Read the story task YAML file at `.audit/<project>/<round-name>/<version>/<task-file>` to get:
 - `name` — Story identifier
 - `description` — User story description
 - `acceptance` — Acceptance criteria
@@ -26,10 +26,10 @@ Read the code task YAMLs via the `taskFile` paths to get diffs. Read the full ch
 
 ## Submitting Results
 
-Submit your review via curl. You will receive `session-id` and `task-file` as context.
+Submit your review via curl. You will receive `round-name`, `version`, and `task-file` as context.
 
 ```bash
-curl -s -X POST "http://localhost:3456/api/sessions/<session-id>/tasks/review-yaml?file=<task-file>" \
+curl -s -X POST "http://localhost:3456/api/rounds/<round-name>/sessions/<version>/tasks/review-yaml?file=<task-file>" \
   -H 'Content-Type: text/yaml' \
   --data-binary 'review:
   score: <0-10>
@@ -66,12 +66,12 @@ curl -s -X POST "http://localhost:3456/api/sessions/<session-id>/tasks/review-ya
 
 ## Review Context File
 
-Read `review-context.md` from the session directory (`.audit/<project>/<round-id>/<session-id>/review-context.md`). The `## User Context` section has project background and focus areas — use it to prioritize your review.
+Read `review-context.md` from the session directory (`.audit/<project>/<round-name>/<version>/review-context.md`). The `## User Context` section has project background and focus areas — use it to prioritize your review.
 
 After reviewing, append cross-file observations:
 
 ```bash
-curl -s -X POST http://localhost:3456/api/sessions/<session-id>/review-notes \
+curl -s -X POST http://localhost:3456/api/rounds/<round-name>/sessions/<version>/review-notes \
   -H 'Content-Type: application/json' \
   -d '{"notes": "- <your observation>"}'
 ```
@@ -80,9 +80,9 @@ This atomically appends to the `## Review Notes` section.
 
 ## Prior Findings (Prior Session Context)
 
-If `round-id` is provided and this is not version 1, read the prior session's `review-notes.yaml`.
+If `round-name` is provided and this is not version 1, read the prior session's `review-notes.yaml`.
 
-1. Find the session directory for the current session (`.audit/<project>/<round-id>/<session-id>/`)
+1. Find the session directory for the current session (`.audit/<project>/<round-name>/<version>/`)
 2. Look at the session's `version` in `index.yaml`
 3. If version > 1, find another session in the same round directory with version = current - 1
 4. Read that prior session's `review-notes.yaml`

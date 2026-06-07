@@ -72,7 +72,7 @@ export async function renderRoundDetail(container, params) {
   async function loadNotes() {
     const completedSessions = (round.sessions || []).filter(s => s.status === "completed");
     if (completedSessions.length > 0) {
-      const latest = completedSessions[completedSessions.length - 1];
+      const latest = completedSessions.reduce((a, b) => (a.version || 0) > (b.version || 0) ? a : b);
       try {
         latestNotes = await api.getNotes(roundName, latest.id);
       } catch { latestNotes = null; }
@@ -103,11 +103,16 @@ export async function renderRoundDetail(container, params) {
         </div>
         <div class="flex items-center gap-2">
           <a href="#/round/${encodeURIComponent(roundName)}/summary" class="btn btn-ghost">
-            ${icon("barChart", 14)} Round Summary
+            ${icon("fileText", 14)} View Report
           </a>
+          ${latestVersion < 10 ? `
+            <button id="new-session-btn" class="btn btn-ghost">
+              ${icon("plus", 14)} Start New Review
+            </button>
+          ` : ""}
           ${showReReview ? `
             <button id="re-review-btn" class="btn btn-primary">
-              ${icon("refreshCw", 14)} Re-review
+              ${icon("refreshCw", 14)} Fix &amp; Re-check
             </button>
           ` : ""}
         </div>
@@ -168,13 +173,6 @@ export async function renderRoundDetail(container, params) {
                 </div>`;
             }).join("")}
           </div>
-          ${latestVersion < 10 ? `
-            <div style="margin-top:var(--space-4)">
-              <button id="new-session-btn" class="btn btn-ghost" style="border-color:var(--border)">
-                ${icon("plus", 14)} New Session
-              </button>
-            </div>
-          ` : ""}
         `}
       </div>
     `;
@@ -222,55 +220,112 @@ export async function renderRoundDetail(container, params) {
     const panel = document.getElementById("re-review-panel");
     if (!panel || !latestNotes) return;
 
-    const needFixFiles = [];
-    const otherFiles = [];
+    // Build task-level info from notes
+    const taskMap = new Map();
     for (const task of latestNotes.tasks || []) {
       const findings = task.findings || [];
-      const hasNeedFix = findings.some(f => f.status === "need-fix");
-      // Extract source file paths from findings
-      const files = [...new Set(findings.map(f => f.file).filter(Boolean))];
-      if (hasNeedFix) {
-        for (const f of files) needFixFiles.push(f);
-      } else if (files.length > 0) {
-        for (const f of files) otherFiles.push(f);
-      }
+      if (findings.length === 0) continue;
+      const needFixCount = findings.filter(f => f.status === "need-fix").length;
+      const totalFindings = findings.length;
+      const sourceFiles = [...new Set(findings.map(f => f.file).filter(Boolean))];
+      const isStory = task.file.startsWith("story-tasks/");
+      taskMap.set(task.file, {
+        file: task.file,
+        sourceFiles,
+        isStory,
+        needFixCount,
+        totalFindings,
+        hasNeedFix: needFixCount > 0,
+        score: task.review?.score ?? null,
+      });
     }
 
+    const needFixTasks = [];
+    const resolvedTasks = [];
+    for (const [, t] of taskMap) {
+      if (t.hasNeedFix) needFixTasks.push(t);
+      else resolvedTasks.push(t);
+    }
+    needFixTasks.sort((a, b) => a.file.localeCompare(b.file));
+    resolvedTasks.sort((a, b) => a.file.localeCompare(b.file));
+
+    function shortName(taskFile) {
+      const base = taskFile.split("/").pop().replace(/\.yaml$/, "");
+      return base;
+    }
+
+    function taskLabel(t) {
+      const name = shortName(t.file);
+      const typeTag = t.isStory ? " (story)" : "";
+      return `${escapeHtml(name)}${typeTag}`;
+    }
+
+    function taskSourceLine(t) {
+      if (t.sourceFiles.length === 0) return "";
+      return `<div class="text-xs text-muted">${t.sourceFiles.map(f => escapeHtml(f)).join(", ")}</div>`;
+    }
+
+    // Fetch previous review context
+    const completedSessions = (round.sessions || [])
+      .filter(s => s.status === "completed")
+      .sort((a, b) => (b.version || 0) - (a.version || 0));
+    const prevVersion = completedSessions[0]?.id;
+    let previousContext = "";
+    if (prevVersion) {
+      api.getReviewContext(roundName, prevVersion).then(ctx => {
+        previousContext = ctx.context || "";
+        const ta = document.getElementById("re-review-context");
+        if (ta && !ta.value) ta.value = previousContext;
+      }).catch(() => {});
+    }
+
+    // ---- Step 1: Task selection + context ----
     panel.style.display = "block";
     panel.innerHTML = `
       <div class="card mb-4 re-review-panel">
-        <h3 class="font-semibold mb-3">${icon("refreshCw", 16)} Re-review Files</h3>
-        <p class="text-sm text-muted mb-3">Select files to include in the next review pass. Need-fix files are pre-selected.</p>
+        <h3 class="font-semibold mb-3">${icon("refreshCw", 16)} Select Tasks to Re-check</h3>
+        <p class="text-sm text-muted mb-3">Select tasks to include in the next review pass. Tasks with need-fix findings are pre-selected.</p>
 
-        ${needFixFiles.length > 0 ? `
+        ${needFixTasks.length > 0 ? `
           <div class="mb-3">
-            <div class="text-xs font-semibold text-warning mb-2">FILES TO RE-REVIEW</div>
-            ${needFixFiles.map(f => `
+            <div class="text-xs font-semibold text-warning mb-2">NEED-FIX TASKS</div>
+            ${needFixTasks.map(t => `
               <label class="re-review-file-item">
-                <input type="checkbox" checked data-file="${escapeHtml(f)}" class="re-review-check" />
-                <span class="text-sm">${escapeHtml(f)}</span>
-                <span class="badge badge-created text-xs" style="margin-left:auto">need-fix</span>
+                <input type="checkbox" checked data-task="${escapeHtml(t.file)}" class="re-review-check" />
+                <div style="min-width:0;flex:1">
+                  <div class="text-sm">${taskLabel(t)}</div>
+                  ${taskSourceLine(t)}
+                </div>
+                <span class="text-xs" style="margin-left:auto;white-space:nowrap">${t.needFixCount} need-fix, ${t.totalFindings} findings${t.score !== null ? ` — Score: ${t.score}` : ""}</span>
               </label>
             `).join("")}
           </div>
         ` : ""}
 
-        ${otherFiles.length > 0 ? `
+        ${resolvedTasks.length > 0 ? `
           <div class="mb-3">
-            <div class="text-xs font-semibold text-muted mb-2">PREVIOUSLY RESOLVED FILES</div>
-            ${otherFiles.map(f => `
+            <div class="text-xs font-semibold text-muted mb-2">RESOLVED TASKS</div>
+            ${resolvedTasks.map(t => `
               <label class="re-review-file-item">
-                <input type="checkbox" data-file="${escapeHtml(f)}" class="re-review-check" />
-                <span class="text-sm text-muted">${escapeHtml(f)}</span>
-                <span class="badge badge-completed text-xs" style="margin-left:auto">resolved</span>
+                <input type="checkbox" data-task="${escapeHtml(t.file)}" class="re-review-check" />
+                <div style="min-width:0;flex:1">
+                  <div class="text-sm text-muted">${taskLabel(t)}</div>
+                  ${taskSourceLine(t)}
+                </div>
+                <span class="text-xs text-muted" style="margin-left:auto;white-space:nowrap">${t.totalFindings} findings${t.score !== null ? ` — Score: ${t.score}` : ""}</span>
               </label>
             `).join("")}
           </div>
         ` : ""}
+
+        <details class="mb-3" style="border-top:1px solid var(--border);padding-top:var(--space-3)">
+          <summary class="text-sm cursor-pointer" style="color:var(--text-muted)">Review Context (optional)</summary>
+          <textarea id="re-review-context" class="form-input mt-2" rows="4" placeholder="Additional instructions or context for this re-check..." style="width:100%;resize:vertical;font-size:var(--text-sm)"></textarea>
+        </details>
 
         <div class="flex items-center gap-2 mt-4">
-          <button id="start-re-review-btn" class="btn btn-primary">
-            ${icon("zap", 14)} Start Re-review
+          <button id="re-review-next-btn" class="btn btn-primary">
+            ${icon("arrowRight", 14)} Next
           </button>
           <button id="cancel-re-review-btn" class="btn btn-ghost">Cancel</button>
         </div>
@@ -281,26 +336,72 @@ export async function renderRoundDetail(container, params) {
       panel.style.display = "none";
     });
 
-    document.getElementById("start-re-review-btn").addEventListener("click", async () => {
-      const btn = document.getElementById("start-re-review-btn");
+    document.getElementById("re-review-next-btn").addEventListener("click", () => {
       const checked = panel.querySelectorAll(".re-review-check:checked");
-      const files = [...checked].map(c => c.dataset.file);
+      const tasks = [...checked].map(c => c.dataset.task);
 
-      if (files.length === 0) {
-        showToast("Select at least one file to re-review", "warning");
+      if (tasks.length === 0) {
+        showToast("Select at least one task to re-check", "warning");
         return;
       }
 
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner spinner-sm"></span> Creating session...';
-      try {
-        const result = await api.reReview(roundName, { files });
-        location.hash = `#/round/${encodeURIComponent(roundName)}/v${result.version}/progress`;
-      } catch (e) {
-        showToast("Failed to start re-review: " + e.message);
-        btn.disabled = false;
-        btn.innerHTML = `${icon("zap", 14)} Start Re-review`;
-      }
+      const reviewContext = (document.getElementById("re-review-context")?.value || "").trim();
+      const codeCount = tasks.filter(t => !t.startsWith("story-tasks/")).length;
+      const storyCount = tasks.filter(t => t.startsWith("story-tasks/")).length;
+
+      // ---- Step 2: Confirmation ----
+      panel.innerHTML = `
+        <div class="card mb-4 re-review-panel">
+          <h3 class="font-semibold mb-3">${icon("refreshCw", 16)} Confirm Re-check</h3>
+
+          <div class="card" style="background:var(--bg-surface)">
+            <div class="text-sm mb-2">
+              <span class="text-muted">Type:</span>
+              <span class="font-medium">${round.sessions?.find(s => s.status === "completed")?.type === "all" ? "Code + Story" : "Code Review"}</span>
+            </div>
+            <div class="text-sm mb-2">
+              <span class="text-muted">Tasks:</span>
+              <span class="font-medium">${codeCount} code task${codeCount !== 1 ? "s" : ""}${storyCount > 0 ? ` + ${storyCount} story task${storyCount !== 1 ? "s" : ""}` : ""}</span>
+            </div>
+            <div class="text-sm">
+              <span class="text-muted">Scope:</span>
+              <span class="font-medium">Uncommitted changes + original task diffs</span>
+            </div>
+            ${reviewContext ? `
+              <div class="text-sm mt-2" style="border-top:1px solid var(--border);padding-top:var(--space-2)">
+                <span class="text-muted">Context:</span>
+                <div class="mt-1" style="white-space:pre-wrap;max-height:80px;overflow-y:auto">${escapeHtml(reviewContext)}</div>
+              </div>
+            ` : ""}
+          </div>
+
+          <div class="flex items-center gap-2 mt-4">
+            <button id="start-re-review-btn" class="btn btn-primary">
+              ${icon("zap", 14)} Start Re-check
+            </button>
+            <button id="back-re-review-btn" class="btn btn-ghost">${icon("arrowLeft", 14)} Back</button>
+          </div>
+        </div>
+      `;
+
+      document.getElementById("back-re-review-btn").addEventListener("click", () => {
+        renderReReviewPanel();
+      });
+
+      document.getElementById("start-re-review-btn").addEventListener("click", async () => {
+        const btn = document.getElementById("start-re-review-btn");
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner spinner-sm"></span> Creating session...';
+        try {
+          const result = await api.reReview(roundName, { tasks, reviewContext: reviewContext || undefined });
+          await api.advance(roundName, `v${result.version}`, { action: "start" });
+          location.hash = `#/round/${encodeURIComponent(roundName)}/v${result.version}/progress`;
+        } catch (e) {
+          showToast("Failed to start re-check: " + e.message);
+          btn.disabled = false;
+          btn.innerHTML = `${icon("zap", 14)} Start Re-check`;
+        }
+      });
     });
   }
 

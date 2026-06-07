@@ -1,21 +1,21 @@
 // skills/audit/scripts/lib/task.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { sanitizePath, sanitizeFilePath, updateSessionStatus, resolveSessionPath } from "./session.mjs";
+import { sanitizePath, sanitizeFilePath, updateSessionStatus, resolveSessionPath, validateVersion } from "./session.mjs";
 import { readYaml, writeYaml, writeIndexYaml } from "./yaml.mjs";
 import { AppError } from "./errors.mjs";
 
 const ALLOWED_STATUSES = ["pending", "reviewing", "reviewed"];
 
-export function updateTask(reportsDir, sid, taskFile, status, score, reviewData, overview) {
+export function updateTask(reportsDir, roundName, version, taskFile, status, score, reviewData, overview) {
   if (!ALLOWED_STATUSES.includes(status)) {
     throw new AppError("Invalid status: " + status + ". Allowed: " + ALLOWED_STATUSES.join(", "), "VALIDATION_ERROR", 400);
   }
 
-  const safeSid = sanitizePath(sid);
   const safeTaskFile = sanitizeFilePath(taskFile);
-  const indexPath = resolveSessionPath(reportsDir, safeSid);
-  if (!indexPath) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
+  validateVersion(version);
+  const indexPath = resolveSessionPath(reportsDir, roundName, version);
+  if (!indexPath) throw new AppError("Session not found: " + roundName + "/" + version, "NOT_FOUND", 404);
   const sessionDir = path.dirname(indexPath);
   const taskPath = path.join(sessionDir, safeTaskFile);
 
@@ -49,17 +49,17 @@ export function updateTask(reportsDir, sid, taskFile, status, score, reviewData,
     (index[group] || []).every(t => t.status === "reviewed")
   );
   if (allReviewed) {
-    updateSessionStatus(reportsDir, safeSid, "completed");
+    updateSessionStatus(reportsDir, roundName, version, "completed");
   }
 
   return { file: safeTaskFile, status };
 }
 
-export function appendReview(reportsDir, sid, taskFile, yamlText) {
-  const safeSid = sanitizePath(sid);
+export function appendReview(reportsDir, roundName, version, taskFile, yamlText) {
   const safeTaskFile = sanitizeFilePath(taskFile);
-  const indexPath = resolveSessionPath(reportsDir, safeSid);
-  if (!indexPath) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
+  validateVersion(version);
+  const indexPath = resolveSessionPath(reportsDir, roundName, version);
+  if (!indexPath) throw new AppError("Session not found: " + roundName + "/" + version, "NOT_FOUND", 404);
   const sessionDir = path.dirname(indexPath);
   const taskPath = path.join(sessionDir, safeTaskFile);
 
@@ -84,17 +84,17 @@ export function appendReview(reportsDir, sid, taskFile, yamlText) {
     (index[group] || []).every(t => t.status === "reviewed")
   );
   if (allReviewed) {
-    updateSessionStatus(reportsDir, safeSid, "completed");
+    updateSessionStatus(reportsDir, roundName, version, "completed");
   }
 
   return { file: safeTaskFile, status: "reviewed" };
 }
 
 // Get all tasks for a session
-export function getTasks(reportsDir, sid) {
-  const safeSid = sanitizePath(sid);
-  const indexPath = resolveSessionPath(reportsDir, safeSid);
-  if (!indexPath) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
+export function getTasks(reportsDir, roundName, version) {
+  validateVersion(version);
+  const indexPath = resolveSessionPath(reportsDir, roundName, version);
+  if (!indexPath) throw new AppError("Session not found: " + roundName + "/" + version, "NOT_FOUND", 404);
   const sessionDir = path.dirname(indexPath);
 
   const index = readYaml(indexPath);
@@ -120,10 +120,10 @@ export function getTasks(reportsDir, sid) {
 }
 
 // Lightweight task list from index.yaml only — no per-task YAML reads
-export function getTasksSummary(reportsDir, sid) {
-  const safeSid = sanitizePath(sid);
-  const indexPath = resolveSessionPath(reportsDir, safeSid);
-  if (!indexPath) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
+export function getTasksSummary(reportsDir, roundName, version) {
+  validateVersion(version);
+  const indexPath = resolveSessionPath(reportsDir, roundName, version);
+  if (!indexPath) throw new AppError("Session not found: " + roundName + "/" + version, "NOT_FOUND", 404);
   const sessionDir = path.dirname(indexPath);
 
   const index = readYaml(indexPath);
@@ -145,10 +145,10 @@ export function getTasksSummary(reportsDir, sid) {
 }
 
 // Get single task detail
-export function getTask(reportsDir, sid, taskFile) {
-  const safeSid = sanitizePath(sid);
-  const indexPath = resolveSessionPath(reportsDir, safeSid);
-  if (!indexPath) throw new AppError("Session not found: " + safeSid, "NOT_FOUND", 404);
+export function getTask(reportsDir, roundName, version, taskFile) {
+  validateVersion(version);
+  const indexPath = resolveSessionPath(reportsDir, roundName, version);
+  if (!indexPath) throw new AppError("Session not found: " + roundName + "/" + version, "NOT_FOUND", 404);
   const sessionDir = path.dirname(indexPath);
 
   const index = readYaml(indexPath);

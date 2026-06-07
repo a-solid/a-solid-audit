@@ -40,10 +40,6 @@ export function resolveProjectName(projectDir, settings) {
   return path.basename(path.resolve(projectDir));
 }
 
-export function roundId() {
-  return new Date().toISOString().replace(/:/g, "-");
-}
-
 export function resolveReportsDir(projectDir) {
   const settings = loadAuditSettings();
   const rawRoot = settings.rootDir || "~/.audit";

@@ -1,7 +1,7 @@
 // skills/audit/scripts/public/js/views/round-summary.mjs
 import { api } from "../api.mjs";
 import { showToast, setBreadcrumb, icon, escapeHtml } from "../app.mjs";
-import { SEVERITY_LABELS, scoreColor } from "../constants.mjs";
+import { scoreColor } from "../constants.mjs";
 
 function relativeTime(dateStr) {
   const now = Date.now();

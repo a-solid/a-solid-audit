@@ -257,14 +257,6 @@ export function readYaml(filePath) {
   return parseYaml(content);
 }
 
-export function patchYaml(filePath, patches) {
-  const data = readYaml(filePath);
-  for (const [key, value] of Object.entries(patches)) {
-    data[key] = value;
-  }
-  writeYaml(filePath, data);
-}
-
 export function writeCodeTaskYaml(filePath, data) {
   writeYaml(filePath, {
     name: data.name,

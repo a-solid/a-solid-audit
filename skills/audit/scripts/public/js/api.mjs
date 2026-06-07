@@ -75,15 +75,11 @@ export const api = {
   // Tasks
   getTasks: (id) => request("GET", `/api/sessions/${encodeURIComponent(id)}/tasks`),
   getTasksSummary: (id) => request("GET", `/api/sessions/${encodeURIComponent(id)}/tasks/summary`),
-  getTask: (id, file) =>
-    request("GET", `/api/sessions/${encodeURIComponent(id)}/tasks?file=${encodeURIComponent(file)}`),
 
   // Notes
   getNotes: (id) => request("GET", `/api/sessions/${encodeURIComponent(id)}/notes`),
   updateTaskNote: (id, file, data) =>
     request("POST", `/api/sessions/${encodeURIComponent(id)}/notes`, { file, ...data }),
-  updateSummary: (id, data) =>
-    request("POST", `/api/sessions/${encodeURIComponent(id)}/summary`, data),
 
   // Review Context
   getReviewContext: (id) => request("GET", `/api/sessions/${encodeURIComponent(id)}/review-context`),

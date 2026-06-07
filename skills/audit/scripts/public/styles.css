@@ -1373,10 +1373,6 @@ code {
     transition: none;
   }
 }
-.needs-attention-item:hover {
-  background: var(--bg-hover);
-  transition: background var(--duration-fast) var(--ease-spring);
-}
 .notes-fab {
   position: fixed; bottom: var(--space-6); right: var(--space-6); z-index: calc(var(--z-overlay) + 1);
   width: 44px; height: 44px; border-radius: 50%;
@@ -1815,27 +1811,6 @@ code {
   cursor: pointer;
   flex-shrink: 0;
 }
-.scope-tree-folder-toggle {
-  width: 16px;
-  height: 16px;
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  transition: transform var(--duration-fast);
-}
-.scope-tree-folder-toggle.expanded {
-  transform: rotate(90deg);
-}
-.scope-tree-folder-icon {
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
-.scope-tree-folder-name {
-  font-weight: 500;
-  color: var(--text-secondary);
-}
 .scope-tree-file-name {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -1875,101 +1850,6 @@ code {
   padding: var(--space-6);
   color: var(--text-muted);
   font-size: var(--text-sm);
-}
-
-/* ─── Print ─── */
-@media print {
-  .no-print { display: none !important; }
-  body { background: white !important; color: black; }
-  :root {
-    --bg-gradient-start: #fff;
-    --bg-gradient-end: #fff;
-    --bg-deep: #fff;
-    --bg-base: #fff;
-    --bg-surface: #f9fafb;
-    --bg-surface-solid: #fff;
-    --bg-elevated: #f3f4f6;
-    --bg-hover: #e5e7eb;
-    --bg-active: #d1d5db;
-    --bg-muted: #f3f4f6;
-    --bg-input: #fff;
-    --text-primary: #111827;
-    --text-secondary: #4b5563;
-    --text-muted: #9ca3af;
-    --accent: #166534;
-    --accent-hover: #166534;
-    --accent-dim: rgba(22, 101, 52, 0.12);
-    --accent-glow: rgba(22, 101, 52, 0.12);
-    --danger: #991b1b;
-    --warning: #92400e;
-    --info: #1e40af;
-    --border: #e5e7eb;
-    --border-hover: #d1d5db;
-    --border-accent: rgba(22, 101, 52, 0.3);
-    --card-blur: 0px;
-  }
-  .card, .stat-card, .sidebar-panel, .detail-panel, .finding-card {
-    background: white; border-color: #e5e7eb; color: black;
-  }
-  .text-primary, .text-secondary { color: black; }
-  pre { border-color: #e5e7eb; }
-
-  .print-task-card {
-    background: white; border-color: #d1d5db; color: black;
-    page-break-inside: avoid;
-  }
-  .print-task-header { border-bottom-color: #d1d5db; }
-  .print-finding-card {
-    background: #f9fafb; border-left-color: #9ca3af;
-  }
-  .print-finding-card.severity-border-critical,
-  .print-finding-card.severity-border-major,
-  .print-finding-card.severity-border-high { border-left-color: #dc2626; }
-  .print-finding-card.severity-border-medium,
-  .print-finding-card.severity-border-minor { border-left-color: #d97706; }
-  .print-finding-card.severity-border-low,
-  .print-finding-card.severity-border-info { border-left-color: #2563eb; }
-  .badge, .print-finding-card {
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  .badge { border: 1px solid #d1d5db; }
-  .badge.severity-critical, .badge.severity-major, .badge.severity-high {
-    color: #991b1b; border-color: #fca5a5; background: #fef2f2;
-  }
-  .badge.severity-medium, .badge.severity-minor {
-    color: #92400e; border-color: #fcd34d; background: #fffbeb;
-  }
-  .badge.severity-low, .badge.severity-info {
-    color: #1e40af; border-color: #93c5fd; background: #eff6ff;
-  }
-  .stat-card { page-break-inside: avoid; }
-  .severity-bar-row { page-break-inside: avoid; }
-  .print-badge-need-fix { color: #991b1b; border-color: #fca5a5; background: #fef2f2; }
-  .print-badge-wont-fix { color: #92400e; border-color: #fcd34d; background: #fffbeb; }
-  .print-badge-not-an-issue { color: #1e40af; border-color: #93c5fd; background: #eff6ff; }
-  .print-badge-pending { color: #6b7280; border-color: #d1d5db; background: #f9fafb; }
-
-  /* Print/PDF utility overrides */
-  .print-only { display: block; }
-
-  /* Clean up textarea in PDF */
-  #summary-notes {
-    border: none;
-    background: transparent;
-    resize: none;
-    overflow: visible;
-    -webkit-appearance: none;
-    appearance: none;
-    box-shadow: none;
-  }
-
-  /* Remove green border from signed sign-off in print */
-  #review-summary-card[style*="border-color:var(--success)"],
-  #review-summary-card[style*="border-color: var(--success)"] {
-    border-color: #e5e7eb !important;
-    border-left-color: #e5e7eb !important;
-  }
 }
 
 /* ─── Responsive ─── */

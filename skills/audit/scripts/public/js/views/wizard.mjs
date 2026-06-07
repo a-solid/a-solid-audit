@@ -23,6 +23,7 @@ export async function renderWizard(container, params) {
   const isNew = !sessionId || sessionId === "new";
   const urlParams = new URLSearchParams(window.location.hash.split("?")[1] || "");
   let preselectType = urlParams.get("type");
+  const roundId = urlParams.get("roundId");
   let step = 1;
   let prevStep = 0;
   let reviewType = "code";
@@ -195,7 +196,7 @@ export async function renderWizard(container, params) {
   function render() {
     const shortId = sessionId && !isNew ? sessionId.slice(0, 7) : "";
     setBreadcrumb([
-      { label: "Sessions", href: "#/home" },
+      { label: "Rounds", href: "#/home" },
       ...(shortId ? [{ label: shortId, href: `#/wizard/${sessionId}` }] : []),
       { label: isNew ? "New Audit" : "Configure" },
     ]);
@@ -302,7 +303,13 @@ export async function renderWizard(container, params) {
         nextBtn.disabled = true;
         nextBtn.innerHTML = '<span class="spinner spinner-sm"></span> Creating...';
         try {
-          const { id, projectDir } = await api.createSession({ type: reviewType });
+          if (!roundId) {
+            showToast("No round specified. Start from the home page.");
+            nextBtn.disabled = false;
+            nextBtn.innerHTML = originalHTML;
+            return;
+          }
+          const { id, projectDir } = await api.createRoundSession(roundId, { type: reviewType });
           sessionId = id;
           defaultProjectDir = projectDir || "";
           location.hash = `#/wizard/${id}`;
@@ -319,7 +326,7 @@ export async function renderWizard(container, params) {
         try {
           const session = await api.getSession(sessionId);
           if (session?.type !== "project") {
-            const { id } = await api.createSession({ type: "project" });
+            const { id } = await api.createRoundSession(roundId, { type: "project" });
             localStorage.removeItem(`audit-wizard-${sessionId}`);
             location.hash = `#/wizard/${id}`;
             return;

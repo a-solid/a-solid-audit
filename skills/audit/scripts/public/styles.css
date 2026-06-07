@@ -2831,6 +2831,121 @@ code {
   margin-bottom: var(--space-4);
 }
 
+/* ─── Report Score Hero ─── */
+.report-score-hero {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-5);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-5);
+}
+
+.report-score-ring {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+}
+
+.report-score-ring svg {
+  transform: rotate(-90deg);
+}
+
+.report-score-ring-bg {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 6;
+}
+
+.report-score-ring-fill {
+  fill: none;
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.5s ease-out;
+}
+
+.report-score-value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.report-score-info h2 {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  margin-bottom: var(--space-1);
+}
+
+.report-score-info p {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+/* ─── Report Stat Cards ─── */
+.report-stat-card {
+  border-top: 3px solid var(--border);
+  text-align: center;
+  padding: var(--space-3);
+}
+.report-stat-card[data-accent="warning"] { border-top-color: var(--warning); }
+.report-stat-card[data-accent="danger"] { border-top-color: var(--danger); }
+.report-stat-card[data-accent="success"] { border-top-color: var(--accent); }
+
+/* ─── Score Mini Bar ─── */
+.score-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.score-bar-track {
+  width: 48px;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.score-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease-out;
+}
+
+/* ─── Severity Summary ─── */
+.severity-summary {
+  display: flex;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  margin-bottom: var(--space-2);
+}
+
+.severity-summary-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.severity-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ─── Print Footer (hidden on screen) ─── */
+.print-footer {
+  display: none;
+}
+
 /* ─── Print Header ─── */
 .print-header {
   display: none;
@@ -2838,45 +2953,72 @@ code {
 
 /* ─── Print Styles ─── */
 @media print {
+  /* Hide interactive UI */
   .app-header,
   .breadcrumb,
   .btn,
   .toast-container,
-  #notes-panel-root {
+  #notes-panel-root,
+  .accordion-chevron,
+  #toggle-findings-btn,
+  .no-print {
     display: none !important;
   }
+
+  /* Page setup */
+  @page {
+    margin: 2cm 1.5cm;
+    size: A4;
+  }
+
+  /* Print header */
   .print-header {
     display: block;
     text-align: center;
-    margin-bottom: var(--space-6);
+    margin-bottom: 2em;
+    padding-bottom: 1em;
+    border-bottom: 2px solid #333;
   }
   .print-header h1 {
-    font-size: 24px;
+    font-size: 22px;
     font-weight: 700;
-    color: #000;
-    margin-bottom: var(--space-1);
+    color: #000 !important;
+    margin-bottom: 0.25em;
   }
   .print-header p {
-    font-size: 14px;
-    color: #666;
+    font-size: 13px;
+    color: #666 !important;
   }
 
-  /* Force light theme */
+  /* Print footer */
+  .print-footer {
+    display: block !important;
+    text-align: center;
+    font-size: 11px;
+    color: #999 !important;
+    margin-top: 2em;
+    padding-top: 1em;
+    border-top: 1px solid #ddd;
+  }
+
+  /* Force light theme but keep severity colors */
   body {
     background: #fff !important;
     color: #000 !important;
+    font-family: "Inter", -apple-system, sans-serif !important;
   }
   .card {
     background: #fff !important;
-    border: 1px solid #ddd !important;
+    border: 1px solid #ccc !important;
     box-shadow: none !important;
   }
+
+  /* Keep colors for important elements */
   * {
     color: #000 !important;
-    border-color: #ddd !important;
+    border-color: #ccc !important;
   }
-  .text-muted,
-  .text-secondary {
+  .text-muted, .text-secondary {
     color: #666 !important;
   }
   .finding-severity-badge {
@@ -2884,22 +3026,49 @@ code {
   }
   .badge {
     color: #333 !important;
-    border: 1px solid #ccc !important;
+    border: 1px solid #bbb !important;
   }
   .version-badge {
     color: #333 !important;
     background: #eee !important;
   }
 
-  /* Typography */
-  body {
-    font-family: Georgia, "Times New Roman", serif;
+  /* Score hero in print */
+  .report-score-hero-ring {
+    border-color: #333 !important;
   }
-  .font-mono {
-    font-family: var(--font-mono);
+  .report-score-hero-value {
+    color: #000 !important;
   }
 
-  /* Force show high-priority findings */
+  /* Score bars keep their colors */
+  .score-bar-fill {
+    /* keep inline background color from JS */
+  }
+
+  /* Expand all accordions */
+  details {
+    display: block !important;
+  }
+  details > summary {
+    display: block !important;
+    list-style: none !important;
+    font-weight: 600;
+    margin-bottom: 0.25em;
+  }
+  details > summary::marker,
+  details > summary::-webkit-details-marker {
+    display: none !important;
+  }
+  details > div,
+  details > .finding-accordion-body {
+    display: block !important;
+  }
+
+  /* Force show all findings */
+  .summary-finding-hidden {
+    display: block !important;
+  }
   .summary-finding-high-priority {
     display: flex !important;
   }
@@ -2911,9 +3080,13 @@ code {
   .round-summary-table {
     page-break-inside: avoid;
   }
+  .report-score-hero {
+    page-break-after: avoid;
+  }
 
-  /* Hide low-priority findings that were hidden by toggle */
-  .finding-accordion.summary-finding-hidden {
-    display: none !important;
+  /* Stat cards in print */
+  .report-stat-card {
+    border: 1px solid #ccc !important;
+    page-break-inside: avoid;
   }
 }

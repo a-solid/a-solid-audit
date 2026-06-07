@@ -4,7 +4,6 @@ import { renderHome } from "./views/home.mjs";
 import { renderWizard } from "./views/wizard.mjs";
 import { renderProgress } from "./views/progress.mjs";
 import { renderReview } from "./views/review.mjs";
-import { renderSummary } from "./views/summary.mjs";
 import { renderSettings } from "./views/settings.mjs";
 import { renderRoundDetail } from "./views/round-detail.mjs";
 import { renderRoundSummary } from "./views/round-summary.mjs";
@@ -79,7 +78,7 @@ const notesPanel = initNotesPanel(notesPanelRoot);
 function getSessionIdFromHash() {
   const hash = location.hash.slice(1) || "";
   const parts = hash.split("/").filter(Boolean);
-  if (parts.length >= 2 && ["wizard", "progress", "review", "summary"].includes(parts[0])) {
+  if (parts.length >= 2 && ["wizard", "progress", "review"].includes(parts[0])) {
     return parts[1];
   }
   return null;
@@ -164,7 +163,6 @@ const routes = {
   wizard: renderWizard,
   progress: renderProgress,
   review: renderReview,
-  summary: renderSummary,
   settings: renderSettings,
   rounds: renderRoundDetail,
   "round-summary": renderRoundSummary,

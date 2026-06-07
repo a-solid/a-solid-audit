@@ -7,6 +7,8 @@ import { renderReview } from "./views/review.mjs";
 import { renderSettings } from "./views/settings.mjs";
 import { renderRoundDetail } from "./views/round-detail.mjs";
 import { renderRoundSummary } from "./views/round-summary.mjs";
+import { renderProjectView } from "./views/project-view.mjs";
+import { renderProjectRound } from "./views/project-round.mjs";
 import { initNotesPanel } from "./components/notes-panel.mjs";
 import { initTheme } from "./theme.mjs";
 
@@ -276,6 +278,15 @@ async function navigate() {
     } else {
       render = renderRoundDetail;
       params = [roundName];
+    }
+  } else if (parts[0] === "project" && parts.length >= 2) {
+    const projectName = decodeURIComponent(parts[1]);
+    if (parts.length >= 4 && parts[2] === "round") {
+      render = renderProjectRound;
+      params = [projectName, decodeURIComponent(parts[3])];
+    } else {
+      render = renderProjectView;
+      params = [projectName];
     }
   } else {
     // Non-round routes: home, settings

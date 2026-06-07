@@ -219,6 +219,37 @@ export async function renderReview(container, params) {
     if (manualResolvedCount > 0) parts.push(`${manualResolvedCount} manual`);
     const subtitle = parts.join(" · ") || `${total} resolved`;
 
+    function renderAccordionItem(f) {
+      const sevLabel = f.severity.toUpperCase();
+      const sevColor = `var(--${f.severity === "critical" ? "danger" : f.severity === "high" || f.severity === "major" ? "danger" : "warning"})`;
+      const statusLabel = f.status === "need-fix" ? "Need Fix" : f.status === "wont-fix" ? "Won't Fix" : f.status === "not-an-issue" ? "Not an Issue" : f.status === "well-done" ? "Well Done" : "";
+      const statusPill = f.status ? `finding-status-pill finding-status-pill-${f.status}` : "";
+
+      return `
+        <div class="finding-accordion">
+          <details>
+            <summary>
+              <span class="accordion-chevron">${icon("chevronRight", 14)}</span>
+              <span class="finding-severity-badge" style="background:${sevColor}">${sevLabel}</span>
+              <span class="finding-file-ref">${escapeHtml(f.fileName)}${f.line ? `:${f.line}` : ""}</span>
+              <span class="accordion-desc-trunc">${escapeHtml(f.description)}</span>
+              <span class="${statusPill}">${statusLabel}</span>
+            </summary>
+            <div class="finding-accordion-body">
+              <div class="finding-description">${escapeHtml(f.description)}</div>
+              ${f.suggestion ? `<div class="finding-suggestion"><span class="text-xs text-muted">Suggestion:</span> ${escapeHtml(f.suggestion)}</div>` : ""}
+              ${f.code ? `
+                <details class="finding-code-details">
+                  <summary class="finding-code-toggle">Show code</summary>
+                  <pre class="finding-code-block"><code>${escapeHtml(f.code)}</code></pre>
+                </details>
+              ` : ""}
+              ${f.reason ? `<div class="finding-reason-text">${escapeHtml(f.reason)}</div>` : ""}
+            </div>
+          </details>
+        </div>`;
+    }
+
     return `
       <div class="findings-all-clear">
         ${icon("check", 32)}
@@ -227,23 +258,10 @@ export async function renderReview(container, params) {
         <a href="#/round/${encodeURIComponent(roundName)}" class="btn btn-primary btn-sm">${icon("arrowLeft", 14)} Back to Round</a>
       </div>
       ${total > 0 ? `
-        <details class="findings-resolved-list">
-          <summary>Show resolved findings (${total})</summary>
-          ${findings.items.map(f => {
-            const sevLabel = f.severity.toUpperCase();
-            const sevColor = `var(--${f.severity === "critical" ? "danger" : f.severity === "high" || f.severity === "major" ? "danger" : "warning"})`;
-            const statusLabel = f.status === "need-fix" ? "Need Fix" : f.status === "wont-fix" ? "Won't Fix" : f.status === "not-an-issue" ? "Not an Issue" : f.status === "well-done" ? "Well Done" : "";
-            const reasonText = f.reason ? ` — ${escapeHtml(f.reason)}` : "";
-            return `
-              <div class="findings-resolved-card">
-                <span class="finding-severity-badge" style="background:${sevColor}">${sevLabel}</span>
-                <span class="finding-file-ref">${escapeHtml(f.fileName)}${f.line ? `:${f.line}` : ""}</span>
-                <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(f.description)}</span>
-                <span class="finding-status-badge finding-status-${f.status}">${statusLabel}</span>
-                <span class="text-xs text-muted">${reasonText}</span>
-              </div>`;
-          }).join("")}
-        </details>
+        <div style="margin-top:var(--space-3)">
+          <div class="text-xs text-muted mb-2">${total} resolved findings — click to expand</div>
+          ${findings.items.map(f => renderAccordionItem(f)).join("")}
+        </div>
       ` : ""}`;
   }
 
@@ -306,13 +324,42 @@ export async function renderReview(container, params) {
     const sevLabel = f.severity.toUpperCase();
     const sevColor = `var(--${f.severity === "critical" ? "danger" : f.severity === "high" || f.severity === "major" ? "danger" : "warning"})`;
     const statusLabel = f.status === "need-fix" ? "Need Fix" : f.status === "wont-fix" ? "Won't Fix" : f.status === "not-an-issue" ? "Not an Issue" : f.status === "well-done" ? "Well Done" : "";
-    const muted = isTriaged ? "finding-card-muted" : "";
+    const statusPill = f.status ? `finding-status-pill finding-status-pill-${f.status}` : "";
+
+    if (isTriaged) {
+      return `
+        <div class="finding-accordion" data-idx="${idx}" data-file="${escapeHtml(f.file)}" data-fidx="${f.findingIdx}">
+          <details>
+            <summary>
+              <span class="accordion-chevron">${icon("chevronRight", 14)}</span>
+              <span class="finding-severity-badge" style="background:${sevColor}">${sevLabel}</span>
+              <span class="finding-file-ref">${escapeHtml(f.fileName)}${f.line ? `:${f.line}` : ""}</span>
+              <span class="accordion-desc-trunc">${escapeHtml(f.description)}</span>
+              <span class="${statusPill}">${statusLabel}</span>
+            </summary>
+            <div class="finding-accordion-body">
+              <div class="finding-description">${escapeHtml(f.description)}</div>
+              ${f.suggestion ? `<div class="finding-suggestion"><span class="text-xs text-muted">Suggestion:</span> ${escapeHtml(f.suggestion)}</div>` : ""}
+              ${f.code ? `
+                <details class="finding-code-details">
+                  <summary class="finding-code-toggle">Show code</summary>
+                  <pre class="finding-code-block"><code>${escapeHtml(f.code)}</code></pre>
+                </details>
+              ` : ""}
+              ${f.reason ? `<div class="finding-reason-text">${escapeHtml(f.reason)}</div>` : ""}
+              <div class="finding-actions">
+                <button class="btn btn-sm btn-revert" data-action="revert" data-idx="${idx}">Undo</button>
+              </div>
+            </div>
+          </details>
+        </div>`;
+    }
+
     return `
-      <div class="finding-card ${muted}" data-idx="${idx}" data-file="${escapeHtml(f.file)}" data-fidx="${f.findingIdx}" tabindex="0" role="article" aria-label="${sevLabel} finding in ${escapeHtml(f.fileName)}">
+      <div class="finding-card" data-idx="${idx}" data-file="${escapeHtml(f.file)}" data-fidx="${f.findingIdx}" tabindex="0" role="article" aria-label="${sevLabel} finding in ${escapeHtml(f.fileName)}">
         <div class="finding-card-header">
           <span class="finding-severity-badge" style="background:${sevColor}">${sevLabel}</span>
           <span class="finding-file-ref">${escapeHtml(f.fileName)}${f.line ? `:${f.line}` : ""}</span>
-          ${isTriaged && statusLabel ? `<span class="finding-status-badge finding-status-${f.status}">${icon("check", 12)} ${statusLabel}</span>` : ""}
         </div>
         <div class="finding-description">${escapeHtml(f.description)}</div>
         ${f.suggestion ? `<div class="finding-suggestion"><span class="text-xs text-muted">Suggestion:</span> ${escapeHtml(f.suggestion)}</div>` : ""}
@@ -322,18 +369,12 @@ export async function renderReview(container, params) {
             <pre class="finding-code-block"><code>${escapeHtml(f.code)}</code></pre>
           </details>
         ` : ""}
-        ${!isTriaged ? `
-          <div class="finding-actions">
-            <button class="btn btn-sm btn-need-fix" data-action="need-fix" data-idx="${idx}">${icon("zap", 12)} Need Fix</button>
-            <button class="btn btn-sm btn-wont-fix-trigger" data-action="wont-fix" data-idx="${idx}">Won't Fix</button>
-            <button class="btn btn-sm btn-not-issue-trigger" data-action="not-an-issue" data-idx="${idx}">Not an Issue</button>
-          </div>
-          <div class="finding-reason-panel hidden" data-reason-panel="${idx}"></div>
-        ` : `
-          <div class="finding-actions">
-            <button class="btn btn-sm btn-revert" data-action="revert" data-idx="${idx}">Undo</button>
-          </div>
-        `}
+        <div class="finding-actions">
+          <button class="btn btn-sm btn-need-fix" data-action="need-fix" data-idx="${idx}">${icon("zap", 12)} Need Fix</button>
+          <button class="btn btn-sm btn-wont-fix-trigger" data-action="wont-fix" data-idx="${idx}">Won't Fix</button>
+          <button class="btn btn-sm btn-not-issue-trigger" data-action="not-an-issue" data-idx="${idx}">Not an Issue</button>
+        </div>
+        <div class="finding-reason-panel hidden" data-reason-panel="${idx}"></div>
       </div>`;
   }
 

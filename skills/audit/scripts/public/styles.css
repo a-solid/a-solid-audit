@@ -2403,8 +2403,126 @@ code {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+/* ─── Finding Accordion (resolved findings) ─── */
 .finding-card-muted {
-  opacity: 0.6;
+  /* kept as class but opacity removed — accordion handles compact display */
+}
+
+.finding-accordion {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-2);
+  background: var(--bg-surface);
+  overflow: hidden;
+}
+
+.finding-accordion summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  list-style: none;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
+.finding-accordion summary::-webkit-details-marker {
+  display: none;
+}
+
+.finding-accordion summary::marker {
+  display: none;
+  content: "";
+}
+
+.finding-accordion .accordion-chevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  transition: transform 0.15s ease-out;
+}
+
+.finding-accordion[open] .accordion-chevron {
+  transform: rotate(90deg);
+}
+
+.finding-accordion summary:hover {
+  background: var(--bg-hover);
+}
+
+.finding-accordion-body {
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.finding-accordion-body .finding-description {
+  margin-bottom: var(--space-2);
+}
+
+.finding-accordion-body .finding-suggestion {
+  margin-bottom: var(--space-2);
+}
+
+.finding-accordion-body .finding-code-details {
+  margin-bottom: var(--space-2);
+}
+
+.finding-accordion-body .finding-reason-text {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  padding: var(--space-1) var(--space-2);
+  border-left: 2px solid var(--border);
+  margin-bottom: var(--space-2);
+}
+
+.finding-accordion-body .finding-actions {
+  margin-top: var(--space-2);
+}
+
+/* Status pill for triaged accordion summary row */
+.finding-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: var(--radius-sm);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.finding-status-pill-need-fix {
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  background: transparent;
+}
+
+.finding-status-pill-wont-fix {
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  background: transparent;
+}
+
+.finding-status-pill-not-an-issue {
+  color: var(--info);
+  border: 1px solid var(--info);
+  background: transparent;
+}
+
+.finding-status-pill-well-done {
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  background: transparent;
+}
+
+/* Accordion compact description (truncated in summary row) */
+.finding-accordion .accordion-desc-trunc {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .finding-card-header {
   display: flex;
@@ -2630,31 +2748,6 @@ code {
 .findings-all-clear .btn {
   margin-top: var(--space-2);
 }
-.findings-resolved-list {
-  margin-top: var(--space-3);
-}
-.findings-resolved-list summary {
-  cursor: pointer;
-  font-size: var(--text-sm);
-  color: var(--text-muted);
-  padding: var(--space-2) 0;
-}
-.findings-resolved-list summary:hover {
-  color: var(--text-secondary);
-}
-.findings-resolved-card {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-md);
-  opacity: 0.6;
-  font-size: var(--text-sm);
-}
-.findings-resolved-card + .findings-resolved-card {
-  border-top: 1px solid var(--border);
-}
-
 /* Project Switcher */
 .project-switcher {
   position: relative;

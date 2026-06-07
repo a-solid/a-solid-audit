@@ -75,11 +75,12 @@ if (settingsBtn) settingsBtn.innerHTML = icon("settings", 16);
 const notesPanelRoot = document.getElementById("notes-panel-root");
 const notesPanel = initNotesPanel(notesPanelRoot);
 
-function getSessionIdFromHash() {
+function getSessionRef() {
   const hash = location.hash.slice(1) || "";
   const parts = hash.split("/").filter(Boolean);
-  if (parts.length >= 2 && ["wizard", "progress", "review"].includes(parts[0])) {
-    return parts[1];
+  // #/round/<roundName>/v<N>/<view>
+  if (parts.length >= 4 && parts[0] === "round" && /^v\d+$/.test(parts[2])) {
+    return { roundName: decodeURIComponent(parts[1]), version: parts[2] };
   }
   return null;
 }
@@ -144,8 +145,10 @@ let activePollTimer = null;
 
 async function checkActiveSessions() {
   try {
-    const sessions = await api.listSessions();
-    const hasActive = sessions.some(s => s.status === "reviewing");
+    const rounds = await api.listRounds();
+    const hasActive = rounds.some(r =>
+      (r.sessions || []).some(s => s.status === "reviewing")
+    );
     const dot = document.getElementById("active-dot");
     if (dot) dot.style.display = hasActive ? "block" : "none";
   } catch { /* ignore */ }
@@ -160,19 +163,14 @@ function startActivePolling() {
 
 const routes = {
   home: renderHome,
+  settings: renderSettings,
+};
+
+const roundRoutes = {
   wizard: renderWizard,
   progress: renderProgress,
   review: renderReview,
-  settings: renderSettings,
-  rounds: renderRoundDetail,
-  "round-summary": renderRoundSummary,
 };
-
-function parseHash() {
-  const hash = location.hash.slice(1) || "/home";
-  const [view, ...rest] = hash.split("/").filter(Boolean);
-  return { view: view || "home", params: rest };
-}
 
 async function navigate() {
   // Cleanup previous view's listeners
@@ -183,10 +181,46 @@ async function navigate() {
     activePollTimer = null;
   }
 
-  const { view, params } = parseHash();
-  notesPanel.updateSession(getSessionIdFromHash());
+  const hash = location.hash.slice(1) || "/home";
+  const parts = hash.split("/").filter(Boolean);
+
+  let render, params;
+
+  // Parse round-based routes: #/round/<roundName>/...
+  if (parts[0] === "round" && parts.length >= 2) {
+    const roundName = decodeURIComponent(parts[1]);
+    if (parts.length === 2) {
+      // #/round/<roundName> → round detail
+      render = renderRoundDetail;
+      params = [roundName];
+    } else if (parts[2] === "summary") {
+      // #/round/<roundName>/summary
+      render = renderRoundSummary;
+      params = [roundName];
+    } else if (/^v\d+$/.test(parts[2]) && parts.length >= 4) {
+      // #/round/<roundName>/v<N>/<view>
+      const version = parts[2];
+      const viewName = parts[3];
+      render = roundRoutes[viewName];
+      params = [roundName, version];
+    } else if (/^v\d+$/.test(parts[2]) && parts.length === 3) {
+      // Default to wizard if no view specified
+      render = renderWizard;
+      params = [roundName, parts[2]];
+    } else {
+      render = renderRoundDetail;
+      params = [roundName];
+    }
+  } else {
+    // Non-round routes: home, settings
+    const view = parts[0] || "home";
+    render = routes[view];
+    params = parts.slice(1);
+  }
+
+  notesPanel.updateSession(getSessionRef());
   window.scrollTo({ top: 0 });
-  const render = routes[view];
+
   if (!render) {
     container.innerHTML = `
       <div class="empty-state">

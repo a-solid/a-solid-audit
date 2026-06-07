@@ -23,36 +23,103 @@ const STATUS_CONFIG = {
   completed:  { color: "text-success", accent: "card-accent-success", badge: "badge-completed" },
 };
 
+function getLatestSession(sessions) {
+  if (!sessions || sessions.length === 0) return null;
+  return sessions
+    .slice()
+    .sort((a, b) => new Date(b.created) - new Date(a.created))[0];
+}
+
+function renderModal(container) {
+  const overlay = document.createElement("div");
+  overlay.id = "new-round-modal";
+  overlay.style.cssText = "position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6)";
+  overlay.innerHTML = `
+    <div class="card" style="width:100%;max-width:440px;padding:24px;margin:16px">
+      <h2 class="text-lg mb-4">New Audit Round</h2>
+      <div class="mb-3">
+        <label class="block text-sm font-medium mb-1">Round name <span class="text-danger">*</span></label>
+        <input id="modal-round-name" type="text" class="input" placeholder="e.g. Sprint 24 Review" maxlength="120" autofocus />
+      </div>
+      <div class="mb-4">
+        <label class="block text-sm font-medium mb-1">Description</label>
+        <textarea id="modal-round-desc" class="input" rows="3" placeholder="Optional description of this audit round" maxlength="500"></textarea>
+      </div>
+      <div class="flex items-center justify-end gap-2">
+        <button id="modal-cancel-btn" class="btn btn-ghost">Cancel</button>
+        <button id="modal-create-btn" class="btn btn-primary">Create</button>
+      </div>
+    </div>
+  `;
+  container.appendChild(overlay);
+
+  const nameInput = document.getElementById("modal-round-name");
+  const descInput = document.getElementById("modal-round-desc");
+  const cancelBtn = document.getElementById("modal-cancel-btn");
+  const createBtn = document.getElementById("modal-create-btn");
+
+  function close() {
+    overlay.remove();
+  }
+
+  cancelBtn.addEventListener("click", close);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) close();
+  });
+
+  createBtn.addEventListener("click", async () => {
+    const name = nameInput.value.trim();
+    if (!name) {
+      nameInput.style.borderColor = "var(--danger, #ef4444)";
+      nameInput.focus();
+      return;
+    }
+    const description = descInput.value.trim();
+    createBtn.disabled = true;
+    createBtn.textContent = "Creating...";
+    try {
+      const round = await api.createRound({ name, description });
+      location.hash = `#/wizard/new?roundId=${encodeURIComponent(round.id)}`;
+    } catch (e) {
+      showToast("Failed to create round: " + e.message);
+      createBtn.disabled = false;
+      createBtn.textContent = "Create";
+    }
+  });
+
+  nameInput.focus();
+}
+
 export async function renderHome(container) {
   setBreadcrumb([]);
 
   container.innerHTML = `
     <div class="flex items-center justify-between mb-6">
       <div>
-        <h1 class="text-2xl">Sessions</h1>
-        <p class="text-sm text-muted mt-1">Code reviews, story alignment, and project scans</p>
+        <h1 class="text-2xl">Audit Rounds</h1>
+        <p class="text-sm text-muted mt-1">Organized code review rounds with versioned sessions</p>
       </div>
       <button id="new-audit-btn" class="btn btn-primary">
         ${icon("plus", 16)}
         New Audit
       </button>
     </div>
-    <div id="session-list"></div>
+    <div id="round-list"></div>
   `;
 
   document.getElementById("new-audit-btn").addEventListener("click", () => {
-    location.hash = "#/wizard/new";
+    renderModal(container);
   });
 
-  const listEl = document.getElementById("session-list");
+  const listEl = document.getElementById("round-list");
   listEl.innerHTML = Array.from({ length: 3 }, () =>
     `<div class="skeleton skeleton-card"></div>`
   ).join("");
 
   try {
-    const sessions = await api.listSessions();
+    const rounds = await api.listRounds();
 
-    if (sessions.length === 0) {
+    if (rounds.length === 0) {
       listEl.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-icon">
@@ -63,64 +130,50 @@ export async function renderHome(container) {
               <line x1="8" y1="8" x2="12" y2="8"/>
             </svg>
           </div>
-          <h2>No audit sessions yet</h2>
-          <p>Start by auditing specific code changes, or scan an entire project for comprehensive analysis.</p>
+          <h2>No audit rounds yet</h2>
+          <p>Start by creating an audit round to organize code reviews into versioned sessions.</p>
           <div class="empty-state-cta-row">
-            <a href="#/wizard/new?type=code" class="btn btn-primary">${icon("code", 16)} Code Review</a>
-            <a href="#/wizard/new?type=project" class="btn btn-ghost" style="border-color:var(--border)">${icon("folder-search", 16)} Project Scan</a>
+            <button id="empty-new-audit-btn" class="btn btn-primary">${icon("plus", 16)} New Audit</button>
           </div>
         </div>
       `;
+      document.getElementById("empty-new-audit-btn").addEventListener("click", () => {
+        renderModal(container);
+      });
       return;
     }
 
     listEl.innerHTML = `<div class="session-grid">
-      ${sessions.map(s => {
-      const cfg = STATUS_CONFIG[s.status] || STATUS_CONFIG.created;
-      const pct = s.progress?.percentage ?? 0;
-      const isProject = s.type === "project";
-      const typeIcon = s.type === "code" ? icon("code", 18)
-        : s.type === "all" ? icon("book-open", 18)
-        : icon("folder-search", 18);
-      const typeLabel = isProject ? "Project Scan" : s.type === "all" ? "Code + Story" : "Code Review";
-      const progressLabel = s.totalTasks ? `${s.reviewedTasks || 0}/${s.totalTasks}` : '';
-      return `
-        <div class="session-card card card-clickable ${cfg.accent}" data-id="${s.id}" data-status="${s.status}" data-type="${s.type}" tabindex="0" role="button" aria-label="${escapeHtml(s.id)}, ${s.status}">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3" style="min-width:0">
-              <div class="session-card-type-icon">${typeIcon}</div>
-              <div style="min-width:0">
-                <div class="font-mono text-sm truncate">${escapeHtml(s.id)}</div>
-                <div class="text-xs text-muted mt-1">
-                  ${typeLabel} &middot; <span class="session-time" title="${new Date(s.created).toLocaleString()}">${relativeTime(s.created)}</span>
+      ${rounds.map(r => {
+        const latest = getLatestSession(r.sessions);
+        const status = latest ? latest.status : "created";
+        const cfg = STATUS_CONFIG[status] || STATUS_CONFIG.created;
+        const sessionCount = r.sessions ? r.sessions.length : 0;
+        const latestVersion = latest ? latest.version : null;
+        return `
+          <div class="session-card card card-clickable ${cfg.accent}" data-id="${r.id}" tabindex="0" role="button" aria-label="${escapeHtml(r.name)}, ${status}">
+            <div class="flex items-center justify-between">
+              <div style="min-width:0;flex:1">
+                <h3 class="text-base font-semibold truncate">${escapeHtml(r.name)}</h3>
+                ${r.description ? `<p class="text-sm text-muted mt-1" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(r.description)}</p>` : ""}
+                <div class="text-xs text-muted mt-2">
+                  ${icon("clock", 12)} <span title="${new Date(r.created).toLocaleString()}">${relativeTime(r.created)}</span>
                 </div>
               </div>
+              <div class="flex items-center gap-4" style="flex-shrink:0;margin-left:16px">
+                ${latestVersion != null ? `<span class="badge badge-created">v${latestVersion}</span>` : ""}
+                <span class="text-sm text-muted">${sessionCount} session${sessionCount !== 1 ? "s" : ""}</span>
+                <span class="badge ${cfg.badge}">${status}</span>
+              </div>
             </div>
-            <div class="flex items-center gap-4" style="flex-shrink:0">
-              ${s.progress ? `
-                <div style="width:100px">
-                  <div class="progress-bar progress-bar-lg">
-                    <div class="progress-fill${s.status === "completed" ? " progress-fill-success" : ""}" style="width:${pct}%"></div>
-                  </div>
-                  <div class="text-xs text-muted mt-1 text-right">${s.progress.reviewed}/${s.progress.total}</div>
-                </div>
-              ` : ""}
-              ${progressLabel ? `<span class="session-progress-label">${progressLabel}</span>` : ''}
-              <span class="badge ${cfg.badge}">${s.status === "created" && s.progress?.total > 0 ? "configuring" : s.status}</span>
-              ${s.status === "completed" ? `<a href="#/review/${s.id}" class="session-findings-link" onclick="event.stopPropagation()">${icon("eye", 12)} Findings</a>` : ""}
-            </div>
-          </div>
-        </div>`;
-    }).join("")}
+          </div>`;
+      }).join("")}
     </div>`;
 
     listEl.querySelectorAll(".card-clickable").forEach(card => {
       card.addEventListener("click", () => {
         const id = card.dataset.id;
-        const status = card.dataset.status;
-        if (status === "completed") location.hash = `#/summary/${id}`;
-        else if (status === "created" || status === "scanned") location.hash = `#/wizard/${id}`;
-        else location.hash = `#/progress/${id}`;
+        location.hash = `#/rounds/${id}`;
       });
       card.addEventListener("keydown", (e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -130,6 +183,6 @@ export async function renderHome(container) {
       });
     });
   } catch (e) {
-    showToast("Failed to load sessions: " + e.message);
+    showToast("Failed to load rounds: " + e.message);
   }
 }

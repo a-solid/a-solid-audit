@@ -296,7 +296,7 @@ export async function renderRoundDetail(container, params) {
                   <div class="text-sm">${taskLabel(t)}</div>
                   ${taskSourceLine(t)}
                 </div>
-                <span class="text-xs" style="margin-left:auto;white-space:nowrap">${t.needFixCount} need-fix, ${t.totalFindings} findings${t.score !== null ? ` — Score: ${t.score}` : ""}</span>
+                <span class="text-xs" style="margin-left:auto;white-space:nowrap">${t.needFixCount} need-fix, ${t.totalFindings} findings${t.score !== null ? ` — Score: ${escapeHtml(String(t.score))}` : ""}</span>
               </label>
             `).join("")}
           </div>
@@ -312,7 +312,7 @@ export async function renderRoundDetail(container, params) {
                   <div class="text-sm text-muted">${taskLabel(t)}</div>
                   ${taskSourceLine(t)}
                 </div>
-                <span class="text-xs text-muted" style="margin-left:auto;white-space:nowrap">${t.totalFindings} findings${t.score !== null ? ` — Score: ${t.score}` : ""}</span>
+                <span class="text-xs text-muted" style="margin-left:auto;white-space:nowrap">${t.totalFindings} findings${t.score !== null ? ` — Score: ${escapeHtml(String(t.score))}` : ""}</span>
               </label>
             `).join("")}
           </div>

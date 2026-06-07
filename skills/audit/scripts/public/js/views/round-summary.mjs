@@ -72,27 +72,24 @@ export async function renderRoundSummary(container, params) {
 
   function renderFindingsByFile(filesData) {
     const HIGH_SEVERITIES = ["critical", "high", "major"];
-    const filesWithFindings = filesData.filter(f => (f.review?.findings || []).length > 0);
-    if (filesWithFindings.length === 0) return "";
-
+    const enrichedFiles = [];
     const allFindings = [];
-    for (const f of filesWithFindings) {
+    for (const f of filesData) {
       const reviewFindings = f.review?.findings || [];
+      if (reviewFindings.length === 0) continue;
       const noteFindings = f.findings || [];
+      const fileFindings = [];
       for (let i = 0; i < reviewFindings.length; i++) {
         const rf = reviewFindings[i];
         const status = noteFindings[i]?.status || null;
         const isHighPriority = HIGH_SEVERITIES.includes(rf.severity) || status === "need-fix" || !status;
-        allFindings.push({
-          fileName: f.name,
-          severity: rf.severity,
-          description: rf.description || "",
-          status: status,
-          line: rf.line || null,
-          isHighPriority,
-        });
+        const item = { severity: rf.severity, description: rf.description || "", status, line: rf.line || null, isHighPriority };
+        fileFindings.push(item);
+        allFindings.push(item);
       }
+      enrichedFiles.push({ name: f.name, findings: fileFindings });
     }
+    if (enrichedFiles.length === 0) return "";
 
     const hasActionable = allFindings.some(f => f.isHighPriority);
 
@@ -109,18 +106,9 @@ export async function renderRoundSummary(container, params) {
             ${icon("check", 18)} <span class="font-medium" style="color:var(--accent)">All findings resolved</span>
           </div>
         ` : ""}
-        ${filesWithFindings.map(f => {
-          const reviewFindings = f.review?.findings || [];
-          const noteFindings = f.findings || [];
-          const fileFindings = [];
-          for (let i = 0; i < reviewFindings.length; i++) {
-            const rf = reviewFindings[i];
-            const status = noteFindings[i]?.status || null;
-            const isHighPriority = HIGH_SEVERITIES.includes(rf.severity) || status === "need-fix" || !status;
-            fileFindings.push({ severity: rf.severity, description: rf.description || "", status, line: rf.line || null, isHighPriority });
-          }
-          const highPriority = fileFindings.filter(f => f.isHighPriority);
-          const lowPriority = fileFindings.filter(f => !f.isHighPriority);
+        ${enrichedFiles.map(f => {
+          const highPriority = f.findings.filter(f => f.isHighPriority);
+          const lowPriority = f.findings.filter(f => !f.isHighPriority);
           if (highPriority.length === 0 && lowPriority.length === 0) return "";
 
           return `
@@ -240,7 +228,7 @@ export async function renderRoundSummary(container, params) {
       container.querySelectorAll(".summary-finding-hidden").forEach(el => {
         el.style.display = showingAll ? "" : "none";
       });
-      toggleBtn.textContent = showingAll ? "Show actionable only" : "Show all findings";
+      toggleBtn.innerText = showingAll ? "Show actionable only" : "Show all findings";
     });
   }
 }

@@ -70,15 +70,102 @@ export async function renderRoundSummary(container, params) {
     { label: "Well Done", value: stats.wellDone, icon: "shield", color: "var(--success)" },
   ];
 
+  function renderFindingsByFile(filesData) {
+    const HIGH_SEVERITIES = ["critical", "high", "major"];
+    const filesWithFindings = filesData.filter(f => (f.review?.findings || []).length > 0);
+    if (filesWithFindings.length === 0) return "";
+
+    const allFindings = [];
+    for (const f of filesWithFindings) {
+      const reviewFindings = f.review?.findings || [];
+      const noteFindings = f.findings || [];
+      for (let i = 0; i < reviewFindings.length; i++) {
+        const rf = reviewFindings[i];
+        const status = noteFindings[i]?.status || null;
+        const isHighPriority = HIGH_SEVERITIES.includes(rf.severity) || status === "need-fix" || !status;
+        allFindings.push({
+          fileName: f.name,
+          severity: rf.severity,
+          description: rf.description || "",
+          status: status,
+          line: rf.line || null,
+          isHighPriority,
+        });
+      }
+    }
+
+    const hasActionable = allFindings.some(f => f.isHighPriority);
+
+    return `
+      <div class="mt-6">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-lg font-semibold">Findings by File</h2>
+          <button id="toggle-findings-btn" class="btn btn-ghost btn-sm">
+            ${hasActionable ? "Show all findings" : "Show actionable only"}
+          </button>
+        </div>
+        ${!hasActionable ? `
+          <div class="card" style="border-color:var(--accent);text-align:center;padding:var(--space-4)">
+            ${icon("check", 18)} <span class="font-medium" style="color:var(--accent)">All findings resolved</span>
+          </div>
+        ` : ""}
+        ${filesWithFindings.map(f => {
+          const reviewFindings = f.review?.findings || [];
+          const noteFindings = f.findings || [];
+          const fileFindings = [];
+          for (let i = 0; i < reviewFindings.length; i++) {
+            const rf = reviewFindings[i];
+            const status = noteFindings[i]?.status || null;
+            const isHighPriority = HIGH_SEVERITIES.includes(rf.severity) || status === "need-fix" || !status;
+            fileFindings.push({ severity: rf.severity, description: rf.description || "", status, line: rf.line || null, isHighPriority });
+          }
+          const highPriority = fileFindings.filter(f => f.isHighPriority);
+          const lowPriority = fileFindings.filter(f => !f.isHighPriority);
+          if (highPriority.length === 0 && lowPriority.length === 0) return "";
+
+          return `
+            <div class="summary-file-section">
+              <div class="font-mono text-sm text-muted mb-2 mt-4">${escapeHtml(f.name)}</div>
+              ${highPriority.map(f => renderSummaryFinding(f, true)).join("")}
+              ${lowPriority.map(f => renderSummaryFinding(f, false)).join("")}
+            </div>`;
+        }).join("")}
+      </div>`;
+  }
+
+  function renderSummaryFinding(f, isHighPriority) {
+    const sevLabel = f.severity.toUpperCase();
+    const sevColor = `var(--${f.severity === "critical" ? "danger" : f.severity === "high" || f.severity === "major" ? "danger" : f.severity === "medium" || f.severity === "minor" ? "warning" : "info"})`;
+    const statusCfg = FINDING_STATUS_CONFIG[f.status || "pending"];
+    const priorityClass = isHighPriority ? "summary-finding-high-priority" : "summary-finding-low-priority";
+    const hiddenClass = !isHighPriority ? "summary-finding-hidden" : "";
+    return `
+      <div class="summary-finding-row ${priorityClass} ${hiddenClass}">
+        <span class="finding-severity-badge" style="background:${sevColor}">${sevLabel}</span>
+        <span class="summary-finding-desc">${escapeHtml(f.description)}</span>
+        ${statusCfg ? `<span class="badge ${statusCfg.badge}" style="font-size:10px">${statusCfg.label}</span>` : ""}
+      </div>`;
+  }
+
   container.innerHTML = `
+    <div class="print-header">
+      <h1>${escapeHtml(round.name)} — Audit Report</h1>
+      <p>${new Date().toLocaleDateString()}</p>
+    </div>
+
     <div class="flex items-center justify-between mb-6">
       <div>
         <h1 class="text-2xl">Round Summary</h1>
         <p class="text-sm text-muted mt-1">${escapeHtml(round.name)} &middot; Aggregated across ${files.length} file${files.length !== 1 ? "s" : ""}</p>
       </div>
-      <a href="#/round/${encodeURIComponent(roundName)}" class="btn btn-ghost">
-        ${icon("arrowLeft", 14)} Back to Round
-      </a>
+      <div class="flex items-center gap-2">
+        <button id="export-pdf-btn" class="btn btn-ghost">
+          ${icon("download", 14)} Export PDF
+        </button>
+        <a href="#/round/${encodeURIComponent(roundName)}" class="btn btn-ghost">
+          ${icon("arrowLeft", 14)} Back to Round
+        </a>
+      </div>
     </div>
 
     <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
@@ -137,6 +224,23 @@ export async function renderRoundSummary(container, params) {
           </table>
         </div>
       </div>
+      ${renderFindingsByFile(files)}
     `}
   `;
+
+  document.getElementById("export-pdf-btn")?.addEventListener("click", () => {
+    window.print();
+  });
+
+  const toggleBtn = document.getElementById("toggle-findings-btn");
+  if (toggleBtn) {
+    let showingAll = false;
+    toggleBtn.addEventListener("click", () => {
+      showingAll = !showingAll;
+      container.querySelectorAll(".summary-finding-hidden").forEach(el => {
+        el.style.display = showingAll ? "" : "none";
+      });
+      toggleBtn.textContent = showingAll ? "Show actionable only" : "Show all findings";
+    });
+  }
 }

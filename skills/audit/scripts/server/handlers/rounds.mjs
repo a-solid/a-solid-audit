@@ -7,6 +7,7 @@ import { readYaml, writeYaml, writeIndexYaml, writeCodeTaskYaml } from "../../li
 import { runGitDiff, parseDiffByFile, detectLanguage, taskFileName } from "../../lib/git.mjs";
 import { jsonResponse, errorResponse, readBody } from "../index.mjs";
 import { resolveReportsDir, resolveProjectDir, loadAuditSettings } from "../../lib/paths.mjs";
+import { emitSignal } from "./wait.mjs";
 
 function findRoundDir(projectDir, roundName) {
   const reportsDir = resolveReportsDir(projectDir);
@@ -114,7 +115,7 @@ export function registerRoundRoutes(router, projectDir) {
     jsonResponse(res, { version: nextVersion, roundName: params.roundName }, 201);
   });
 
-  // POST /api/rounds/:roundName/re-review — create new versioned session with need-fix files
+  // POST /api/rounds/:roundName/re-review — create new versioned session with selected tasks
   router.post("/api/rounds/:roundName/re-review", async (req, res, params) => {
     const roundDir = findRoundDir(projectDir, params.roundName);
     if (!roundDir) return errorResponse(res, "Round not found", "NOT_FOUND", 404);
@@ -128,53 +129,81 @@ export function registerRoundRoutes(router, projectDir) {
       return errorResponse(res, "No sessions in this round", "NOT_FOUND", 404);
     }
 
-    // Find latest session
-    const latest = sessions.reduce((a, b) => (a.version || 0) > (b.version || 0) ? a : b);
+    // Find latest session that has actual tasks (skip empty re-review sessions)
+    const latest = sessions.reduce((a, b) => {
+      const aHasTasks = (a.progress?.total || 0) > 0;
+      const bHasTasks = (b.progress?.total || 0) > 0;
+      if (aHasTasks && !bHasTasks) return a;
+      if (!aHasTasks && bHasTasks) return b;
+      return (a.version || 0) > (b.version || 0) ? a : b;
+    });
     const latestIndexPath = resolveSessionPath(reportsDir, params.roundName, latest.id);
     if (!latestIndexPath) return errorResponse(res, "Latest session not found", "NOT_FOUND", 404);
     const latestDir = path.dirname(latestIndexPath);
+    const latestIndex = readYaml(latestIndexPath);
 
-    // Read latest session's review-notes to find need-fix files
-    const notesPath = path.join(latestDir, "review-notes.yaml");
-    const needFixFiles = new Set();
-    if (fs.existsSync(notesPath)) {
-      const notes = readYaml(notesPath);
-      for (const task of notes.tasks || []) {
-        const hasNeedFix = (task.findings || []).some(f => f.status === "need-fix");
-        if (hasNeedFix) {
-          for (const f of task.findings || []) {
-            if (f.file) needFixFiles.add(f.file);
-          }
+    // Determine which tasks to include
+    const selectedTaskFiles = new Set(Array.isArray(body.tasks) ? body.tasks : []);
+
+    // If no tasks specified, fall back to need-fix detection from notes
+    if (selectedTaskFiles.size === 0) {
+      const notesPath = path.join(latestDir, "review-notes.yaml");
+      if (fs.existsSync(notesPath)) {
+        const notes = readYaml(notesPath);
+        for (const task of notes.tasks || []) {
+          const hasNeedFix = (task.findings || []).some(f => f.status === "need-fix");
+          if (hasNeedFix && task.file) selectedTaskFiles.add(task.file);
         }
       }
     }
 
-    // Merge with user-specified files
-    if (Array.isArray(body.files)) {
-      for (const f of body.files) needFixFiles.add(f);
+
+    if (selectedTaskFiles.size === 0) {
+      return errorResponse(res, "No tasks to re-review", "VALIDATION_ERROR", 400);
     }
 
-    if (needFixFiles.size === 0) {
-      return errorResponse(res, "No files to re-review", "VALIDATION_ERROR", 400);
+    // Collect source files from selected tasks
+    const sourceFiles = new Set();
+    const notesPath = path.join(latestDir, "review-notes.yaml");
+    const notes = fs.existsSync(notesPath) ? readYaml(notesPath) : { tasks: [] };
+    for (const tf of selectedTaskFiles) {
+      const noteTask = (notes.tasks || []).find(t => t.file === tf);
+      if (noteTask) {
+        for (const f of noteTask.findings || []) {
+          if (f.file) sourceFiles.add(f.file);
+        }
+      }
     }
 
-    // Create new session
+    // Also read original task YAMLs to get source files for tasks not in notes
+    for (const tf of selectedTaskFiles) {
+      const taskYamlPath = path.join(latestDir, tf);
+      if (fs.existsSync(taskYamlPath)) {
+        const taskData = readYaml(taskYamlPath);
+        if (taskData.name) sourceFiles.add(taskData.name);
+      }
+    }
+
+    // Create new session preserving original type
+    const sessionType = latestIndex.session?.type || "code";
     const maxVersion = sessions.reduce((max, s) => Math.max(max, s.version || 0), 0);
     const nextVersion = maxVersion + 1;
     const versionStr = "v" + nextVersion;
     const result = createSession(reportsDir, params.roundName, versionStr, {
-      type: "code",
+      type: sessionType,
       projectDir: resolveProjectDir(),
     });
 
-    // Generate task YAMLs from uncommitted diff for the need-fix files
+    // Generate code task YAMLs — prefer uncommitted diff, fall back to copying originals
     const diff = runGitDiff("uncommitted", "", projectDir);
     const filesMap = parseDiffByFile(diff);
     const tasksDir = path.join(result.dir, "code-tasks");
     fs.mkdirSync(tasksDir, { recursive: true });
-    const tasks = [];
+    const codeTasks = [];
+    const newCodeTaskFiles = new Map(); // source file → new task file name
 
-    for (const filePath of needFixFiles) {
+    // Try uncommitted diff first for source files
+    for (const filePath of sourceFiles) {
       const fileData = filesMap[filePath];
       if (!fileData) continue;
       const diffText = fileData.diff;
@@ -189,25 +218,84 @@ export function registerRoundRoutes(router, projectDir) {
         diff: diffText, review: { score: 0, summary: "", findings: [], positives: [] },
       };
       writeCodeTaskYaml(path.join(tasksDir, tf), task);
-      tasks.push({ file: "code-tasks/" + tf, name: filePath, status: "pending" });
+      codeTasks.push({ file: "code-tasks/" + tf, name: filePath, status: "pending" });
+      newCodeTaskFiles.set(filePath, "code-tasks/" + tf);
     }
 
-    // Update index.yaml with tasks
+    // For selected code tasks not covered by uncommitted diff, copy original task YAMLs
+    for (const tf of selectedTaskFiles) {
+      if (tf.startsWith("story-tasks/")) continue; // story tasks handled below
+      // Already created from diff?
+      if (codeTasks.some(ct => ct.file === tf)) continue;
+      const origTaskPath = path.join(latestDir, tf);
+      if (!fs.existsSync(origTaskPath)) continue;
+
+      const taskData = readYaml(origTaskPath);
+      // Reset review state
+      taskData.review = { score: 0, summary: "", findings: [], positives: [] };
+      taskData.status = "pending";
+
+      const destFile = path.join(tasksDir, path.basename(tf));
+      writeCodeTaskYaml(destFile, taskData);
+      codeTasks.push({ file: "code-tasks/" + path.basename(tf), name: taskData.name || tf, status: "pending" });
+      if (taskData.name) newCodeTaskFiles.set(taskData.name, "code-tasks/" + path.basename(tf));
+    }
+
+    // Copy story tasks from original session, updating file references
+    const storyTasks = [];
+    const originalStoryTasks = latestIndex.storyTasks || [];
+    const storyTasksDir = path.join(result.dir, "story-tasks");
+    for (const stRef of originalStoryTasks) {
+      const origStoryPath = path.join(latestDir, stRef.file);
+      if (!fs.existsSync(origStoryPath)) continue;
+
+      const storyData = readYaml(origStoryPath);
+      // Filter files to only those with new code tasks
+      const filteredFiles = (storyData.files || []).filter(f => newCodeTaskFiles.has(f.name));
+      if (filteredFiles.length === 0) continue;
+
+      // Update taskFile references
+      storyData.files = filteredFiles.map(f => ({
+        ...f,
+        taskFile: newCodeTaskFiles.get(f.name) || f.taskFile,
+      }));
+
+      fs.mkdirSync(storyTasksDir, { recursive: true });
+      const destPath = path.join(storyTasksDir, path.basename(stRef.file));
+      writeYaml(destPath, storyData);
+      storyTasks.push({ file: stRef.file, name: stRef.name || storyData.name, status: "pending" });
+    }
+
+    // Auto-include stories if none were explicitly selected but session type is "all"
+    // Stories already handled above via originalStoryTasks copy
+
+    // Update index.yaml
     const indexPath = path.join(result.dir, "index.yaml");
     const index = readYaml(indexPath);
     writeIndexYaml(indexPath, {
-      session: { ...index.session, status: "ready" },
-      codeTasks: tasks,
-      storyTasks: [],
+      session: { ...index.session, status: "reviewing" },
+      codeTasks,
+      storyTasks,
       projectTasks: [],
     });
+
+    // Write review-context.md if provided
+    if (body.reviewContext) {
+      fs.writeFileSync(
+        path.join(result.dir, "review-context.md"),
+        `## User Context\n\n${body.reviewContext}\n`,
+      );
+    }
+
+    // Signal /wait so AI detects the new session immediately
+    emitSignal(params.roundName, versionStr, "start");
 
     jsonResponse(res, {
       ok: true,
       version: nextVersion,
       roundName: params.roundName,
-      taskCount: tasks.length,
-      files: tasks.map(t => t.name),
+      taskCount: codeTasks.length + storyTasks.length,
+      files: codeTasks.map(t => t.name),
     });
   });
 

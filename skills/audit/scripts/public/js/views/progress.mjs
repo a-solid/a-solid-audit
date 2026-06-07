@@ -15,7 +15,7 @@ export async function renderProgress(container, params) {
 
   const shortId = sessionId ? sessionId.slice(0, 7) : "";
   setBreadcrumb([
-    { label: "Sessions", href: "#/home" },
+    { label: "Rounds", href: "#/home" },
     ...(shortId ? [{ label: shortId, href: `#/progress/${sessionId}` }] : []),
     { label: "Progress" },
   ]);

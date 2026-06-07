@@ -1,11 +1,12 @@
 // skills/audit/scripts/server/handlers/rounds.mjs
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { sanitizePath, createSession, resolveSessionPath, listSessions } from "../../lib/session.mjs";
 import { readYaml, writeYaml, writeIndexYaml, writeCodeTaskYaml } from "../../lib/yaml.mjs";
 import { runGitDiff, parseDiffByFile, detectLanguage, taskFileName } from "../../lib/git.mjs";
 import { jsonResponse, errorResponse, readBody } from "../index.mjs";
-import { resolveReportsDir, resolveProjectDir } from "../../lib/paths.mjs";
+import { resolveReportsDir, resolveProjectDir, loadAuditSettings } from "../../lib/paths.mjs";
 
 function findRoundDir(projectDir, roundName) {
   const reportsDir = resolveReportsDir(projectDir);
@@ -268,6 +269,153 @@ export function registerRoundRoutes(router, projectDir) {
     const files = [...fileMap.values()];
     const stats = { totalFiles: files.length, totalFindings: 0, needFix: 0, wontFix: 0, notAnIssue: 0, wellDone: 0, pending: 0 };
 
+    for (const f of files) {
+      for (const finding of f.findings || []) {
+        stats.totalFindings++;
+        const s = finding.status || "pending";
+        if (s === "need-fix") stats.needFix++;
+        else if (s === "wont-fix") stats.wontFix++;
+        else if (s === "not-an-issue") stats.notAnIssue++;
+        else if (s === "well-done") stats.wellDone++;
+        else stats.pending++;
+      }
+    }
+
+    jsonResponse(res, { files, stats });
+  });
+
+  // GET /api/projects — list all projects
+  router.get("/api/projects", (req, res) => {
+    const settings = loadAuditSettings();
+    const rawRoot = settings.rootDir || "~/.audit";
+    const rootDir = rawRoot.startsWith("~")
+      ? path.join(os.homedir(), rawRoot.slice(1))
+      : path.resolve(rawRoot);
+    const currentProject = path.basename(projectDir);
+
+    if (!fs.existsSync(rootDir)) return jsonResponse(res, { currentProject, projects: [] });
+
+    const projects = [];
+    for (const entry of fs.readdirSync(rootDir)) {
+      const projDir = path.join(rootDir, entry);
+      if (!fs.statSync(projDir).isDirectory()) continue;
+
+      let roundCount = 0;
+      let latestActivity = null;
+      for (const sub of fs.readdirSync(projDir)) {
+        const roundDir = path.join(projDir, sub);
+        if (!fs.statSync(roundDir).isDirectory()) continue;
+        if (!fs.existsSync(path.join(roundDir, "round.yaml"))) continue;
+        roundCount++;
+        const data = readYaml(path.join(roundDir, "round.yaml"));
+        if (data.created && (!latestActivity || data.created > latestActivity)) {
+          latestActivity = data.created;
+        }
+      }
+
+      projects.push({
+        name: entry,
+        isCurrent: entry === currentProject,
+        roundCount,
+        latestActivity,
+      });
+    }
+
+    jsonResponse(res, { currentProject, projects });
+  });
+
+  // GET /api/projects/:projectName/rounds — read-only round listing for any project
+  router.get("/api/projects/:projectName/rounds", (req, res, params) => {
+    const settings = loadAuditSettings();
+    const rawRoot = settings.rootDir || "~/.audit";
+    const rootDir = rawRoot.startsWith("~")
+      ? path.join(os.homedir(), rawRoot.slice(1))
+      : path.resolve(rawRoot);
+    const safeName = sanitizePath(params.projectName);
+    const projReportsDir = path.join(rootDir, safeName);
+
+    if (!fs.existsSync(projReportsDir)) return jsonResponse(res, []);
+
+    const rounds = [];
+    for (const entry of fs.readdirSync(projReportsDir)) {
+      const roundDir = path.join(projReportsDir, entry);
+      if (!fs.statSync(roundDir).isDirectory()) continue;
+      const roundYaml = path.join(roundDir, "round.yaml");
+      if (!fs.existsSync(roundYaml)) continue;
+      const data = readYaml(roundYaml);
+      const sessions = listSessions(projReportsDir, entry);
+      rounds.push({
+        name: data.name,
+        description: data.description || "",
+        created: data.created,
+        sessions,
+      });
+    }
+    rounds.sort((a, b) => b.created.localeCompare(a.created));
+    jsonResponse(res, rounds);
+  });
+
+  // GET /api/projects/:projectName/rounds/:roundName/summary — read-only findings summary
+  router.get("/api/projects/:projectName/rounds/:roundName/summary", (req, res, params) => {
+    const settings = loadAuditSettings();
+    const rawRoot = settings.rootDir || "~/.audit";
+    const rootDir = rawRoot.startsWith("~")
+      ? path.join(os.homedir(), rawRoot.slice(1))
+      : path.resolve(rawRoot);
+    const safeProject = sanitizePath(params.projectName);
+    const safeRound = sanitizePath(params.roundName);
+    const projReportsDir = path.join(rootDir, safeProject);
+    const roundDir = path.join(projReportsDir, safeRound);
+
+    if (!fs.existsSync(roundDir) || !fs.existsSync(path.join(roundDir, "round.yaml"))) {
+      return errorResponse(res, "Round not found", "NOT_FOUND", 404);
+    }
+
+    const sessions = listSessions(projReportsDir, safeRound);
+    if (sessions.length === 0) {
+      return jsonResponse(res, { files: [], stats: { totalFiles: 0, totalFindings: 0, needFix: 0, wontFix: 0, notAnIssue: 0, wellDone: 0, pending: 0 } });
+    }
+
+    const fileMap = new Map();
+    const sorted = [...sessions].sort((a, b) => (a.version || 0) - (b.version || 0));
+
+    for (const session of sorted) {
+      const indexPath = resolveSessionPath(projReportsDir, safeRound, session.id);
+      if (!indexPath) continue;
+      const sessionDir = path.dirname(indexPath);
+      const index = readYaml(indexPath);
+
+      const allTaskRefs = [...(index.codeTasks || []), ...(index.storyTasks || []), ...(index.projectTasks || [])];
+      for (const ref of allTaskRefs) {
+        const taskPath = path.join(sessionDir, ref.file);
+        if (!fs.existsSync(taskPath)) continue;
+        const task = readYaml(taskPath);
+        fileMap.set(ref.name || ref.file, {
+          name: ref.name || ref.file,
+          latestVersion: session.version || 1,
+          sessionId: session.id,
+          review: task.review || { score: 0, summary: "", findings: [] },
+        });
+      }
+
+      const notesPath = path.join(sessionDir, "review-notes.yaml");
+      if (fs.existsSync(notesPath)) {
+        const notes = readYaml(notesPath);
+        for (const noteTask of notes.tasks || []) {
+          const matchingRef = allTaskRefs.find(r => r.file === noteTask.file);
+          if (matchingRef) {
+            const name = matchingRef.name || matchingRef.file;
+            const existing = fileMap.get(name);
+            if (existing && existing.sessionId === session.id) {
+              existing.findings = noteTask.findings || [];
+            }
+          }
+        }
+      }
+    }
+
+    const files = [...fileMap.values()];
+    const stats = { totalFiles: files.length, totalFindings: 0, needFix: 0, wontFix: 0, notAnIssue: 0, wellDone: 0, pending: 0 };
     for (const f of files) {
       for (const finding of f.findings || []) {
         stats.totalFindings++;

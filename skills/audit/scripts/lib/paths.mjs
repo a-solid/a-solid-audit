@@ -24,7 +24,7 @@ export function resolveProjectDir(explicitDir) {
   return process.cwd();
 }
 
-function loadAuditSettings() {
+export function loadAuditSettings() {
   const settingsPath = path.join(import.meta.dirname, "..", "settings.json");
   if (!fs.existsSync(settingsPath)) return {};
   try {

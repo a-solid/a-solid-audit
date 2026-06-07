@@ -477,7 +477,7 @@ export async function renderReview(container, params) {
       container.querySelectorAll(".finding-reason-panel").forEach(p => p.classList.add("hidden"));
       return;
     }
-    const cards = [...container.querySelectorAll(".finding-card")];
+    const cards = [...container.querySelectorAll(".finding-card, .finding-accordion")];
     if (cards.length === 0) return;
     if (e.key === "j" || e.key === "ArrowDown") {
       e.preventDefault();

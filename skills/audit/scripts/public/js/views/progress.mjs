@@ -91,6 +91,11 @@ export async function renderProgress(container, params) {
         subtitle.textContent = "";
       }
     } else {
+      if (phase === "paused") {
+        heading.textContent = "Review Paused";
+        subtitle.textContent = "AI terminal was disconnected. Click Resume to continue.";
+        return;
+      }
       heading.textContent = "AI Review in Progress";
       subtitle.textContent = "Keep the AI terminal open.";
     }
@@ -197,6 +202,72 @@ export async function renderProgress(container, params) {
       }
 
       if (scanOverlay) scanOverlay.classList.add("hidden");
+
+      // Paused state — show resume button
+      if (session.status === "paused") {
+        updateHeading(false, "paused");
+        document.getElementById("session-badge").innerHTML = `<span class="badge badge-ready">${escapeHtml(session.status)}</span>`;
+
+        let tasks = [];
+        try { tasks = await api.getTasksSummary(roundName, version); } catch (e) { /* ignore */ }
+
+        const total = tasks.length;
+        const reviewed = tasks.filter(t => t.status === "reviewed").length;
+        const pct = total ? Math.round((reviewed / total) * 100) : 0;
+
+        document.getElementById("progress-fill").style.width = pct + "%";
+        document.getElementById("progress-text").textContent = `${reviewed} of ${total} tasks reviewed`;
+        document.getElementById("progress-pct").textContent = pct + "%";
+
+        if (tasks.length > 0) {
+          document.getElementById("task-list").innerHTML = tasks.map(t => {
+            const isReviewed = t.status === "reviewed";
+            return `
+              <div class="card flex items-center justify-between" role="listitem" style="padding:var(--space-3) var(--space-4)">
+                <div class="flex items-center gap-3" style="min-width:0">
+                  ${isReviewed
+                    ? `<span style="color:var(--accent);flex-shrink:0">${icon("check", 16)}</span>`
+                    : `<span style="color:var(--text-muted);flex-shrink:0">${icon("clock", 16)}</span>`
+                  }
+                  <span class="text-sm font-mono truncate">${escapeHtml(t.name || t.file)}</span>
+                </div>
+                <div class="flex items-center gap-3" style="flex-shrink:0">
+                  <span class="badge ${isReviewed ? "complete" : "ai-pending"}">${isReviewed ? "Complete" : "Pending"}</span>
+                </div>
+              </div>`;
+          }).join("");
+        }
+
+        // Show resume button (only once)
+        const existingBtn = document.getElementById("resume-review-btn");
+        if (!existingBtn) {
+          const btnDiv = document.createElement("div");
+          btnDiv.style.cssText = "text-align:center;margin-top:var(--space-4)";
+          btnDiv.innerHTML = `
+            <button id="resume-review-btn" class="btn btn-primary">${icon("refreshCw", 14)} Resume Review</button>
+          `;
+          const taskList = document.getElementById("task-list");
+          if (taskList) taskList.after(btnDiv);
+
+          document.getElementById("resume-review-btn").addEventListener("click", async () => {
+            const btn = document.getElementById("resume-review-btn");
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner spinner-sm"></span> Resuming...';
+            try {
+              await api.advance(roundName, version, { action: "resume" });
+              btnDiv.remove();
+              pollInterval = 3000;
+              pollTimer = setTimeout(poll, pollInterval);
+            } catch (e) {
+              showToast("Failed to resume: " + e.message);
+              btn.disabled = false;
+              btn.innerHTML = `${icon("refreshCw", 14)} Resume Review`;
+            }
+          });
+        }
+
+        return; // Stop polling while paused
+      }
 
       updateHeading(session.type === "project", "reviewing");
 

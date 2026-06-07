@@ -24,11 +24,12 @@ const STATUS_CONFIG = {
   scanning:   { color: "text-info",    badge: "badge-reviewing" },
   scanned:    { color: "text-warning", badge: "badge-ready" },
   grouping:   { color: "text-info",    badge: "badge-reviewing" },
+  paused:     { color: "text-warning", badge: "badge-ready" },
 };
 
 function sessionTarget(status, roundName, version) {
   if (status === "completed") return `#/round/${encodeURIComponent(roundName)}/${version}/review`;
-  if (["reviewing", "scanning", "grouping"].includes(status)) return `#/round/${encodeURIComponent(roundName)}/${version}/progress`;
+  if (["reviewing", "scanning", "grouping", "paused"].includes(status)) return `#/round/${encodeURIComponent(roundName)}/${version}/progress`;
   return `#/round/${encodeURIComponent(roundName)}/${version}/wizard`;
 }
 

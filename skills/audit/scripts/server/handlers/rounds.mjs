@@ -1,16 +1,16 @@
 // skills/audit/scripts/server/handlers/rounds.mjs
 import fs from "node:fs";
 import path from "node:path";
-import { sanitizePath, sessionId, createSession, resolveSessionPath, listSessions } from "../../lib/session.mjs";
+import { sanitizePath, createSession, resolveSessionPath, listSessions } from "../../lib/session.mjs";
 import { readYaml, writeYaml, writeIndexYaml, writeCodeTaskYaml } from "../../lib/yaml.mjs";
 import { runGitDiff, parseDiffByFile, detectLanguage, taskFileName } from "../../lib/git.mjs";
 import { jsonResponse, errorResponse, readBody } from "../index.mjs";
 import { resolveReportsDir, resolveProjectDir } from "../../lib/paths.mjs";
 
-function findRoundDir(projectDir, rid) {
+function findRoundDir(projectDir, roundName) {
   const reportsDir = resolveReportsDir(projectDir);
-  const safeRid = sanitizePath(rid);
-  const roundDir = path.join(reportsDir, safeRid);
+  const safeRound = sanitizePath(roundName);
+  const roundDir = path.join(reportsDir, safeRound);
   if (!fs.existsSync(path.join(roundDir, "round.yaml"))) return null;
   return roundDir;
 }
@@ -31,8 +31,13 @@ export function registerRoundRoutes(router, projectDir) {
     }
 
     const reportsDir = resolveReportsDir(projectDir);
-    const rid = new Date().toISOString().replace(/:/g, "-");
-    const roundDir = path.join(reportsDir, rid);
+    const safeRound = sanitizePath(name);
+    const roundDir = path.join(reportsDir, safeRound);
+
+    if (fs.existsSync(roundDir)) {
+      return errorResponse(res, "Round already exists: " + safeRound, "CONFLICT", 409);
+    }
+
     fs.mkdirSync(roundDir, { recursive: true });
 
     writeYaml(path.join(roundDir, "round.yaml"), {
@@ -41,7 +46,7 @@ export function registerRoundRoutes(router, projectDir) {
       created: new Date().toISOString(),
     });
 
-    jsonResponse(res, { id: rid, name }, 201);
+    jsonResponse(res, { name }, 201);
   });
 
   // GET /api/rounds — list rounds
@@ -57,101 +62,74 @@ export function registerRoundRoutes(router, projectDir) {
       if (!fs.existsSync(roundYaml)) continue;
       const data = readYaml(roundYaml);
 
-      const sessions = [];
-      for (const sub of fs.readdirSync(roundDir)) {
-        const subDir = path.join(roundDir, sub);
-        if (!fs.statSync(subDir).isDirectory()) continue;
-        if (fs.existsSync(path.join(subDir, "index.yaml"))) {
-          const index = readYaml(path.join(subDir, "index.yaml"));
-          sessions.push({
-            id: index.session.id,
-            type: index.session.type,
-            version: index.session.version || 1,
-            status: index.session.status || "created",
-            created: index.session.created,
-          });
-        }
-      }
-      sessions.sort((a, b) => b.created.localeCompare(a.created));
-
-      rounds.push({ id: entry, name: data.name, description: data.description || "", created: data.created, sessions });
+      const sessions = listSessions(reportsDir, entry);
+      rounds.push({
+        name: data.name,
+        description: data.description || "",
+        created: data.created,
+        sessions,
+      });
     }
     rounds.sort((a, b) => b.created.localeCompare(a.created));
     jsonResponse(res, rounds);
   });
 
-  // GET /api/rounds/:roundId — round detail
-  router.get("/api/rounds/:roundId", (req, res, params) => {
-    const roundDir = findRoundDir(projectDir, params.roundId);
+  // GET /api/rounds/:roundName — round detail
+  router.get("/api/rounds/:roundName", (req, res, params) => {
+    const roundDir = findRoundDir(projectDir, params.roundName);
     if (!roundDir) return errorResponse(res, "Round not found", "NOT_FOUND", 404);
 
     const data = readYaml(path.join(roundDir, "round.yaml"));
+    const reportsDir = resolveReportsDir(projectDir);
+    const sessions = listSessions(reportsDir, params.roundName);
 
-    const sessions = [];
-    for (const entry of fs.readdirSync(roundDir)) {
-      const subDir = path.join(roundDir, entry);
-      if (!fs.statSync(subDir).isDirectory()) continue;
-      if (fs.existsSync(path.join(subDir, "index.yaml"))) {
-        const index = readYaml(path.join(subDir, "index.yaml"));
-        const taskRefs = [...(index.codeTasks || []), ...(index.storyTasks || []), ...(index.projectTasks || [])];
-        const reviewed = taskRefs.filter(t => t.status === "reviewed").length;
-        sessions.push({
-          id: index.session.id,
-          type: index.session.type,
-          version: index.session.version || 1,
-          status: index.session.status || "created",
-          created: index.session.created,
-          progress: { total: taskRefs.length, reviewed, percentage: taskRefs.length ? Math.round((reviewed / taskRefs.length) * 100) : 0 },
-        });
-      }
-    }
-    sessions.sort((a, b) => b.created.localeCompare(a.created));
-
-    jsonResponse(res, { id: params.roundId, name: data.name, description: data.description || "", created: data.created, sessions });
+    jsonResponse(res, {
+      name: data.name,
+      description: data.description || "",
+      created: data.created,
+      sessions,
+    });
   });
 
-  // POST /api/rounds/:roundId/sessions — create session within round
-  router.post("/api/rounds/:roundId/sessions", async (req, res, params) => {
-    const roundDir = findRoundDir(projectDir, params.roundId);
+  // POST /api/rounds/:roundName/sessions — create session within round
+  router.post("/api/rounds/:roundName/sessions", async (req, res, params) => {
+    const roundDir = findRoundDir(projectDir, params.roundName);
     if (!roundDir) return errorResponse(res, "Round not found", "NOT_FOUND", 404);
 
     let body = {};
     try { body = JSON.parse(await readBody(req)); } catch {}
 
     const reportsDir = resolveReportsDir(projectDir);
-    const sessions = listSessions(reportsDir, params.roundId);
-    const maxVersion = sessions.reduce((max, s) => Math.max(max, s.version || 1), 0);
+    const sessions = listSessions(reportsDir, params.roundName);
+    const maxVersion = sessions.reduce((max, s) => Math.max(max, s.version || 0), 0);
     const nextVersion = maxVersion + 1;
+    const versionStr = "v" + nextVersion;
 
-    const sid = sessionId();
-    const options = {
+    createSession(reportsDir, params.roundName, versionStr, {
       type: body.type || "code",
       projectDir: resolveProjectDir(),
-      roundId: params.roundId,
-      version: nextVersion,
-    };
+    });
 
-    const result = createSession(reportsDir, sid, options);
-    jsonResponse(res, { id: result.id, version: nextVersion, roundId: params.roundId }, 201);
+    jsonResponse(res, { version: nextVersion, roundName: params.roundName }, 201);
   });
 
-  // POST /api/rounds/:roundId/re-review — create new versioned session with need-fix files
-  router.post("/api/rounds/:roundId/re-review", async (req, res, params) => {
-    const roundDir = findRoundDir(projectDir, params.roundId);
+  // POST /api/rounds/:roundName/re-review — create new versioned session with need-fix files
+  router.post("/api/rounds/:roundName/re-review", async (req, res, params) => {
+    const roundDir = findRoundDir(projectDir, params.roundName);
     if (!roundDir) return errorResponse(res, "Round not found", "NOT_FOUND", 404);
 
     let body = {};
     try { body = JSON.parse(await readBody(req)); } catch {}
 
     const reportsDir = resolveReportsDir(projectDir);
-    const sessions = listSessions(reportsDir, params.roundId);
+    const sessions = listSessions(reportsDir, params.roundName);
     if (sessions.length === 0) {
       return errorResponse(res, "No sessions in this round", "NOT_FOUND", 404);
     }
 
     // Find latest session
-    const latest = sessions.reduce((a, b) => (a.version || 1) > (b.version || 1) ? a : b);
-    const latestIndexPath = resolveSessionPath(reportsDir, latest.id);
+    const latest = sessions.reduce((a, b) => (a.version || 0) > (b.version || 0) ? a : b);
+    const latestIndexPath = resolveSessionPath(reportsDir, params.roundName, latest.id);
     if (!latestIndexPath) return errorResponse(res, "Latest session not found", "NOT_FOUND", 404);
     const latestDir = path.dirname(latestIndexPath);
 
@@ -180,14 +158,12 @@ export function registerRoundRoutes(router, projectDir) {
     }
 
     // Create new session
-    const maxVersion = sessions.reduce((max, s) => Math.max(max, s.version || 1), 0);
+    const maxVersion = sessions.reduce((max, s) => Math.max(max, s.version || 0), 0);
     const nextVersion = maxVersion + 1;
-    const sid = sessionId();
-    const result = createSession(reportsDir, sid, {
+    const versionStr = "v" + nextVersion;
+    const result = createSession(reportsDir, params.roundName, versionStr, {
       type: "code",
       projectDir: resolveProjectDir(),
-      roundId: params.roundId,
-      version: nextVersion,
     });
 
     // Generate task YAMLs from uncommitted diff for the need-fix files
@@ -227,20 +203,20 @@ export function registerRoundRoutes(router, projectDir) {
 
     jsonResponse(res, {
       ok: true,
-      sessionId: sid,
       version: nextVersion,
+      roundName: params.roundName,
       taskCount: tasks.length,
       files: tasks.map(t => t.name),
     });
   });
 
-  // GET /api/rounds/:roundId/summary — round-level summary
-  router.get("/api/rounds/:roundId/summary", (req, res, params) => {
-    const roundDir = findRoundDir(projectDir, params.roundId);
+  // GET /api/rounds/:roundName/summary — round-level summary
+  router.get("/api/rounds/:roundName/summary", (req, res, params) => {
+    const roundDir = findRoundDir(projectDir, params.roundName);
     if (!roundDir) return errorResponse(res, "Round not found", "NOT_FOUND", 404);
 
     const reportsDir = resolveReportsDir(projectDir);
-    const sessions = listSessions(reportsDir, params.roundId);
+    const sessions = listSessions(reportsDir, params.roundName);
     if (sessions.length === 0) {
       return jsonResponse(res, { files: [], stats: { totalFiles: 0, totalFindings: 0, needFix: 0, wontFix: 0, notAnIssue: 0, wellDone: 0, pending: 0 } });
     }
@@ -249,10 +225,10 @@ export function registerRoundRoutes(router, projectDir) {
     const fileMap = new Map();
 
     // Process sessions from oldest to newest so later versions overwrite
-    const sorted = [...sessions].sort((a, b) => (a.version || 1) - (b.version || 1));
+    const sorted = [...sessions].sort((a, b) => (a.version || 0) - (b.version || 0));
 
     for (const session of sorted) {
-      const indexPath = resolveSessionPath(reportsDir, session.id);
+      const indexPath = resolveSessionPath(reportsDir, params.roundName, session.id);
       if (!indexPath) continue;
       const sessionDir = path.dirname(indexPath);
       const index = readYaml(indexPath);

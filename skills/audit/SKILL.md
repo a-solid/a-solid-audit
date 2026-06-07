@@ -30,33 +30,17 @@ This skill operates with **high autonomy**. Do not ask for permission between in
    curl -s http://localhost:3456/api/rounds
    ```
    If this fails, the server didn't start.
-3. Tell the user: "A-Solid Audit server running at http://localhost:3456 — open this URL in your browser to configure the audit."
-4. Create a round (name is the ID):
-   ```bash
-   curl -s -X POST http://localhost:3456/api/rounds \
-     -H 'Content-Type: application/json' \
-     -d '{"name":"audit-round-1"}'
-   # Returns: {"name":"audit-round-1"}
-   ```
-   Note the `name` from the response. This is the `round-name`.
-5. Create a session within the round (auto-assigned version number):
-   ```bash
-   curl -s -X POST http://localhost:3456/api/rounds/audit-round-1/sessions \
-     -H 'Content-Type: application/json' \
-     -d '{"type":"code"}'
-   # Returns: {"version":1,"roundName":"audit-round-1"}
-   ```
-   Note the `version` from the response.
-6. **Wait for user to finish configuring** by calling:
+3. Tell the user: "A-Solid Audit server running at http://localhost:3456. Create a round, add a session, and click Start Review in the browser — I'll detect it and begin the review loop automatically."
+4. **Wait for the user to finish configuring** by calling:
    ```bash
    curl http://localhost:3456/wait
    ```
    This blocks until the user clicks "Start Review" in the browser, or times out after 10 minutes.
-7. When the response arrives with the roundName and version, proceed to the review loop.
+5. When the response arrives with the roundName and version, proceed to the review loop.
 
 ### 2. Begin Review (after /wait resolves)
 
-1. The session should now have status `reviewing` (the browser sets this when the user clicks Start Review).
+1. The session should now have status `reviewing` (the browser sets this when the user clicks Start Review). If the session is `paused`, this means a previous review was interrupted — the `/wait` endpoint will return `Action: resume` when the user clicks Resume.
 2. Confirm the session status:
    ```bash
    curl -s http://localhost:3456/api/rounds/audit-round-1/sessions/v1

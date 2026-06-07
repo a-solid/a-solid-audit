@@ -294,6 +294,7 @@ export function writeIndexYaml(filePath, data) {
   };
   if (data.session.projectDir) session.projectDir = data.session.projectDir;
   if (data.session.roundId) session.roundId = data.session.roundId;
+  if (data.session.roundName) session.roundName = data.session.roundName;
   writeYaml(filePath, {
     session,
     codeTasks: (data.codeTasks || data.tasks || []).map(t => {

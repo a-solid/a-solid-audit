@@ -162,6 +162,10 @@ export function updateSessionStatus(reportsDir, roundName, version, newStatus) {
   if (!indexPath) throw new AppError("Session not found: " + safeRound + "/" + version, "NOT_FOUND", 404);
   const index = readYaml(indexPath);
   const current = index.session.status || "created";
+  // Idempotent — already in target state
+  if (newStatus === current) {
+    return index.session;
+  }
   const type = index.session.type || "code";
 
   const transitions = TRANSITIONS[type] || TRANSITIONS.code;

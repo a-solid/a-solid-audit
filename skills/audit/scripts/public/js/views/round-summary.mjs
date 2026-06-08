@@ -3,20 +3,6 @@ import { api } from "../api.mjs";
 import { showToast, setBreadcrumb, icon, escapeHtml } from "../app.mjs";
 import { scoreColor } from "../constants.mjs";
 
-function relativeTime(dateStr) {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diff = now - then;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(dateStr).toLocaleDateString();
-}
-
 const FINDING_STATUS_CONFIG = {
   "need-fix":   { label: "Need Fix",    badge: "badge-ready",     color: "var(--warning)" },
   "wont-fix":   { label: "Won't Fix",   badge: "badge-created",   color: "var(--text-muted)" },
@@ -25,11 +11,6 @@ const FINDING_STATUS_CONFIG = {
   "pending":    { label: "Pending",     badge: "badge-reviewing",  color: "var(--info)" },
 };
 
-/**
- * Build the SVG ring for the overall score hero.
- * @param {number} score 0-10
- * @param {string} color CSS color for the ring fill
- */
 function scoreRingSVG(score, color) {
   const r = 34;
   const circ = 2 * Math.PI * r;
@@ -43,11 +24,6 @@ function scoreRingSVG(score, color) {
   </svg>`;
 }
 
-/**
- * Build a mini score bar HTML snippet.
- * @param {number} score 0-10
- * @param {string} color CSS color for the fill
- */
 function scoreBarHTML(score, color) {
   const pct = (score / 10) * 100;
   return `<span class="score-bar">
@@ -56,17 +32,42 @@ function scoreBarHTML(score, color) {
   </span>`;
 }
 
+function severityCounts(findings) {
+  const counts = { critical: 0, high: 0, major: 0, medium: 0, minor: 0, low: 0, info: 0 };
+  for (const f of findings) {
+    const sev = (f.severity || "").toLowerCase();
+    if (sev in counts) counts[sev]++;
+    else counts.info++;
+  }
+  return counts;
+}
+
+function severitySummaryHTML(counts) {
+  const sevColorMap = {
+    critical: "var(--danger)", high: "var(--danger)", major: "var(--danger)",
+    medium: "var(--warning)", minor: "var(--warning)", low: "var(--info)", info: "var(--info)",
+  };
+  const displayOrder = ["critical", "high", "major", "medium", "minor", "low", "info"];
+  const items = [];
+  for (const sev of displayOrder) {
+    if (counts[sev] > 0) {
+      items.push(`<span class="severity-summary-item">
+        <span class="severity-dot" style="background:${sevColorMap[sev]}"></span>
+        ${counts[sev]} ${sev}
+      </span>`);
+    }
+  }
+  return items.length ? `<div class="severity-summary">${items.join("")}</div>` : "";
+}
+
 export async function renderRoundSummary(container, params) {
   const roundName = params[0];
   if (!roundName) { location.hash = "#/home"; return; }
 
   setBreadcrumb([{ label: "Rounds", href: "#/home" }]);
-
   container.innerHTML = `<div class="skeleton skeleton-card"></div>`;
 
-  let round;
-  let summary;
-
+  let round, summary;
   try {
     [round, summary] = await Promise.all([
       api.getRound(roundName),
@@ -91,54 +92,78 @@ export async function renderRoundSummary(container, params) {
 
   const { files, stats } = summary;
 
-  // ── Calculate overall average score ──
+  // Overall score
   const scoredFiles = files.filter(f => f.review?.score != null);
   const avgScore = scoredFiles.length
     ? scoredFiles.reduce((sum, f) => sum + f.review.score, 0) / scoredFiles.length
     : null;
   const hasScores = scoredFiles.length > 0;
 
-  // Stat cards with accent attributes
+  // Stat cards
   const statCards = [
     { label: "Total Files", value: stats.totalFiles, icon: "file", accent: "success" },
-    { label: "Findings", value: stats.totalFindings, icon: "alertTriangle", accent: null },
+    { label: "Findings", value: stats.totalFindings, icon: "alertTriangle" },
     { label: "Need Fix", value: stats.needFix, icon: "zap", color: "var(--warning)", accent: "warning" },
-    { label: "Won't Fix", value: stats.wontFix, icon: "minus-circle", accent: null },
-    { label: "Not an Issue", value: stats.notAnIssue, icon: "check", accent: null },
+    { label: "Won't Fix", value: stats.wontFix, icon: "minus-circle" },
+    { label: "Not an Issue", value: stats.notAnIssue, icon: "check" },
     { label: "Well Done", value: stats.wellDone, icon: "shield", color: "var(--success)", accent: "success" },
   ];
 
-  // ── Severity counting helper ──
-  function severityCounts(findings) {
-    const counts = { critical: 0, high: 0, major: 0, medium: 0, minor: 0, low: 0, info: 0 };
-    for (const f of findings) {
-      const sev = (f.severity || "").toLowerCase();
-      if (sev in counts) counts[sev]++;
-      else counts.info++;
-    }
-    return counts;
+  // Score hero
+  let scoreHeroHTML = "";
+  if (hasScores) {
+    const avgRound = Math.round(avgScore * 10) / 10;
+    const heroColor = avgRound >= 7 ? "var(--accent)" : avgRound >= 4 ? "var(--warning)" : "var(--danger)";
+    scoreHeroHTML = `
+      <div class="report-score-hero">
+        <div class="report-score-ring">
+          ${scoreRingSVG(avgRound, heroColor)}
+          <div class="report-score-value" style="color:${heroColor}">${avgRound}</div>
+        </div>
+        <div class="report-score-info">
+          <h2>Overall Score</h2>
+          <p>${scoredFiles.length} file${scoredFiles.length !== 1 ? "s" : ""} reviewed &middot; ${stats.totalFindings} finding${stats.totalFindings !== 1 ? "s" : ""}</p>
+        </div>
+      </div>`;
   }
 
-  function severitySummaryHTML(counts) {
-    const items = [];
-    const sevColorMap = {
-      critical: "var(--danger)", high: "var(--danger)", major: "var(--danger)",
-      medium: "var(--warning)", minor: "var(--warning)", low: "var(--info)", info: "var(--info)",
-    };
-    const displayOrder = ["critical", "high", "major", "medium", "minor", "low", "info"];
-    for (const sev of displayOrder) {
-      if (counts[sev] > 0) {
-        items.push(`<span class="severity-summary-item">
-          <span class="severity-dot" style="background:${sevColorMap[sev]}"></span>
-          ${counts[sev]} ${sev}
-        </span>`);
-      }
+  // Findings rendering
+  const HIGH_SEVERITIES = ["critical", "high", "major"];
+
+  function renderSummaryFinding(f, isHighPriority) {
+    const sevLabel = f.severity.toUpperCase();
+    const sevColor = `var(--${f.severity === "critical" ? "danger" : f.severity === "high" || f.severity === "major" ? "danger" : f.severity === "medium" || f.severity === "minor" ? "warning" : "info"})`;
+    const statusCfg = FINDING_STATUS_CONFIG[f.status || "pending"];
+    const lineInfo = isHighPriority && f.line ? `<span class="text-muted" style="font-size:11px;margin-left:4px">L${f.line}</span>` : "";
+
+    if (!isHighPriority) {
+      return `
+        <div class="finding-accordion summary-finding-hidden">
+          <details>
+            <summary>
+              <span class="accordion-chevron">${icon("chevronRight", 14)}</span>
+              <span class="finding-severity-badge" style="background:${sevColor}">${sevLabel}</span>
+              <span class="accordion-desc-trunc">${escapeHtml(f.description)}</span>
+              ${statusCfg ? `<span class="finding-status-pill finding-status-pill-${f.status || "pending"}">${statusCfg.label}</span>` : ""}
+            </summary>
+            <div class="finding-accordion-body">
+              <div class="finding-description">${escapeHtml(f.description)}</div>
+              ${f.line ? `<div class="text-muted" style="font-size:11px;margin-top:2px">Line ${f.line}</div>` : ""}
+              ${statusCfg ? `<span class="badge ${statusCfg.badge}" style="font-size:10px">${statusCfg.label}</span>` : ""}
+            </div>
+          </details>
+        </div>`;
     }
-    return items.length ? `<div class="severity-summary">${items.join("")}</div>` : "";
+
+    return `
+      <div class="summary-finding-row summary-finding-high-priority">
+        <span class="finding-severity-badge" style="background:${sevColor}">${sevLabel}</span>
+        <span class="summary-finding-desc">${escapeHtml(f.description)}${lineInfo}</span>
+        ${statusCfg ? `<span class="badge ${statusCfg.badge}" style="font-size:10px">${statusCfg.label}</span>` : ""}
+      </div>`;
   }
 
   function renderFindingsByFile(filesData) {
-    const HIGH_SEVERITIES = ["critical", "high", "major"];
     const enrichedFiles = [];
     const allFindings = [];
     for (const f of filesData) {
@@ -177,9 +202,7 @@ export async function renderRoundSummary(container, params) {
           const highPriority = f.findings.filter(f => f.isHighPriority);
           const lowPriority = f.findings.filter(f => !f.isHighPriority);
           if (highPriority.length === 0 && lowPriority.length === 0) return "";
-
           const counts = severityCounts(f.findings);
-
           return `
             <div class="summary-file-section">
               <div class="font-mono text-sm text-muted mb-2 mt-4">${escapeHtml(f.name)}</div>
@@ -191,68 +214,13 @@ export async function renderRoundSummary(container, params) {
       </div>`;
   }
 
-  function renderSummaryFinding(f, isHighPriority) {
-    const sevLabel = f.severity.toUpperCase();
-    const sevColor = `var(--${f.severity === "critical" ? "danger" : f.severity === "high" || f.severity === "major" ? "danger" : f.severity === "medium" || f.severity === "minor" ? "warning" : "info"})`;
-    const statusCfg = FINDING_STATUS_CONFIG[f.status || "pending"];
-
-    // Line number display for high-priority findings
-    const lineInfo = isHighPriority && f.line ? `<span class="text-muted" style="font-size:11px;margin-left:4px">L${f.line}</span>` : "";
-
-    if (!isHighPriority) {
-      // Resolved/low-priority: use accordion
-      return `
-        <div class="finding-accordion summary-finding-hidden">
-          <details>
-            <summary>
-              <span class="accordion-chevron">${icon("chevronRight", 14)}</span>
-              <span class="finding-severity-badge" style="background:${sevColor}">${sevLabel}</span>
-              <span class="accordion-desc-trunc">${escapeHtml(f.description)}</span>
-              ${statusCfg ? `<span class="finding-status-pill finding-status-pill-${f.status || "pending"}">${statusCfg.label}</span>` : ""}
-            </summary>
-            <div class="finding-accordion-body">
-              <div class="finding-description">${escapeHtml(f.description)}</div>
-              ${f.line ? `<div class="text-muted" style="font-size:11px;margin-top:2px">Line ${f.line}</div>` : ""}
-              ${statusCfg ? `<span class="badge ${statusCfg.badge}" style="font-size:10px">${statusCfg.label}</span>` : ""}
-            </div>
-          </details>
-        </div>`;
-    }
-
-    // High-priority: keep existing flat row style
-    return `
-      <div class="summary-finding-row summary-finding-high-priority">
-        <span class="finding-severity-badge" style="background:${sevColor}">${sevLabel}</span>
-        <span class="summary-finding-desc">${escapeHtml(f.description)}${lineInfo}</span>
-        ${statusCfg ? `<span class="badge ${statusCfg.badge}" style="font-size:10px">${statusCfg.label}</span>` : ""}
-      </div>`;
-  }
-
-  // ── Build score hero section ──
-  let scoreHeroHTML = "";
-  if (hasScores) {
-    const avgRound = Math.round(avgScore * 10) / 10;
-    const heroColor = avgRound >= 7 ? "var(--accent)" : avgRound >= 4 ? "var(--warning)" : "var(--danger)";
-    scoreHeroHTML = `
-      <div class="report-score-hero">
-        <div class="report-score-ring">
-          ${scoreRingSVG(avgRound, heroColor)}
-          <div class="report-score-value" style="color:${heroColor}">${avgRound}</div>
-        </div>
-        <div class="report-score-info">
-          <h2>Overall Score</h2>
-          <p>${scoredFiles.length} file${scoredFiles.length !== 1 ? "s" : ""} reviewed &middot; ${stats.totalFindings} finding${stats.totalFindings !== 1 ? "s" : ""}</p>
-        </div>
-      </div>`;
-  }
-
   container.innerHTML = `
     <div class="print-header">
       <h1>${escapeHtml(round.name)} — Audit Report</h1>
       <p>${new Date().toLocaleDateString()}</p>
     </div>
 
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center justify-between mb-6 no-print">
       <div>
         <h1 class="text-2xl">Round Summary</h1>
         <p class="text-sm text-muted mt-1">${escapeHtml(round.name)} &middot; Aggregated across ${files.length} file${files.length !== 1 ? "s" : ""}</p>

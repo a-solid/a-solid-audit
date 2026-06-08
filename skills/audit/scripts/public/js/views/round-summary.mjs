@@ -60,6 +60,11 @@ function severitySummaryHTML(counts) {
   return items.length ? `<div class="severity-summary">${items.join("")}</div>` : "";
 }
 
+function shortFileName(fullName) {
+  const parts = fullName.split("/");
+  return parts[parts.length - 1];
+}
+
 export async function renderRoundSummary(container, params) {
   const roundName = params[0];
   if (!roundName) { location.hash = "#/home"; return; }
@@ -134,7 +139,7 @@ export async function renderRoundSummary(container, params) {
     const sevLabel = f.severity.toUpperCase();
     const sevColor = `var(--${f.severity === "critical" ? "danger" : f.severity === "high" || f.severity === "major" ? "danger" : f.severity === "medium" || f.severity === "minor" ? "warning" : "info"})`;
     const statusCfg = FINDING_STATUS_CONFIG[f.status || "pending"];
-    const lineInfo = isHighPriority && f.line ? `<span class="text-muted" style="font-size:11px;margin-left:4px">L${f.line}</span>` : "";
+    const lineInfo = f.line ? `<span class="text-muted" style="font-size:11px;margin-left:4px">L${f.line}</span>` : "";
 
     if (!isHighPriority) {
       return `
@@ -156,10 +161,10 @@ export async function renderRoundSummary(container, params) {
     }
 
     return `
-      <div class="summary-finding-row summary-finding-high-priority">
+      <div class="summary-finding-row summary-finding-high-priority severity-${f.severity}">
         <span class="finding-severity-badge" style="background:${sevColor}">${sevLabel}</span>
         <span class="summary-finding-desc">${escapeHtml(f.description)}${lineInfo}</span>
-        ${statusCfg ? `<span class="badge ${statusCfg.badge}" style="font-size:10px">${statusCfg.label}</span>` : ""}
+        ${statusCfg ? `<span class="badge ${statusCfg.badge}" style="font-size:10px;flex-shrink:0">${statusCfg.label}</span>` : ""}
       </div>`;
   }
 
@@ -190,7 +195,7 @@ export async function renderRoundSummary(container, params) {
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-lg font-semibold">Findings by File</h2>
           <button id="toggle-findings-btn" class="btn btn-ghost btn-sm">
-            ${hasActionable ? "Show all findings" : "Show actionable only"}
+            Show resolved
           </button>
         </div>
         ${!hasActionable ? `
@@ -203,9 +208,13 @@ export async function renderRoundSummary(container, params) {
           const lowPriority = f.findings.filter(f => !f.isHighPriority);
           if (highPriority.length === 0 && lowPriority.length === 0) return "";
           const counts = severityCounts(f.findings);
+          const displayName = shortFileName(f.name);
           return `
             <div class="summary-file-section">
-              <div class="font-mono text-sm text-muted mb-2 mt-4">${escapeHtml(f.name)}</div>
+              <div class="flex items-center justify-between mb-2">
+                <span class="font-mono text-sm font-medium" title="${escapeHtml(f.name)}">${escapeHtml(displayName)}</span>
+                <span class="text-xs text-muted">${f.findings.length} finding${f.findings.length !== 1 ? "s" : ""}</span>
+              </div>
               ${severitySummaryHTML(counts)}
               ${highPriority.map(f => renderSummaryFinding(f, true)).join("")}
               ${lowPriority.map(f => renderSummaryFinding(f, false)).join("")}
@@ -273,18 +282,19 @@ export async function renderRoundSummary(container, params) {
                 const findings = f.findings || [];
                 const statuses = new Set(findings.filter(fi => fi).map(fi => fi.status || "pending"));
                 const hasScore = f.review?.score != null;
+                const displayName = shortFileName(f.name);
                 return `
                   <tr>
-                    <td class="font-mono text-sm">${escapeHtml(f.name)}</td>
+                    <td class="font-mono text-sm file-name-cell" title="${escapeHtml(f.name)}">${escapeHtml(displayName)}</td>
                     <td style="text-align:center"><span class="version-badge">v${f.latestVersion}</span></td>
                     <td style="text-align:center">${hasScore ? scoreBarHTML(scoreVal, sc) : `<span class="text-muted">—</span>`}</td>
                     <td style="text-align:center">${findings.length}</td>
-                    <td>
-                      <div class="flex items-center gap-1 flex-wrap">
+                    <td class="status-cell">
+                      <div class="status-badges">
                         ${[...statuses].map(st => {
                           const cfg = FINDING_STATUS_CONFIG[st] || FINDING_STATUS_CONFIG.pending;
                           const count = findings.filter(fi => fi && (fi.status || "pending") === st).length;
-                          return `<span class="badge ${cfg.badge}" style="font-size:11px">${count} ${cfg.label}</span>`;
+                          return `<span class="badge ${cfg.badge}" style="font-size:10px">${count} ${cfg.label}</span>`;
                         }).join("")}
                       </div>
                     </td>
@@ -312,9 +322,9 @@ export async function renderRoundSummary(container, params) {
     toggleBtn.addEventListener("click", () => {
       showingAll = !showingAll;
       container.querySelectorAll(".summary-finding-hidden").forEach(el => {
-        el.style.display = showingAll ? "" : "none";
+        el.classList.toggle("finding-visible", showingAll);
       });
-      toggleBtn.innerText = showingAll ? "Show actionable only" : "Show all findings";
+      toggleBtn.innerText = showingAll ? "Hide resolved" : "Show resolved";
     });
   }
 }

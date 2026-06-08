@@ -356,6 +356,7 @@ export function registerRoundRoutes(router, projectDir) {
 
     for (const f of files) {
       for (const finding of f.findings || []) {
+        if (!finding) continue;
         stats.totalFindings++;
         const s = finding.status || "pending";
         if (s === "need-fix") stats.needFix++;
@@ -503,6 +504,7 @@ export function registerRoundRoutes(router, projectDir) {
     const stats = { totalFiles: files.length, totalFindings: 0, needFix: 0, wontFix: 0, notAnIssue: 0, wellDone: 0, pending: 0 };
     for (const f of files) {
       for (const finding of f.findings || []) {
+        if (!finding) continue;
         stats.totalFindings++;
         const s = finding.status || "pending";
         if (s === "need-fix") stats.needFix++;

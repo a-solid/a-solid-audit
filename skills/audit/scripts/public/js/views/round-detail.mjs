@@ -84,7 +84,7 @@ export async function renderRoundDetail(container, params) {
   function hasNeedFix() {
     if (!latestNotes) return false;
     return (latestNotes.tasks || []).some(t =>
-      (t.findings || []).some(f => f.status === "need-fix")
+      (t.findings || []).some(f => f?.status === "need-fix")
     );
   }
 
@@ -225,9 +225,9 @@ export async function renderRoundDetail(container, params) {
     for (const task of latestNotes.tasks || []) {
       const findings = task.findings || [];
       if (findings.length === 0) continue;
-      const needFixCount = findings.filter(f => f.status === "need-fix").length;
-      const totalFindings = findings.length;
-      const sourceFiles = [...new Set(findings.map(f => f.file).filter(Boolean))];
+      const needFixCount = findings.filter(f => f?.status === "need-fix").length;
+      const totalFindings = findings.filter(f => f != null).length;
+      const sourceFiles = [...new Set(findings.map(f => f?.file).filter(Boolean))];
       const isStory = task.file.startsWith("story-tasks/");
       taskMap.set(task.file, {
         file: task.file,

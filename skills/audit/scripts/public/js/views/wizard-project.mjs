@@ -146,13 +146,19 @@ export function renderProjectConfigure(content, state) {
       <button id="project-next" class="btn btn-primary">Next ${icon("chevronRight", 14)}</button>
     </div>`;
 
-  api.getSession(state.roundName, state.version).then(session => {
+  if (!state.isNew) {
+    api.getSession(state.roundName, state.version).then(session => {
+      const dirInput = document.getElementById("project-dir");
+      if (dirInput) {
+        dirInput.value = session.projectDir || state.defaultProjectDir || "";
+      }
+      renderCodegraphStatus("codegraph-status", session.projectDir || state.defaultProjectDir || "");
+    }).catch(() => {});
+  } else {
     const dirInput = document.getElementById("project-dir");
-    if (dirInput) {
-      dirInput.value = session.projectDir || state.defaultProjectDir || "";
-    }
-    renderCodegraphStatus("codegraph-status", session.projectDir || state.defaultProjectDir || "");
-  }).catch(() => {});
+    if (dirInput) dirInput.value = state.defaultProjectDir || "";
+    renderCodegraphStatus("codegraph-status", state.defaultProjectDir || "");
+  }
 
   api.getReviewContext(state.roundName, state.version).then(data => {
     const input = document.getElementById("project-context-input");
@@ -199,6 +205,13 @@ export function renderProjectConfigure(content, state) {
     try {
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner spinner-sm"></span> Saving...';
+      // Create session if this is a new wizard (deferred from step 1)
+      if (state.isNew) {
+        const created = await api.createRoundSession(state.roundName, { type: "project" });
+        state.version = "v" + created.version;
+        state.isNew = false;
+        history.replaceState(null, "", `#/round/${encodeURIComponent(state.roundName)}/${state.version}/wizard`);
+      }
       // Save project directory to session
       const dirInput = document.getElementById("project-dir");
       if (dirInput) {

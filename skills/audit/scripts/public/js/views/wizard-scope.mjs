@@ -51,6 +51,13 @@ export function renderScopeStep(content, state) {
           return;
         }
       }
+      // Create session if this is a new wizard (deferred from step 1)
+      if (state.isNew) {
+        const created = await api.createRoundSession(state.roundName, { type: state.reviewType });
+        state.version = "v" + created.version;
+        state.isNew = false;
+        history.replaceState(null, "", `#/round/${encodeURIComponent(state.roundName)}/${state.version}/wizard`);
+      }
       const result = await api.setScope(state.roundName, state.version, state.scopeMethod, state.scopeRef, state.excludedFiles);
       if (!result.taskCount || result.taskCount === 0) {
         showToast("No changed files found in this scope. Try a different scope or commit changes first.", "warning");

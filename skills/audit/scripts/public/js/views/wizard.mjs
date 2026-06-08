@@ -20,8 +20,8 @@ function formatScopeDisplay(method, ref) {
 
 export async function renderWizard(container, params) {
   const roundName = params[0];
-  const version = params[1];
-  const isNew = !version || version === "new";
+  let version = params[1];
+  let isNew = !version || version === "new";
   let step = 1;
   let prevStep = 0;
   let reviewType = "code";
@@ -158,7 +158,9 @@ export async function renderWizard(container, params) {
   const state = {
     get roundName() { return roundName; },
     get version() { return version; },
+    set version(v) { version = v; },
     get isNew() { return isNew; },
+    set isNew(v) { isNew = v; },
     get step() { return step; },
     set step(v) { step = v; },
     get prevStep() { return prevStep; },
@@ -291,41 +293,7 @@ export async function renderWizard(container, params) {
       });
     });
     document.getElementById("step1-next").addEventListener("click", async () => {
-      const nextBtn = document.getElementById("step1-next");
-      // If new wizard, create session on Next
-      if (isNew) {
-        const originalHTML = nextBtn.innerHTML;
-        nextBtn.disabled = true;
-        nextBtn.innerHTML = '<span class="spinner spinner-sm"></span> Creating...';
-        try {
-          if (!roundName) {
-            showToast("No round specified. Start from the home page.");
-            nextBtn.disabled = false;
-            nextBtn.innerHTML = originalHTML;
-            return;
-          }
-          const result = await api.createRoundSession(roundName, { type: reviewType });
-          location.hash = `#/round/${encodeURIComponent(roundName)}/v${result.version}/wizard`;
-        } catch (e) {
-          showToast("Failed to create session: " + e.message);
-          nextBtn.disabled = false;
-          nextBtn.innerHTML = originalHTML;
-        }
-        return;
-      }
-      // For existing session switching to project, create new session
-      if (reviewType === "project" && !isNew) {
-        // Check if current session is already project type
-        try {
-          const session = await api.getSession(roundName, version);
-          if (session?.type !== "project") {
-            const result = await api.createRoundSession(roundName, { type: "project" });
-            localStorage.removeItem(`audit-wizard-${roundName}-${version}`);
-            location.hash = `#/round/${encodeURIComponent(roundName)}/v${result.version}/wizard`;
-            return;
-          }
-        } catch {}
-      }
+      // Step 1 → 2 is pure navigation; session is created later at scope confirm / project next
       step = 2;
       save();
       render();

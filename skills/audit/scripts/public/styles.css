@@ -2941,12 +2941,11 @@ code {
   flex-shrink: 0;
 }
 
-/* ─── Print Footer (hidden on screen) ─── */
+/* ─── Print Footer & Header (hidden on screen) ─── */
 .print-footer {
   display: none;
 }
 
-/* ─── Print Header ─── */
 .print-header {
   display: none;
 }
@@ -3034,16 +3033,11 @@ code {
   }
 
   /* Score hero in print */
-  .report-score-hero-ring {
-    border-color: #333 !important;
+  .report-score-ring-bg {
+    stroke: #ddd !important;
   }
-  .report-score-hero-value {
+  .report-score-value {
     color: #000 !important;
-  }
-
-  /* Score bars keep their colors */
-  .score-bar-fill {
-    /* keep inline background color from JS */
   }
 
   /* Expand all accordions */

@@ -143,25 +143,26 @@ export async function renderReview(container, params) {
     const task = tasks.find(t => t.file === taskFile);
     if (!task) return;
     const findingsCount = (task.review?.findings || []).length;
-    const noteTask = notes?.tasks?.find(t => t.file === taskFile);
-    const noteFindings = Array.from({ length: findingsCount }, (_, i) => {
-      return noteTask?.findings?.[i] || null;
-    });
-    noteFindings[findingIdx] = status ? { status, reason: reason || "" } : null;
+    if (!notes) notes = { tasks: [] };
+    let noteTask = notes.tasks.find(t => t.file === taskFile);
+    if (!noteTask) {
+      noteTask = { file: taskFile, findings: [] };
+      notes.tasks.push(noteTask);
+    }
+    // Ensure findings array is long enough
+    while (noteTask.findings.length < findingsCount) noteTask.findings.push(null);
+    // Update only the target index — avoids overwriting concurrent changes to other indices
+    noteTask.findings[findingIdx] = status ? { status, reason: reason || "" } : null;
+    const noteFindings = [...noteTask.findings];
     try {
       await api.updateTaskNote(roundName, version, taskFile, { findings: noteFindings });
-      if (!noteTask) {
-        if (!notes) notes = { tasks: [] };
-        const nt = { file: taskFile, findings: noteFindings };
-        notes.tasks.push(nt);
-      } else {
-        noteTask.findings = noteFindings;
-      }
       const f = findings.items.find(fi => fi.file === taskFile && fi.findingIdx === findingIdx);
       if (f) f.status = status;
       showToast(status ? `${status === "need-fix" ? "Need Fix" : status === "wont-fix" ? "Won't Fix" : "Not an Issue"}` : "Reverted", "success");
       render();
     } catch (e) {
+      // Revert local state on failure
+      noteTask.findings[findingIdx] = null;
       showToast("Failed: " + e.message);
     }
   }

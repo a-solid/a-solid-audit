@@ -345,7 +345,11 @@ async function navigate() {
     setTimeout(() => container.classList.remove("fade-in"), 200);
   }
 
-  startActivePolling();
+  // Only poll for active sessions on pages that show the indicator
+  const lastPart = parts[parts.length - 1];
+  if (lastPart !== "review" && lastPart !== "wizard" && lastPart !== "progress" && lastPart !== "settings") {
+    startActivePolling();
+  }
 }
 
 function handleError(e) {

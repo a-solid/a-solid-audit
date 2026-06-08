@@ -273,6 +273,10 @@ async function navigate() {
       // #/round/<roundName>/summary
       render = renderRoundSummary;
       params = [roundName];
+    } else if (parts[2] === "new" && parts[3] === "wizard") {
+      // #/round/<roundName>/new/wizard → new session wizard (type selection)
+      render = renderWizard;
+      params = [roundName, "new"];
     } else if (/^v\d+$/.test(parts[2]) && parts.length >= 4) {
       // #/round/<roundName>/v<N>/<view>
       const version = parts[2];

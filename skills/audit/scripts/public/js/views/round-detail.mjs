@@ -105,7 +105,7 @@ export async function renderRoundDetail(container, params) {
           <a href="#/round/${encodeURIComponent(roundName)}/summary" class="btn btn-ghost">
             ${icon("fileText", 14)} View Report
           </a>
-          ${latestVersion < 10 ? `
+          ${latestVersion < 10 && sessions.length > 0 ? `
             <button id="new-session-btn" class="btn btn-ghost">
               ${icon("plus", 14)} Start New Review
             </button>
@@ -193,17 +193,8 @@ export async function renderRoundDetail(container, params) {
     // New session button
     const newSessionBtn = document.getElementById("new-session-btn");
     if (newSessionBtn) {
-      newSessionBtn.addEventListener("click", async () => {
-        newSessionBtn.disabled = true;
-        newSessionBtn.innerHTML = '<span class="spinner spinner-sm"></span> Creating...';
-        try {
-          const { version } = await api.createRoundSession(roundName, { type: "code" });
-          location.hash = `#/round/${encodeURIComponent(roundName)}/v${version}/wizard`;
-        } catch (e) {
-          showToast("Failed to create session: " + e.message);
-          newSessionBtn.disabled = false;
-          newSessionBtn.innerHTML = `${icon("plus", 14)} New Session`;
-        }
+      newSessionBtn.addEventListener("click", () => {
+        location.hash = `#/round/${encodeURIComponent(roundName)}/new/wizard`;
       });
     }
 
